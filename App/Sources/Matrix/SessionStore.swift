@@ -37,11 +37,12 @@ struct StoredSession: Codable, Equatable {
     }
 }
 
-/// Reads and writes the session in the keychain. The service name is the bundle id,
-/// so a test host and the app never share an entry.
+/// Reads and writes the session in the keychain group the app and its extension share.
 struct SessionStore {
-    var service = Bundle.main.bundleIdentifier ?? Brand.bundleID
+    /// The app's bundle id in both the app and the extension, so both find the same item.
+    var service = Brand.bundleID
     var account = "session"
+    var accessGroup: String? = SharedStorage.keychainAccessGroup
 
     func load() -> StoredSession? {
         var query = baseQuery
@@ -71,9 +72,11 @@ struct SessionStore {
     }
 
     private var baseQuery: [String: Any] {
-        [kSecClass as String: kSecClassGenericPassword,
-         kSecAttrService as String: service,
-         kSecAttrAccount as String: account]
+        var query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                    kSecAttrService as String: service,
+                                    kSecAttrAccount as String: account]
+        if let accessGroup { query[kSecAttrAccessGroup as String] = accessGroup }
+        return query
     }
 }
 

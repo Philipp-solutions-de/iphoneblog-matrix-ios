@@ -1,0 +1,35 @@
+import MatrixRustSDK
+import SwiftUI
+
+/// Stands in for the conversation views until Vendor/ElementX lands: shows the room's name
+/// and says what comes next, so `main` builds and runs at every step.
+@MainActor
+struct PlaceholderChatScreens: ChatScreenProviding {
+    func roomScreen(roomID: String, host: ChatHost) -> AnyView {
+        AnyView(PlaceholderView(roomID: roomID, host: host, title: nil))
+    }
+
+    func threadScreen(roomID: String, rootEventID: String, host: ChatHost) -> AnyView {
+        AnyView(PlaceholderView(roomID: roomID, host: host, title: "Thread"))
+    }
+}
+
+private struct PlaceholderView: View {
+    let roomID: String
+    let host: ChatHost
+    let title: String?
+    @State private var name = ""
+
+    var body: some View {
+        ContentUnavailableView {
+            Label(title ?? name, systemImage: "bubble.left.and.bubble.right")
+        } description: {
+            Text("Nachrichten lesen und schreiben kommt mit dem nächsten Build.")
+        }
+        .navigationTitle(title ?? name)
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            name = (try? host.client.getRoom(roomId: roomID))?.flatMap { $0.displayName() } ?? ""
+        }
+    }
+}

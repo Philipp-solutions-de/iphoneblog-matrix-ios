@@ -6,6 +6,13 @@ struct RoomSummary: Identifiable, Equatable {
     let id: String
     var name: String
     var isDirect: Bool
+    /// Messages since the last read marker.
+    var unreadMessages: Int = 0
+    /// Mentions of me and keyword hits since the last read marker.
+    var unreadMentions: Int = 0
+    var isMarkedUnread = false
+
+    var hasUnread: Bool { unreadMessages > 0 || isMarkedUnread }
 }
 
 /// Mirrors the SDK's room list into something SwiftUI can draw.
@@ -18,6 +25,9 @@ final class RoomListModel: ObservableObject {
 
     var channels: [RoomSummary] { rooms.filter { !$0.isDirect } }
     var directMessages: [RoomSummary] { rooms.filter(\.isDirect) }
+    var withMentions: [RoomSummary] { rooms.filter { $0.unreadMentions > 0 } }
+    /// Direct messages count as mentions: they are meant for you.
+    var badgeCount: Int { rooms.reduce(0) { $0 + ($1.isDirect ? $1.unreadMessages : $1.unreadMentions) } }
 
     private var sdkRooms: [Room] = []
     private var entries: RoomListEntriesWithDynamicAdaptersResult?
@@ -63,9 +73,14 @@ final class RoomListModel: ObservableObject {
         }
         var summaries: [RoomSummary] = []
         for room in sdkRooms {
-            summaries.append(RoomSummary(id: room.id(),
-                                         name: room.displayName() ?? room.id(),
-                                         isDirect: await room.isDirect()))
+            var summary = RoomSummary(id: room.id(), name: room.displayName() ?? room.id(), isDirect: await room.isDirect())
+            if let info = try? await room.roomInfo() {
+                summary.isDirect = info.isDirect
+                summary.unreadMessages = Int(info.numUnreadMessages)
+                summary.unreadMentions = Int(info.numUnreadMentions)
+                summary.isMarkedUnread = info.isMarkedUnread
+            }
+            summaries.append(summary)
         }
         rooms = summaries
         hasLoaded = true

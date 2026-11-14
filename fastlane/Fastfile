@@ -12,6 +12,7 @@
 require "base64"
 require "tmpdir"
 require "securerandom"
+require "shellwords"
 
 default_platform(:ios)
 
@@ -44,6 +45,17 @@ def api_key
   end
 end
 
+def app_store_profile(key, identifier, force: false)
+  get_provisioning_profile(api_key: key, app_identifier: identifier, team_id: team_id, force: force,
+                           output_path: File.join(ROOT, "build/profiles"))
+  [lane_context[SharedValues::SIGH_NAME], lane_context[SharedValues::SIGH_PROFILE_PATH]]
+end
+
+def profile_has_group?(path, group)
+  plist = `security cms -D -i #{Shellwords.escape(path)}`
+  plist.include?("<string>#{group}</string>")
+end
+
 platform :ios do
   # Builds, signs and exports the App Store .ipa; returns the API key.
   # Signing is manual: the team's one Apple Distribution certificate comes from the
@@ -70,11 +82,16 @@ platform :ios do
 
     project = File.join(ROOT, "iphoneblog.xcodeproj")
     profiles = {}
-    # One entry per signed target; the notification extension joins when it exists.
-    { "App" => brand("BUNDLE_ID") }.each do |target, identifier|
-      get_provisioning_profile(api_key: key, app_identifier: identifier, team_id: team_id,
-                               output_path: File.join(ROOT, "build/profiles"))
-      name = lane_context[SharedValues::SIGH_NAME]
+    bundle_id = brand("BUNDLE_ID")
+    group = brand("APP_GROUP_ID")
+    { "App" => bundle_id, "NotificationExtension" => "#{bundle_id}.nse" }.each do |target, identifier|
+      name, path = app_store_profile(key, identifier)
+      # A profile made before the app group was tied to the id lacks it; make it once more.
+      unless profile_has_group?(path, group)
+        UI.important("#{identifier}: profile lacks #{group}, regenerating")
+        name, path = app_store_profile(key, identifier, force: true)
+        UI.user_error!("#{identifier}: #{group} is not tied to the id (docs/apple-setup.md step 6)") unless profile_has_group?(path, group)
+      end
       profiles[identifier] = name
       update_code_signing_settings(path: project, targets: [target], use_automatic_signing: false,
                                    team_id: team_id, code_sign_identity: "Apple Distribution",

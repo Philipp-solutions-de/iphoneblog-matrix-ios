@@ -4,3 +4,5 @@ App/Generated/
 App/Info.plist
 App/App.entitlements
 .DS_Store
+NotificationExtension/Info.plist
+NotificationExtension/NotificationExtension.entitlements

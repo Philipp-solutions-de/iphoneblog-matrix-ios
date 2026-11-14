@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Start a throwaway Synapse on localhost:8008 for the integration test, with one
-# user and two rooms. Writes the variables for scripts/build.sh to build/test-homeserver.env.
+# Start a throwaway Synapse on localhost:8008 for the integration test: the user "tester",
+# two rooms, and a second user who writes a message and mentions the tester in Allgemein. Writes the variables for scripts/build.sh to build/test-homeserver.env.
 #
 #   scripts/test-homeserver.sh start
 #   scripts/test-homeserver.sh stop
@@ -59,14 +59,32 @@ user="tester"
 password="$(openssl rand -hex 16)"
 run register_new_matrix_user -c homeserver.yaml -u "$user" -p "$password" --no-admin "$url" >/dev/null
 
-token="$(curl -fs -X POST "$url/_matrix/client/v3/login" \
-    -d "{\"type\":\"m.login.password\",\"identifier\":{\"type\":\"m.id.user\",\"user\":\"$user\"},\"password\":\"$password\"}" \
-    | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')"
+login() {
+    curl -fs -X POST "$url/_matrix/client/v3/login" \
+        -d "{\"type\":\"m.login.password\",\"identifier\":{\"type\":\"m.id.user\",\"user\":\"$1\"},\"password\":\"$2\"}" \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])'
+}
+
+# A second person who writes to the tester: one message and one mention in Allgemein.
+writer_password="$(openssl rand -hex 16)"
+run register_new_matrix_user -c homeserver.yaml -u writer -p "$writer_password" --no-admin "$url" >/dev/null
+
+token="$(login "$user" "$password")"
+writer="$(login writer "$writer_password")"
 rooms=(Allgemein Artikel)
+allgemein=""
 for name in "${rooms[@]}"; do
-    curl -fs -X POST "$url/_matrix/client/v3/createRoom" -H "Authorization: Bearer $token" \
-        -d "{\"name\":\"$name\",\"preset\":\"private_chat\"}" >/dev/null
+    id="$(curl -fs -X POST "$url/_matrix/client/v3/createRoom" -H "Authorization: Bearer $token" \
+        -d "{\"name\":\"$name\",\"preset\":\"public_chat\"}" \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin)["room_id"])')"
+    [[ "$name" == Allgemein ]] && allgemein="$id"
 done
+curl -fs -X POST "$url/_matrix/client/v3/join/$allgemein" -H "Authorization: Bearer $writer" -d '{}' >/dev/null
+send() {
+    curl -fs -X PUT "$url/_matrix/client/v3/rooms/$allgemein/send/m.room.message/$1" -H "Authorization: Bearer $writer" -d "$2" >/dev/null
+}
+send t1 '{"msgtype":"m.text","body":"Hallo zusammen"}'
+send t2 "{\"msgtype\":\"m.text\",\"body\":\"tester: schau mal\",\"m.mentions\":{\"user_ids\":[\"@$user:localhost\"]}}"
 curl -fs -X POST "$url/_matrix/client/v3/logout" -H "Authorization: Bearer $token" >/dev/null
 
 cat > "$here/build/test-homeserver.env" <<EOF
@@ -74,5 +92,6 @@ IPHONEBLOG_TEST_HOMESERVER=$url
 IPHONEBLOG_TEST_USER=$user
 IPHONEBLOG_TEST_PASSWORD=$password
 IPHONEBLOG_TEST_ROOMS=$(IFS=,; echo "${rooms[*]}")
+IPHONEBLOG_TEST_MENTION_ROOM=Allgemein
 EOF
 echo "test-homeserver: running at $url with user $user and rooms ${rooms[*]}"
