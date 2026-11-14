@@ -112,6 +112,7 @@ final class AppModel: ObservableObject {
 
     func signOut() async {
         guard case .signedIn(let session) = state else { return }
+        await PushCenter.shared.detach()
         await session.stop()
         try? await session.client.logout()
         if let stored = store.load() { MatrixClientFactory.deleteStore(storeID: stored.storeID) }
@@ -155,8 +156,12 @@ final class AppModel: ObservableObject {
     private func begin(_ client: Client) async throws {
         let session = try ChatSession(client: client)
         pendingClient = nil
-        state = .signedIn(session)
+        // Sync first: the screens and the conversation views read its room list service.
         try await session.start()
+        state = .signedIn(session)
+        if !ProcessInfo.processInfo.isRunningTests {
+            await PushCenter.shared.attach(session)
+        }
     }
 
     private func fail(_ error: Error) {
@@ -164,6 +169,11 @@ final class AppModel: ObservableObject {
         errorMessage = String(localized: "Anmeldung fehlgeschlagen. Bitte versuch es noch einmal.")
         state = .signedOut
     }
+}
+
+extension ProcessInfo {
+    /// Unit and integration tests run inside the app; they must not ask for push permission.
+    var isRunningTests: Bool { environment["XCTestConfigurationFilePath"] != nil }
 }
 
 enum AuthError: Error {

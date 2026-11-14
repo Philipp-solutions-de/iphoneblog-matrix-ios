@@ -5,8 +5,12 @@ The iphoneblog community chat: our own SwiftUI app on the Matrix engine
 `matrix.iphoneblog.de`. Members sign in with their iphoneblog.de account. Channels, threads,
 direct messages, mentions, images and reactions; nothing else.
 
-**State: skeleton.** It signs in (blog sign-in, or username and password on a test server)
-and lists the channels. Timelines, threads and push come after the design is agreed.
+**State: the shell.** Sign-in through the blog (MAS at `auth.iphoneblog.de`), the channel list
+with unread and mention badges, four tabs (Chats, Threads, Erwähnungen, Ich), sign-out, push
+through our Sygnal with a notification extension that writes "Name in #channel: text", and the
+iPad split layout. The conversation views (timeline, threads, composer) come from Element X
+under `Vendor/ElementX/`, behind `App/Sources/Bridge/` (docs/architecture.md); until they land
+a channel shows a placeholder.
 
 How it is built and why: [docs/architecture.md](docs/architecture.md).
 

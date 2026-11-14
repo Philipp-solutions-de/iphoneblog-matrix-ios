@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct IphoneblogApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var model = AppModel()
 
     var body: some Scene {
@@ -24,7 +25,7 @@ struct RootView: View {
         case .signedOut, .signingIn:
             SignInView()
         case .signedIn(let session):
-            RoomListView(session: session, rooms: session.rooms)
+            MainView(session: session, router: session.router, rooms: session.rooms)
         }
     }
 }

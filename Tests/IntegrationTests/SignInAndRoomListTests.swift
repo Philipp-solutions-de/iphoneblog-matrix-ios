@@ -35,6 +35,18 @@ final class SignInAndRoomListTests: XCTestCase {
             XCTAssertTrue(names.contains(room), "room \(room) missing; have \(names.sorted())")
         }
 
+        // The second user's mention shows as an unread mention on that room.
+        if let mentionRoom = env["IPHONEBLOG_TEST_MENTION_ROOM"], !mentionRoom.isEmpty {
+            let until = Date().addingTimeInterval(30)
+            while Date() < until, session.rooms.rooms.first(where: { $0.name == mentionRoom })?.unreadMentions ?? 0 == 0 {
+                try await Task.sleep(for: .milliseconds(250))
+            }
+            let room = try XCTUnwrap(session.rooms.rooms.first { $0.name == mentionRoom })
+            XCTAssertGreaterThanOrEqual(room.unreadMentions, 1, "mention not counted")
+            XCTAssertGreaterThanOrEqual(room.unreadMessages, 1, "messages not counted")
+            XCTAssertEqual(session.rooms.withMentions.map(\.name), [mentionRoom])
+        }
+
         await model.signOut()
         store.delete()
     }
