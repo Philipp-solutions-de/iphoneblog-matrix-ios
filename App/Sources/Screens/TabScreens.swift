@@ -27,12 +27,14 @@ struct MentionsView: View {
     }
 }
 
-/// The threads you take part in, across all channels. Comes with the conversation views.
+/// The threads you take part in, across all channels, from the conversation views.
+/// A tap opens the thread in Chats, beside its channel on iPad.
 struct ThreadsView: View {
+    let session: ChatSession
+
     var body: some View {
         NavigationStack {
-            ContentUnavailableView("Deine Threads", systemImage: "bubble.left",
-                                   description: Text("Hier stehen bald alle Threads, in denen du mitredest, die neuesten oben."))
+            ChatScreens.provider.threadsScreen(host: session)
                 .navigationTitle("Threads")
         }
     }

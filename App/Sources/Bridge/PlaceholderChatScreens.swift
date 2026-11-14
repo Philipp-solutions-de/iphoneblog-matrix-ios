@@ -14,6 +14,15 @@ final class PlaceholderChatScreens: ChatScreenProviding {
     func threadScreen(roomID: String, rootEventID: String, host: ChatHost) -> AnyView {
         AnyView(PlaceholderView(roomID: roomID, host: host, title: "Thread"))
     }
+
+}
+
+extension ChatScreenProviding {
+    /// Until the conversation views bring their thread list, the Threads tab says what comes.
+    func threadsScreen(host: ChatHost) -> AnyView {
+        AnyView(ContentUnavailableView("Deine Threads", systemImage: "bubble.left",
+                                       description: Text("Hier stehen bald alle Threads, in denen du mitredest, die neuesten oben.")))
+    }
 }
 
 private struct PlaceholderView: View {
