@@ -1,0 +1,17 @@
+iphoneblog chat for iPhone and iPad
+Copyright 2026 the iphoneblog-matrix-ios authors
+
+This program is free software: you can redistribute it and/or modify it under the terms
+of the GNU Affero General Public License version 3 (LICENSE).
+
+It contains, or will contain under Vendor/ElementX/, code from Element X iOS
+(https://github.com/element-hq/element-x-ios):
+  Copyright 2025 Element Creations Ltd.
+  Copyright 2022-2025 New Vector Ltd.
+  Licensed under AGPL-3.0-only. The original copyright headers stay in every file.
+  Vendor/ElementX/UPSTREAM.md names the release and lists every local change.
+"Element" and the Element logo are trademarks of Element Creations Ltd. This app carries
+neither and is not made, endorsed or supported by Element.
+
+It uses matrix-rust-sdk through matrix-rust-components-swift
+(https://github.com/element-hq/matrix-rust-components-swift), Apache License 2.0.

@@ -54,4 +54,6 @@ The upload is written and switched off. Once Alex's company developer account ex
 
 ## License
 
-Apache License 2.0 (`LICENSE`), like the Matrix SDK it builds on.
+GNU Affero General Public License v3.0 (`LICENSE`). The app takes its timeline, thread and
+composer views from Element X iOS (AGPL-3.0), kept under `Vendor/ElementX/`; `NOTICE` names
+the copyright holders. The skeleton holds no Element X code yet.

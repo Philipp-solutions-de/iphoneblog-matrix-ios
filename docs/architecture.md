@@ -67,26 +67,55 @@ A tap opens the channel or the thread. Unencrypted rooms make this simple: no ke
 with the extension. Apple's notification-filtering entitlement is requested for Alex's
 account so the extension may drop pushes it cannot show.
 
-**Reuse before writing.** The Matrix engine's UI layer (`matrix-sdk-ui`, part of
-matrix-rust-sdk, Apache-2.0, shipped inside the Swift bindings) already does the hard part of
-every screen: it keeps the lists, merges events, pages back, handles threads and sends. Our
-code is the SwiftUI views on top. Element X's own views are AGPL-3.0; copying them would make
-this app AGPL too, so we read them for how they use the SDK and write our own views.
+**Reuse before writing: the SDK's UI layer plus Element X's chat views.** The Matrix engine's
+UI layer (`matrix-sdk-ui`, Apache-2.0, inside the Swift bindings) does the chat logic. For the
+views we take Element X iOS's timeline, thread and composer code instead of writing our own
+(decision 2026-11-14, from the reuse survey `2026-11-14_research-matrix-reuse.md`, option 1).
+That code is AGPL-3.0, so this app is AGPL-3.0 too; the repository is public, as AGPL asks.
 
-| Part | From matrix-sdk-ui / open source | Our own code |
-|---|---|---|
-| Sync | `SyncService` (sliding sync, offline, restart) | start and stop with the app's life cycle |
-| Room list | `RoomListService`, `RoomList` with filters and diffs, unread counts and mention counts per room | `RoomListModel` applies the diffs; the list view |
-| Timeline | `Timeline`: items with sender, grouping, day dividers, edits, redactions, reactions, read receipts, back-pagination, local echo | message row, image row, link card, reaction chips |
-| Threads | `Timeline` focused on a thread (`TimelineConfiguration` with a thread focus), thread summaries on root events, thread subscriptions | thread view, the "5 Antworten" line, the Threads tab |
-| Composer | send queue with retries (`sendQueue`), replies, edits, mentions as `m.mentions`, media upload | the text field, the @-completion list (user search via the SDK) |
-| Media | `getMediaThumbnail`, `getMediaFile`, upload with progress; caches in the SDK store | image view, full-screen viewer |
-| Push | `NotificationClient` in the extension: fetches the event and the sender's name | the extension's text ("Name in #channel: text"), the pusher registration, the tap to open |
-| Sign-in | OAuth 2.0 with PKCE and dynamic client registration in `Client` | one button and `ASWebAuthenticationSession` |
+| Part | From matrix-sdk-ui | From Element X (transplanted, AGPL) | Our own code |
+|---|---|---|---|
+| Sync | `SyncService` | | start and stop with the app's life cycle |
+| Room list | `RoomListService`, filters, diffs, unread and mention counts | | `RoomListModel`, the channel list view (our design) |
+| Timeline | `Timeline`: pagination, local echo, send queue, edits, reactions, receipts | `Screens/Timeline` (cells, list, reactions, replies, thread summaries), `Services/Timeline` (SDK wrapper, view items) | adapters, our colours and type, cells we do not want removed |
+| Threads | thread focus, `ThreadListService`, thread subscriptions | `Screens/ThreadTimelineScreen`, `Screens/RoomThreadListScreen` | the Threads tab across rooms |
+| Composer | send queue, replies, edits, `Mentions`, media upload | the composer toolbar and mention suggestions from `Screens/RoomScreen`, `Other/Pills` | plain-text mode only (no rich-text editor) |
+| Media | thumbnails, files, upload with progress | `Screens/FilePreviewScreen`, `Screens/MediaPickerScreen` | |
+| Design system | | `compound-ios` (needed by the views), recoloured through its override API | our tokens: teal, coral, greys |
+| Push | `NotificationClient` | | extension text, pusher registration, tap routing |
+| Sign-in | OAuth 2.0, PKCE, dynamic registration | | one button, `ASWebAuthenticationSession` |
 
-Not reused on purpose: Element X's screens and its design system compound-ios (both AGPL);
-rich-text editors (we send plain text with mentions). Standby 7's survey of further reuse
-(`2026-11-14_research-matrix-reuse.md`) may move a row; this table follows its ranking.
+Cut while transplanting: encryption and verification UI, calls, polls, location, voice
+messages, the rich-text editor (`WysiwygComposer`), analytics. Element's name and logo never
+appear (trademark).
+
+**Kept apart so it can be re-synced or swapped.**
+
+```
+Vendor/ElementX/            Element X files, unchanged where possible; Element's headers kept
+  UPSTREAM.md               upstream tag, the list of copied paths, every local edit and why
+  Sources/...               same relative paths as upstream (ElementX/Sources/...)
+  compound-ios/
+App/Sources/Bridge/         our adapters: the protocols the copied views expect
+                            (media provider, timeline controller, user indicators, L10n, routing)
+App/Sources/...             our shell: sign-in, room list, settings, navigation, push
+```
+
+- `scripts/sync-elementx.sh <tag>` copies the listed paths from an Element X release into
+  `Vendor/ElementX/` and reapplies `Vendor/ElementX/patches/*.patch` (our local edits, small and
+  named). A re-sync is a diff to review, not a hand merge. We re-sync when a fix we need lands
+  upstream, not on every release.
+- Our code never reaches into Element X's coordinators or services; it talks to the copied
+  views only through `App/Sources/Bridge/`. Swapping the views for exyte/Chat (MIT) later means
+  replacing `Vendor/ElementX/` and the bridge, not the shell.
+- The SDK pin and the vendored Element X tag move separately. The bump workflow moves the SDK;
+  a red build after an SDK bump may need a re-sync of the matching Element X release, which
+  pins the same SDK line.
+
+**Licence.** `LICENSE` is AGPL-3.0. `NOTICE` names Element Creations Ltd and New Vector Ltd
+for the files under `Vendor/ElementX/` (their headers stay), and the Apache-2.0 matrix-rust-sdk.
+Publishing AGPL code on the App Store under Alex's company is a question to settle before
+launch, not before TestFlight.
 
 **What the screens offer** (see the design proposal): channel list with unread markers,
 channel timeline with thread summaries, a thread view, direct messages, mentions with
@@ -128,4 +157,4 @@ API change small, which costs less than a monthly jump over eight releases.
 
 - Fonts: the blog uses Foro and Foro Sans, licensed for the web. Using them in the app needs
   an app licence from the foundry; until then the app uses the system font (SF Pro).
-- Licence: this repository is Apache-2.0, like the SDK. No AGPL code remains.
+- Licence: AGPL-3.0, because of the transplanted Element X views (above). App Store question before launch.
