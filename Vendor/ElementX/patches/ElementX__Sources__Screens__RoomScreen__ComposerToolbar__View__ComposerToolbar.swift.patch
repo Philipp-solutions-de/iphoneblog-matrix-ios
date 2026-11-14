@@ -1,12 +1,32 @@
 --- a/ElementX/Sources/Screens/RoomScreen/ComposerToolbar/View/ComposerToolbar.swift
 +++ b/ElementX/Sources/Screens/RoomScreen/ComposerToolbar/View/ComposerToolbar.swift
-@@ -102,11 +102,11 @@
+@@ -13,6 +13,8 @@
+ import WysiwygComposer
+ 
+ struct ComposerToolbar: View {
++    @Environment(\.chatComposerPlaceholder) private var chatComposerPlaceholder
++    @Environment(\.chatShowsEncryptionNote) private var chatShowsEncryptionNote
+     @Environment(\.verticalSizeClass) private var verticalSizeClass
+     
+     @ObservedObject var context: ComposerToolbarViewModel.Context
+@@ -61,7 +63,8 @@
+         }
+         .readFrame($frame)
+         .safeAreaInset(edge: .top) {
+-            if !context.viewState.isRoomEncrypted {
++            // iphoneblog: the note shows in direct messages only (design screen 05).
++            if !context.viewState.isRoomEncrypted, chatShowsEncryptionNote {
+                 Label {
+                     Text(L10n.commonNotEncrypted)
+                         .font(.compound.bodySM)
+@@ -101,12 +104,12 @@
+                 if context.viewState.isUploading {
                      ProgressView()
                          .scaledFrame(size: Compound.supportsGlass ? 44 : 36, relativeTo: .compound.headingLG)
-                         .scaledPadding(.vertical, trailingButtonVerticalPadding, relativeTo: .compound.headingLG)
+-                        .scaledPadding(.vertical, trailingButtonVerticalPadding, relativeTo: .compound.headingLG)
 -                } else if context.viewState.showSendButton {
 -                    sendButton
--                        .scaledPadding(.vertical, trailingButtonVerticalPadding, relativeTo: .compound.headingLG)
+                         .scaledPadding(.vertical, trailingButtonVerticalPadding, relativeTo: .compound.headingLG)
                  } else {
 -                    voiceMessageRecordingButton(mode: context.viewState.isVoiceMessageModeActivated ? .recording : .idle)
 +                    // iphoneblog: no voice messages to record; the send button stays, greyed until there is text.
@@ -16,3 +36,13 @@
                          .scaledPadding(.vertical, trailingButtonVerticalPadding, relativeTo: .compound.headingLG)
                  }
              }
+@@ -252,7 +255,8 @@
+     }
+     
+     private var composerPlaceholder: String {
+-        L10n.richTextEditorComposerPlaceholder
++        // iphoneblog: "Nachricht an #allgemein" / "Antworten", set by the screen (Shim/ChatScreens.swift).
++        chatComposerPlaceholder ?? L10n.richTextEditorComposerPlaceholder
+     }
+     
+     private var composerView: WysiwygComposerView {

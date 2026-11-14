@@ -8,7 +8,7 @@ Why we reuse it and how it fits the app: docs/architecture.md, "Reuse before wri
 |---|---|
 | Upstream | https://github.com/element-hq/element-x-ios, tag in `UPSTREAM.tag` (today `release/26.11.0`) |
 | Copied | the paths in `paths.txt` (427 Swift files, about 48,000 lines, plus Compound, strings and assets) |
-| Our edits | `patches/` (one patch per upstream file, 9 today) and `Shim/` (our own files) |
+| Our edits | `patches/` (one patch per upstream file, 13 today) and `Shim/` (our own files) |
 | App side | `Adapter/ElementXChatScreens.swift`, the one file the app target compiles |
 
 ## The layout
@@ -62,7 +62,11 @@ controller, media provider) do the rest.
 | `compound-ios/Package.swift` | Compound's snapshot tests are not copied; their target and dependency go |
 | `Other/Extensions/Bundle.swift` | `Bundle.app` means ChatKit's bundle, where the strings and assets are; Element X's meaning stays as `hostApp` |
 | `Other/Pills/PillAttachmentViewProvider.swift` | a preview-only mock in a non-preview code path |
-| `Screens/RoomScreen/ComposerToolbar/View/ComposerToolbar.swift` | no voice-message record button; the send button stays, greyed while empty |
+| `Other/Pills/PillView.swift` | others' mentions in soft teal (`MentionPillColors`), not a dark badge |
+| `Screens/Timeline/View/Style/TimelineStyler.swift` | messages as rows in the design's Slack style (`Shim/TimelineRowStyler.swift`), not bubbles |
+| `Screens/Timeline/View/ItemMenu/TimelineItemMenuActionProvider.swift` | no Forward and no Pin in the message menu |
+| `Screens/RoomScreen/ComposerToolbar/View/RoomAttachmentPicker.swift` | the + menu offers photos, camera and files only: no text formatting, no polls |
+| `Screens/RoomScreen/ComposerToolbar/View/ComposerToolbar.swift` | no voice-message record button (the send button stays, greyed while empty); the placeholder and the "not encrypted" note come from the screen (environment values in `Shim/ChatScreens.swift`) |
 | `Screens/Timeline/View/Supplementary/TimelineReactionsView.swift` | a preview container built on mocks |
 | `Services/Client/ClientProxyProtocol.swift` | the protocol cut to the members the views use; `Shim/ChatClientProxy` implements it |
 | `Services/Room/JoinedRoomProxy.swift` | `reportUtds: false`: no encryption, so no undecryptable events and no hook to report them |
@@ -79,10 +83,17 @@ controller, media provider) do the rest.
 | Analytics (PostHog) and timing (Sentry) | `Shim/Analytics.swift`: records nothing |
 | Bug reports, keychain, device model, UI-test helpers, test fixtures | not needed by the views |
 
+## Looks
+
+Our views (rows, avatars, thread summary, room header) read `ChatKitStyle.current`; Element X's
+views read Compound's tokens, which `ChatKitTheme.apply(_:)` recolours from the same style. The
+app builds the style from its theme file (`Adapter/Theme+Chat.swift`), so design feedback
+changes App/Sources/Theme.swift and nothing here.
+
 ## Still to do
 
-- Hide "Weiterleiten" (forward) and "Fixieren" (pin) in the message menu
-  (`TimelineItemMenuActionProvider`), and polls in the attachment menu.
-- Drop the rich-text editor package: the composer runs in plain-text mode but still links
-  `WysiwygComposer`.
+- The rich-text editor package stays linked: the composer is built around it, and removing it
+  means patching the composer and its view model in about ten places for no visible gain.
+  The formatting entry is gone from the + menu, so it is never switched on.
+- Membership changes ("4 Änderungen im Chat") still show as collapsed rows.
 - A thread list across rooms for the app's Threads tab (`ThreadListService` per room is vendored).

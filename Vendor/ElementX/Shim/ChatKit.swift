@@ -26,25 +26,35 @@ public protocol ChatKitHost: AnyObject {
     func showMessage(_ text: String)
 }
 
-/// The blog's colours for Element X's design tokens. Call once at app start.
+/// The app's look for ChatKit: our own views read `ChatKitStyle.current`, Element X's views read
+/// Compound's design tokens, which are recoloured here. Call once at app start.
 public enum ChatKitTheme {
-    /// - Parameters:
-    ///   - accent: the blog's teal, for accents and icons.
-    ///   - accentText: the darker teal, where white text sits on it or teal text sits on white.
-    ///   - highlight: coral, for what is meant for the reader (mentions, badges).
     @MainActor
-    public static func apply(accent: Color, accentText: Color, highlight: Color) {
+    public static func apply(_ style: ChatKitStyle) {
         registerMentionPills()
+        ChatKitStyle.current = style
+        let c = style.colors
         let colors = Color.compound
-        colors.override(\.textActionAccent, with: accentText)
-        colors.override(\.textLinkExternal, with: accentText)
-        colors.override(\.iconAccentPrimary, with: accent)
-        colors.override(\.iconAccentTertiary, with: accent)
-        colors.override(\.bgAccentRest, with: accent)
-        colors.override(\.bgAccentHovered, with: accentText)
-        colors.override(\.bgAccentPressed, with: accentText)
-        colors.override(\.bgActionPrimaryRest, with: accentText)
-        colors.override(\.bgBadgeAccent, with: highlight)
+        // Text and canvas.
+        colors.override(\.textPrimary, with: c.ink)
+        colors.override(\.textSecondary, with: c.ink2)
+        colors.override(\.bgCanvasDefault, with: c.background)
+        // Links, buttons and accents: teal.
+        colors.override(\.textActionAccent, with: c.accent)
+        colors.override(\.textLinkExternal, with: c.accent)
+        colors.override(\.iconAccentPrimary, with: c.accentBright)
+        colors.override(\.iconAccentTertiary, with: c.accentBright)
+        colors.override(\.bgAccentRest, with: c.accent)
+        colors.override(\.bgAccentHovered, with: c.accent)
+        colors.override(\.bgAccentPressed, with: c.accent)
+        colors.override(\.bgActionPrimaryRest, with: c.accent)
+        // Reactions: yours on soft teal with a teal edge, others' on the raised surface.
+        colors.override(\.bgSubtlePrimary, with: c.accentSoft)
+        colors.override(\.borderInteractivePrimary, with: c.accent)
+        colors.override(\.bgSubtleSecondary, with: c.surface)
+        // Mentions of you: coral on soft coral. Others' mentions: Shim/LeftOut.swift, MentionPillColors.
+        colors.override(\.bgBadgeAccent, with: c.highlightSoft)
+        colors.override(\.textBadgeAccent, with: c.highlight)
     }
 
     /// Element X's app delegate registers the view that draws a mention as a name pill.

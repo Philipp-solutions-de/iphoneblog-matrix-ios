@@ -61,9 +61,7 @@ struct TimelineItemMenuActionProvider {
             }
         }
         
-        if item.isForwardable {
-            actions.append(.forward(itemID: item.id))
-        }
+        // iphoneblog: no forwarding and no pinned messages.
         
         if item.isEditable, canCurrentUserSendMessage {
             if item.supportsMediaCaption {
@@ -83,9 +81,7 @@ struct TimelineItemMenuActionProvider {
             actions.append(.copyPermalink)
         }
         
-        if canCurrentUserPin, let eventID = item.id.eventID {
-            actions.append(pinnedEventIDs.contains(eventID) ? .unpin : .pin)
-        }
+        // iphoneblog: no forwarding and no pinned messages.
         
         if item.isCopyable {
             actions.append(.copy)

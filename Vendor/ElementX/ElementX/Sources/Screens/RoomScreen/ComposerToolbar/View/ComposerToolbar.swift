@@ -13,6 +13,8 @@ import SwiftUI
 import WysiwygComposer
 
 struct ComposerToolbar: View {
+    @Environment(\.chatComposerPlaceholder) private var chatComposerPlaceholder
+    @Environment(\.chatShowsEncryptionNote) private var chatShowsEncryptionNote
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     
     @ObservedObject var context: ComposerToolbarViewModel.Context
@@ -61,7 +63,8 @@ struct ComposerToolbar: View {
         }
         .readFrame($frame)
         .safeAreaInset(edge: .top) {
-            if !context.viewState.isRoomEncrypted {
+            // iphoneblog: the note shows in direct messages only (design screen 05).
+            if !context.viewState.isRoomEncrypted, chatShowsEncryptionNote {
                 Label {
                     Text(L10n.commonNotEncrypted)
                         .font(.compound.bodySM)
@@ -252,7 +255,8 @@ struct ComposerToolbar: View {
     }
     
     private var composerPlaceholder: String {
-        L10n.richTextEditorComposerPlaceholder
+        // iphoneblog: "Nachricht an #allgemein" / "Antworten", set by the screen (Shim/ChatScreens.swift).
+        chatComposerPlaceholder ?? L10n.richTextEditorComposerPlaceholder
     }
     
     private var composerView: WysiwygComposerView {

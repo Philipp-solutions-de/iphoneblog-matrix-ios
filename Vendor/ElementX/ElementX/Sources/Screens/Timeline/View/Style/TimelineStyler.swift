@@ -50,6 +50,7 @@ struct TimelineStyler<Content: View>: View {
     }
     
     var mainContent: some View {
-        TimelineItemBubbledStylerView(timelineItem: timelineItem, adjustedDeliveryStatus: adjustedDeliveryStatus, content: content)
+        // iphoneblog: rows in the design's Slack style instead of bubbles (Shim/TimelineRowStyler.swift).
+        TimelineItemRowStylerView(timelineItem: timelineItem, adjustedDeliveryStatus: adjustedDeliveryStatus, content: content)
     }
 }

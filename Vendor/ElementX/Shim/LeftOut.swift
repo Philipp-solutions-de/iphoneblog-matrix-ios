@@ -117,3 +117,13 @@ enum ComposerConstant {
 
 /// Finds the ChatKit framework's bundle, where Element X's strings and assets are compiled.
 final class ChatKitBundleToken { }
+
+// MARK: - Mention pills
+
+/// Colours of a pill that mentions someone else (Element X: a dark solid badge). Ours: teal text
+/// on soft teal, from the app's theme. A mention of you uses Compound's badge-accent tokens,
+/// which ChatKitTheme sets to coral.
+enum MentionPillColors {
+    @MainActor static var foreground: Color { ChatKitStyle.current.colors.accent }
+    @MainActor static var background: Color { ChatKitStyle.current.colors.accentSoft }
+}

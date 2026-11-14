@@ -232,9 +232,15 @@ final class ChatRoomCoordinator: ChatScreenCoordinator {
     }
 
     func toPresentable() -> AnyView {
-        AnyView(ChatRoomScreen(context: screenViewModel.context,
-                               timelineContext: timelineViewModel.context,
-                               composerToolbar: ComposerToolbar(context: composerViewModel.context)))
+        let info = roomProxy.infoPublisher.value
+        let title = info.isDirect ? info.displayNameOrID : "# \(info.displayNameOrID)"
+        return AnyView(ChatRoomScreen(context: screenViewModel.context,
+                                      timelineContext: timelineViewModel.context,
+                                      composerToolbar: ComposerToolbar(context: composerViewModel.context),
+                                      title: title,
+                                      subtitle: info.isDirect ? nil : ChatKitStrings.members(info.joinedMembersCount))
+            .environment(\.chatComposerPlaceholder, ChatKitStrings.messageTo(title))
+            .environment(\.chatShowsEncryptionNote, info.isDirect))
     }
 
     private func handle(_ action: TimelineViewModelAction) {
@@ -274,12 +280,31 @@ private struct ChatRoomScreen: View {
     @ObservedObject var context: ThreadTimelineScreenViewModelType.Context
     @ObservedObject var timelineContext: TimelineViewModelType.Context
     let composerToolbar: ComposerToolbar
+    let title: String
+    let subtitle: String?
+
+    private var style: ChatKitStyle { ChatKitStyle.current }
 
     var body: some View {
         TimelineView(timelineContext: timelineContext)
             .background(.compound.bgCanvasDefault)
-            .navigationTitle(context.viewState.roomTitle)
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 0) {
+                        Text(title)
+                            .font(style.fonts.roomTitle)
+                            .foregroundStyle(style.colors.ink)
+                        if let subtitle {
+                            Text(subtitle)
+                                .font(style.fonts.roomSubtitle)
+                                .foregroundStyle(style.colors.ink3)
+                        }
+                    }
+                    .lineLimit(1)
+                }
+            }
             .toolbarBackground(.visible, for: .navigationBar)
             .timelineMediaPreview(viewModel: $context.mediaPreviewViewModel)
             .overlay(alignment: .top) {
@@ -363,7 +388,8 @@ final class ChatThreadCoordinator: ChatScreenCoordinator {
     }
 
     func toPresentable() -> AnyView {
-        coordinator.toPresentable()
+        AnyView(coordinator.toPresentable()
+            .environment(\.chatComposerPlaceholder, ChatKitStrings.replyPlaceholder))
     }
 
     private func handle(_ action: ThreadTimelineScreenCoordinatorAction) {
@@ -415,4 +441,23 @@ enum ChatComposer {
 /// Texts ChatKit adds to Element X's. German, like the rest of the app.
 enum ChatKitStrings {
     static let reportNotOffered = "Melden gibt es hier noch nicht. Schreib dem Team eine Direktnachricht."
+
+    /// "1 Antwort", "5 Antworten".
+    static func replies(_ count: Int) -> String {
+        count == 1 ? "1 Antwort" : "\(count) Antworten"
+    }
+
+    /// Composer placeholder in a channel and in a thread.
+    static func messageTo(_ roomName: String) -> String { "Nachricht an \(roomName)" }
+    static let replyPlaceholder = "Antworten"
+
+    /// Under the room's name: "148 Mitglieder".
+    static func members(_ count: Int) -> String { count == 1 ? "1 Mitglied" : "\(count) Mitglieder" }
+}
+
+extension EnvironmentValues {
+    /// The composer's placeholder for this screen; nil keeps Element X's.
+    @Entry var chatComposerPlaceholder: String?
+    /// Whether the composer says the room is not end-to-end encrypted: in direct messages only.
+    @Entry var chatShowsEncryptionNote = false
 }
