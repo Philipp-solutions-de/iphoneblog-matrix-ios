@@ -74,9 +74,15 @@ platform :ios do
       # The app receives pushes; app and extension share the app group.
       wanted = identifier == bundle_id ? [caps::PUSH_NOTIFICATIONS, caps::APP_GROUPS] : [caps::APP_GROUPS]
       present = bundle.get_capabilities.map(&:capability_type)
-      (wanted - present).each do |cap|
-        bundle.update_capability(cap, enabled: true)
-        UI.success("#{identifier}: #{cap} on")
+      wanted.each do |cap|
+        if present.include?(cap)
+          UI.message("#{identifier}: #{cap} already on")
+        else
+          # POST /v1/bundleIdCapabilities. update_capability (PATCH on the bundle id) answers
+          # "Unauthenticated" for an API key.
+          bundle.create_capability(cap)
+          UI.success("#{identifier}: #{cap} on")
+        end
       end
     end
   end
