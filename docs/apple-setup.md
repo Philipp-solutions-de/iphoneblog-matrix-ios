@@ -11,9 +11,9 @@ profiles, builds, uploads) runs in GitHub Actions with one App Store Connect API
 | Bundle id | `de.iphoneblog.matrix.preview` | `de.iphoneblog.zulip.preview` |
 | Extension | `de.iphoneblog.matrix.preview.nse` | `de.iphoneblog.zulip.preview.NotificationService` |
 | App group | `group.de.iphoneblog.matrix.preview` | `group.de.iphoneblog.zulip.preview` |
-| App record name | `iphoneblog Chat Preview` | `iphoneblog Z` |
+| App record name | `iphoneblog Chat Preview` | `iphoneblog Z Preview` |
 | SKU | `iphoneblog-matrix-preview` | `iphoneblog-zulip-preview` |
-| Identifier workflow | `apple-setup.yml` | `apple-ids` |
+| Identifier workflow | `apple-setup.yml` | `apple-setup.yml` |
 
 Checked against Apple's and fastlane's documentation on 2026-11-14; links at each step.
 **Unverified** marks what the documentation does not settle. No key or secret ever goes into
@@ -98,7 +98,7 @@ gh workflow run apple-setup.yml --repo Philipp-solutions-de/iphoneblog-matrix-io
 ```
 
 ```bash
-gh workflow run apple-ids --repo Philipp-solutions-de/iphoneblog-zulip-ios
+gh workflow run apple-setup.yml --repo Philipp-solutions-de/iphoneblog-zulip-ios
 ```
 
 Each registers its app and extension ids and turns on Push Notifications (app) and App Groups
@@ -120,7 +120,7 @@ after step 6), SKU, User Access **Full Access** > **Create**.
 
 There is no API for this (`POST /v1/apps` does not exist), and fastlane's `produce` needs an
 Apple ID login, which we do not use. Names are 2 to 30 characters; bundle ID and SKU cannot
-change later. If a name is taken, use `iphoneblog Matrix Preview` or `iphoneblog Z Preview`
+change later. If a name is taken, use `iphoneblog Matrix Preview` or `iphoneblog Zulip Preview`
 and tell the agent, which updates the repository's config.
 
 ## 8. One push key for both servers
@@ -169,7 +169,7 @@ gh workflow run build.yml --repo Philipp-solutions-de/iphoneblog-matrix-ios --re
 ```
 
 ```bash
-gh workflow run build --repo Philipp-solutions-de/iphoneblog-zulip-ios --ref main
+gh workflow run build.yml --repo Philipp-solutions-de/iphoneblog-zulip-ios --ref main
 ```
 
 When a first build appears (each app > **TestFlight**, after some minutes of processing):
