@@ -17,6 +17,7 @@ final class Router: ObservableObject {
     @Published var selectedRoomID: String?
     @Published var threadPath: [ThreadRoute] = []
     @Published var presentedURL: URL?
+    @Published var notice: String?
 
     func openRoom(_ roomID: String) {
         tab = .chats
@@ -68,6 +69,7 @@ final class ChatSession: ObservableObject, ChatHost {
             try await rooms.attach(to: service.roomListService())
         }
         await syncService?.start()
+        try await ChatScreens.provider.start(host: self)
         displayName = try? await client.displayName()
         log.info("sync started")
     }
@@ -93,6 +95,10 @@ final class ChatSession: ObservableObject, ChatHost {
 
     func openURL(_ url: URL) {
         router.presentedURL = url
+    }
+
+    func showMessage(_ text: String) {
+        router.notice = text
     }
 
     // MARK: - Push

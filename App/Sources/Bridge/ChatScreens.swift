@@ -28,12 +28,17 @@ protocol ChatHost: AnyObject {
     func openRoom(roomID: String)
     /// Opens a web address the way the app wants (in-app Safari).
     func openURL(_ url: URL)
+    /// Shows a short notice (sent, copied, failed) the app's way.
+    func showMessage(_ text: String)
 }
 
 /// What the conversation views give the app. Implemented once in Vendor/ (today Element X's
 /// transplanted views); `PlaceholderChatScreens` stands in until that lands.
 @MainActor
-protocol ChatScreenProviding {
+protocol ChatScreenProviding: AnyObject {
+    /// Called once per signed-in account after sync started, before any screen is asked for.
+    /// Set up per-account state here (Vendor/ElementX: its `ChatKitSession`, theme).
+    func start(host: ChatHost) async throws
     /// A channel or direct message: timeline, composer, reactions, thread summaries.
     func roomScreen(roomID: String, host: ChatHost) -> AnyView
     /// One thread: root message, replies, composer that answers in the thread.

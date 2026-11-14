@@ -29,6 +29,21 @@ struct MainView: View {
         .sheet(item: $router.presentedURL) { url in
             SafariView(url: url).ignoresSafeArea()
         }
+        .overlay(alignment: .bottom) {
+            if let notice = router.notice {
+                Text(notice)
+                    .font(.subheadline.weight(.medium))
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .background(.regularMaterial, in: Capsule())
+                    .padding(.bottom, 90)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .task {
+                        try? await Task.sleep(for: .seconds(2.5))
+                        withAnimation { router.notice = nil }
+                    }
+            }
+        }
+        .animation(.default, value: router.notice)
     }
 }
 

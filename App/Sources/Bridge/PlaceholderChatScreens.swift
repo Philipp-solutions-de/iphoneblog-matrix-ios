@@ -4,7 +4,9 @@ import SwiftUI
 /// Stands in for the conversation views until Vendor/ElementX lands: shows the room's name
 /// and says what comes next, so `main` builds and runs at every step.
 @MainActor
-struct PlaceholderChatScreens: ChatScreenProviding {
+final class PlaceholderChatScreens: ChatScreenProviding {
+    func start(host: ChatHost) async throws { }
+
     func roomScreen(roomID: String, host: ChatHost) -> AnyView {
         AnyView(PlaceholderView(roomID: roomID, host: host, title: nil))
     }
