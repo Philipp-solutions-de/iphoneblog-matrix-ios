@@ -34,6 +34,7 @@ public enum ChatKitTheme {
     ///   - highlight: coral, for what is meant for the reader (mentions, badges).
     @MainActor
     public static func apply(accent: Color, accentText: Color, highlight: Color) {
+        registerMentionPills()
         let colors = Color.compound
         colors.override(\.textActionAccent, with: accentText)
         colors.override(\.textLinkExternal, with: accentText)
@@ -44,6 +45,15 @@ public enum ChatKitTheme {
         colors.override(\.bgAccentPressed, with: accentText)
         colors.override(\.bgActionPrimaryRest, with: accentText)
         colors.override(\.bgBadgeAccent, with: highlight)
+    }
+
+    /// Element X's app delegate registers the view that draws a mention as a name pill.
+    private static var pillsRegistered = false
+    @MainActor
+    private static func registerMentionPills() {
+        guard !pillsRegistered else { return }
+        NSTextAttachment.registerViewProviderClass(PillAttachmentViewProvider.self, forFileType: InfoPlistReader.main.pillsUTType)
+        pillsRegistered = true
     }
 }
 
@@ -101,6 +111,8 @@ public final class ChatKitSession {
                                               userSettings: userSession.userSettings,
                                               analyticsService: analytics,
                                               eventStringBuilder: .pinnedEventStringBuilder(userID: clientProxy.userID))
+        // As Element X's room flow does before it shows a room: live updates for this room.
+        await proxy.subscribeForUpdates()
         roomProxies[roomID] = proxy
         return proxy
     }

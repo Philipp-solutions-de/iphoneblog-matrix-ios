@@ -53,15 +53,15 @@ struct ChatScreenLoader: View {
 
     @StateObject private var presenter = ChatScreenPresenter()
     @StateObject private var holder = CoordinatorHolder()
-    @State private var failed = false
+    @State private var failure: String?
 
     var body: some View {
         Group {
             if let coordinator = holder.coordinator {
                 coordinator.toPresentable()
-            } else if failed {
+            } else if let failure {
                 ContentUnavailableView(L10n.commonError, systemImage: "exclamationmark.bubble",
-                                       description: Text(L10n.errorUnknown))
+                                       description: Text(failure))
             } else {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -76,7 +76,11 @@ struct ChatScreenLoader: View {
                 holder.coordinator = coordinator
             } catch {
                 MXLog.error("ChatKit could not open \(id): \(error)")
-                failed = true
+                #if DEBUG
+                failure = "\(L10n.errorUnknown)\n\(error)"
+                #else
+                failure = L10n.errorUnknown
+                #endif
             }
         }
         .sheet(item: $presenter.sheet, onDismiss: { presenter.sheet?.coordinator.stop() }) { sheet in

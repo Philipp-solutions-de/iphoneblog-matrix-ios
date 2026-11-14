@@ -73,11 +73,15 @@ targets:
       - path: App/Sources
       - path: App/Generated
       - path: App/Resources
+      # The adapter between the app's Bridge and ChatKit (Vendor/ElementX/Adapter).
+      - path: Vendor/ElementX/Adapter
     dependencies:
       - package: MatrixRustSDK
       - target: NotificationExtension
         embed: true
       - target: ChatKit
+      # ChatKit's voice-message playback links Opus and Ogg as dynamic frameworks; the app embeds them.
+      - package: SwiftOGG
     info:
       path: App/Info.plist
       properties:
@@ -99,6 +103,15 @@ targets:
             CFBundleURLSchemes: ["${OAUTH_REDIRECT_SCHEME}"]
         ITSAppUsesNonExemptEncryption: false
         NSPhotoLibraryUsageDescription: Damit du Bilder im Chat teilen kannst.
+        # Read by ChatKit's Element X views (InfoPlistReader): the app group for media caches,
+        # the base bundle id, and the type that carries a mention pill through copy and paste.
+        appGroupIdentifier: ${APP_GROUP_ID}
+        baseBundleIdentifier: ${BUNDLE_ID}
+        NSCameraUsageDescription: Damit du Fotos direkt im Chat aufnehmen kannst.
+        UTExportedTypeDeclarations:
+          - UTTypeConformsTo: [public.text]
+            UTTypeDescription: Mention Pills
+            UTTypeIdentifier: ${BUNDLE_ID}.pills
         UIBackgroundModes: [remote-notification]
         # Read by SharedStorage to name the keychain group the extension shares.
         AppIdentifierPrefix: $(AppIdentifierPrefix)

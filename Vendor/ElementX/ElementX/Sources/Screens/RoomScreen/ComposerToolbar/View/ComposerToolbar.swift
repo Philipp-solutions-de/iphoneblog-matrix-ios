@@ -102,11 +102,11 @@ struct ComposerToolbar: View {
                     ProgressView()
                         .scaledFrame(size: Compound.supportsGlass ? 44 : 36, relativeTo: .compound.headingLG)
                         .scaledPadding(.vertical, trailingButtonVerticalPadding, relativeTo: .compound.headingLG)
-                } else if context.viewState.showSendButton {
-                    sendButton
-                        .scaledPadding(.vertical, trailingButtonVerticalPadding, relativeTo: .compound.headingLG)
                 } else {
-                    voiceMessageRecordingButton(mode: context.viewState.isVoiceMessageModeActivated ? .recording : .idle)
+                    // iphoneblog: no voice messages to record; the send button stays, greyed until there is text.
+                    sendButton
+                        .disabled(!context.viewState.showSendButton)
+                        .opacity(context.viewState.showSendButton ? 1 : 0.4)
                         .scaledPadding(.vertical, trailingButtonVerticalPadding, relativeTo: .compound.headingLG)
                 }
             }

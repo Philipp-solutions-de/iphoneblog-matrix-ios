@@ -112,3 +112,8 @@ enum ComposerConstant {
     static let allowedHeightRange = minHeight...maxHeight
     static let translationThreshold: CGFloat = 60
 }
+
+// MARK: - Bundle
+
+/// Finds the ChatKit framework's bundle, where Element X's strings and assets are compiled.
+final class ChatKitBundleToken { }
