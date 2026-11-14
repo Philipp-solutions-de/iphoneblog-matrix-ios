@@ -1,0 +1,52 @@
+# TestFlight upload. Off until Alex's company developer account exists:
+# the workflow runs this lane only when the repository variable TESTFLIGHT_ENABLED is "true".
+#
+# Needs these repository secrets (README, "TestFlight"):
+#   ASC_KEY_ID, ASC_ISSUER_ID   the App Store Connect API key's id and issuer
+#   ASC_KEY_P8_BASE64           the .p8 file, base64-encoded
+# Signing is automatic: Xcode creates certificates and profiles with the same key.
+
+require "base64"
+require "tmpdir"
+
+default_platform(:ios)
+
+platform :ios do
+  desc "Build the prepared tree and upload it to TestFlight"
+  lane :beta do
+    root = File.expand_path("..", __dir__)
+    tree = File.join(root, "build/element-x-ios")
+    key_path = File.join(Dir.tmpdir, "AuthKey_#{ENV.fetch('ASC_KEY_ID')}.p8")
+    File.write(key_path, Base64.decode64(ENV.fetch("ASC_KEY_P8_BASE64")))
+
+    api_key = app_store_connect_api_key(
+      key_id: ENV.fetch("ASC_KEY_ID"),
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_filepath: key_path
+    )
+
+    build_app(
+      project: File.join(tree, "ElementX.xcodeproj"),
+      scheme: "ElementX",
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: File.join(root, "build/ipa"),
+      xcargs: [
+        "-allowProvisioningUpdates",
+        "-authenticationKeyPath #{key_path}",
+        "-authenticationKeyID #{ENV.fetch('ASC_KEY_ID')}",
+        "-authenticationKeyIssuerID #{ENV.fetch('ASC_ISSUER_ID')}",
+        "CURRENT_PROJECT_VERSION=#{ENV.fetch('BUILD_NUMBER')}",
+        "-skipPackagePluginValidation",
+        "-skipMacroValidation"
+      ].join(" "),
+      export_xcargs: "-allowProvisioningUpdates"
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      skip_waiting_for_build_processing: true,
+      changelog: "Element X #{ENV.fetch('UPSTREAM_TAG', 'unknown')} with the iphoneblog changes."
+    )
+  end
+end
