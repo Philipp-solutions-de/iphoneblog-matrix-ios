@@ -13,6 +13,7 @@ require "base64"
 require "tmpdir"
 require "securerandom"
 require "shellwords"
+require "xcodeproj"
 
 default_platform(:ios)
 
@@ -96,6 +97,14 @@ platform :ios do
       update_code_signing_settings(path: project, targets: [target], use_automatic_signing: false,
                                    team_id: team_id, code_sign_identity: "Apple Distribution",
                                    profile_name: name, bundle_identifier: identifier)
+    end
+
+    # Frameworks built into the app (ChatKit) sign with the same identity and need no profile.
+    Xcodeproj::Project.open(project).targets
+                      .select { |t| t.product_type == "com.apple.product-type.framework" }
+                      .each do |t|
+      update_code_signing_settings(path: project, targets: [t.name], use_automatic_signing: false,
+                                   team_id: team_id, code_sign_identity: "Apple Distribution")
     end
 
     build_app(
