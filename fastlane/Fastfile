@@ -62,7 +62,6 @@ platform :ios do
       project: File.join(ROOT, "iphoneblog.xcodeproj"),
       scheme: "iphoneblog",
       configuration: "Release",
-      export_method: "app-store",
       export_team_id: team_id,
       output_directory: File.join(ROOT, "build/ipa"),
       xcargs: (auth_args + [
@@ -70,9 +69,17 @@ platform :ios do
         "-skipMacroValidation",
         "DEVELOPMENT_TEAM=#{team_id}",
         "CODE_SIGN_STYLE=Automatic",
+        # Archive with the App Store identity: an "Apple Development" archive needs a
+        # development profile, which needs a registered device, which this team has not.
+        "CODE_SIGN_IDENTITY='Apple Distribution'",
         "CURRENT_PROJECT_VERSION=#{ENV.fetch('BUILD_NUMBER')}"
       ]).join(" "),
-      export_xcargs: auth_args.join(" ")
+      export_xcargs: auth_args.join(" "),
+      export_options: {
+        method: "app-store-connect",
+        signingStyle: "automatic",
+        teamID: team_id
+      }
     )
 
     key
