@@ -50,19 +50,20 @@ struct MeView: View {
             List {
                 Section {
                     VStack(spacing: 8) {
-                        InitialsAvatar(name: session.displayName ?? session.userID, size: 84)
+                        InitialsAvatar(name: session.displayName ?? session.userID, size: Theme.Size.profileAvatar)
                         Text(session.displayName ?? session.userID)
-                            .font(.title2.weight(.semibold))
+                            .font(.system(size: 21, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
                         Text(session.userID)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 14))
+                            .foregroundStyle(Theme.ink3)
                     }
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
                 }
 
-                Section("Mitteilungen") {
-                    LabeledContent("Push", value: pushText)
+                Section {
+                    LabeledContent("Mitteilungen", value: pushText)
                     if push.authorization == .denied {
                         Button("In den Einstellungen erlauben") {
                             if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
@@ -70,7 +71,7 @@ struct MeView: View {
                     }
                 }
 
-                Section("Konto") {
+                Section {
                     Button("Konto auf iphoneblog.de") {
                         Task {
                             if let url = await session.accountURL() { session.openURL(url) }
@@ -87,7 +88,13 @@ struct MeView: View {
                         .accessibilityIdentifier("me.signOut")
                 }
             }
-            .navigationTitle("Ich")
+            .scrollContentBackground(.hidden)
+            .background(Theme.background)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Text("Ich").font(Theme.Font.screenTitle).foregroundStyle(Theme.ink)
+                }
+            }
             .task { await push.refreshAuthorization() }
             .confirmationDialog("Auf diesem Gerät abmelden?", isPresented: $confirmSignOut, titleVisibility: .visible) {
                 Button("Abmelden", role: .destructive) {
