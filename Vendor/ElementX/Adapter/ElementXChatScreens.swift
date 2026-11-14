@@ -16,7 +16,7 @@ final class ElementXChatScreens: ChatScreenProviding {
     private var hosts: [ObjectIdentifier: HostAdapter] = [:]
 
     init() {
-        ChatKitTheme.apply(accent: Theme.teal, accentText: Theme.teal, highlight: Theme.coral)
+        ChatKitTheme.apply(accent: Theme.tealBright, accentText: Theme.teal, highlight: Theme.coral)
     }
 
     func start(host: ChatHost) async throws {
