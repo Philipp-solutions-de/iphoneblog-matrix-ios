@@ -59,6 +59,24 @@ targets:
         UIBackgroundModes: [remote-notification]
         # Read by SharedStorage to name the keychain group the extension shares.
         AppIdentifierPrefix: $(AppIdentifierPrefix)
+        # Keys the Element X views in ChatKit read from the app's Info.plist (InfoPlistReader);
+        # a missing one stops the app ("Add <key> into your target's Info.plist").
+        baseBundleIdentifier: ${BUNDLE_ID}
+        appGroupIdentifier: ${APP_GROUP_ID}
+        keychainAccessGroupIdentifier: $(AppIdentifierPrefix)${BUNDLE_ID}
+        productionAppName: ${APP_DISPLAY_NAME}
+        isNightlyBuild: "NO"
+        # Mentions in the composer are text attachments of this exported type.
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: ${BUNDLE_ID}.pills
+            UTTypeDescription: Mention Pills
+            UTTypeConformsTo: [public.text]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Mention Pills
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Owner
+            LSItemContentTypes: ["${BUNDLE_ID}.pills"]
+        LSSupportsOpeningDocumentsInPlace: false
     entitlements:
       path: App/App.entitlements
       properties:
