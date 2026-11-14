@@ -12,10 +12,9 @@ require "tmpdir"
 default_platform(:ios)
 
 platform :ios do
-  desc "Build the prepared tree and upload it to TestFlight"
+  desc "Build the app and upload it to TestFlight"
   lane :beta do
     root = File.expand_path("..", __dir__)
-    tree = File.join(root, "build/element-x-ios")
     key_path = File.join(Dir.tmpdir, "AuthKey_#{ENV.fetch('ASC_KEY_ID')}.p8")
     File.write(key_path, Base64.decode64(ENV.fetch("ASC_KEY_P8_BASE64")))
 
@@ -26,8 +25,8 @@ platform :ios do
     )
 
     build_app(
-      project: File.join(tree, "ElementX.xcodeproj"),
-      scheme: "ElementX",
+      project: File.join(root, "iphoneblog.xcodeproj"),
+      scheme: "iphoneblog",
       configuration: "Release",
       export_method: "app-store",
       output_directory: File.join(root, "build/ipa"),
@@ -46,7 +45,7 @@ platform :ios do
     upload_to_testflight(
       api_key: api_key,
       skip_waiting_for_build_processing: true,
-      changelog: "Element X #{ENV.fetch('UPSTREAM_TAG', 'unknown')} with the iphoneblog changes."
+      changelog: "Build #{ENV.fetch('BUILD_NUMBER')} from #{ENV.fetch('GITHUB_SHA', 'local')[0, 7]}."
     )
   end
 end

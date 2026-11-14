@@ -1,22 +1,17 @@
 name: Build
 
-# Weekly: take upstream's newest Element X release, apply the iphoneblog changes, build.
-# A red scheduled build opens an issue (or comments on the open one).
-# TestFlight runs only when the repository variable TESTFLIGHT_ENABLED is "true"
-# and the App Store Connect secrets exist (README, "TestFlight").
+# Every push and pull request: build, unit tests, and the sign-in test against a
+# throwaway Synapse on the runner. Weekly as well, so a broken runner image shows up
+# before a release needs it; a red scheduled run opens an issue.
+# TestFlight runs only when the repository variable TESTFLIGHT_ENABLED is "true".
 
 on:
-  schedule:
-    - cron: "17 4 * * 1"   # Mondays 04:17 UTC
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Upstream tag, e.g. release/26.11.0 (empty: newest release)"
-        required: false
-        default: ""
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "17 4 * * 1"   # Mondays 04:17 UTC
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -27,11 +22,10 @@ concurrency:
 
 jobs:
   build:
-    name: Simulator build
+    name: Build and test
+    # GitHub's hosted Xcode 27 image (public preview); macos-26 has no Xcode 27.
     runs-on: xcode-27
-    timeout-minutes: 120
-    outputs:
-      tag: ${{ steps.prepare.outputs.tag }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
         with:
@@ -40,99 +34,90 @@ jobs:
       - name: Select Xcode
         run: |
           xcode="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1)"
-          [ -n "$xcode" ] || { echo "No Xcode 27 on this runner:"; ls -d /Applications/Xcode*; exit 1; }
+          [ -n "$xcode" ] || { ls -d /Applications/Xcode*; exit 1; }
           sudo xcode-select -s "$xcode"
           xcodebuild -version
 
       - name: Install tools
-        run: brew install xcodegen
+        run: brew install xcodegen uv
 
-      - name: Prepare iphoneblog tree
-        id: prepare
-        env:
-          TAG: ${{ inputs.tag }}
-        run: |
-          scripts/prepare.sh "$TAG" | tee prepare.log
-          echo "tag=$(tail -1 prepare.log | sed 's/^tag=//')" >> "$GITHUB_OUTPUT"
+      - name: Generate the project
+        run: scripts/configure.sh
 
       - name: Cache Swift packages
         uses: actions/cache@v6
         with:
           path: build/DerivedData/SourcePackages
-          key: spm-${{ hashFiles('build/element-x-ios/Package.resolved', 'build/element-x-ios/ElementX.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          key: spm-${{ hashFiles('project.yml') }}
           restore-keys: spm-
 
-      - name: Build for the simulator
-        run: scripts/build-simulator.sh
+      - name: Build
+        run: scripts/build.sh build
 
-      - name: Keep the build log
+      - name: Unit tests
+        run: scripts/build.sh test
+
+      - name: Start a test homeserver
+        run: scripts/test-homeserver.sh start
+
+      - name: Sign-in test
+        run: |
+          set -a; . build/test-homeserver.env; set +a
+          scripts/build.sh integration
+
+      - name: Keep the logs
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: xcodebuild-log
-          path: build/xcodebuild.log
+          name: logs
+          path: |
+            build/*.log
+            build/synapse/homeserver.log
           if-no-files-found: ignore
-
-      - name: Keep the simulator app
-        uses: actions/upload-artifact@v7
-        with:
-          name: iphoneblog-simulator-app
-          path: build/DerivedData/Build/Products/Debug-iphonesimulator/ElementX.app
-          retention-days: 14
 
   testflight:
     name: TestFlight
     needs: build
-    if: vars.TESTFLIGHT_ENABLED == 'true' && github.event_name != 'pull_request'
+    if: vars.TESTFLIGHT_ENABLED == 'true' && github.event_name == 'push'
     runs-on: xcode-27
-    timeout-minutes: 120
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-
       - name: Select Xcode
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_27*.app | sort -V | tail -1)"
-
       - name: Install tools
         run: |
           brew install xcodegen
           bundle install
-
-      - name: Prepare iphoneblog tree
-        env:
-          TAG: ${{ needs.build.outputs.tag }}
-        run: scripts/prepare.sh "$TAG"
-
+      - name: Generate the project
+        run: scripts/configure.sh
       - name: Build and upload
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
           BUILD_NUMBER: ${{ github.run_number }}
-          UPSTREAM_TAG: ${{ needs.build.outputs.tag }}
         run: bundle exec fastlane ios beta
 
   report:
-    name: Report a red build
+    name: Report a red scheduled build
     needs: [build, testflight]
     if: failure() && github.event_name == 'schedule'
     runs-on: ubuntu-latest
     permissions:
       issues: write
     steps:
-      - name: Open or update the build issue
-        env:
+      - env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          TAG: ${{ needs.build.outputs.tag }}
         run: |
-          gh label create build-failure --color B60205 --description "Weekly build is red" 2>/dev/null || true
-          body="The weekly build failed for upstream ${TAG:-(tag unknown)}: $RUN_URL"
+          gh label create build-failure --color B60205 --description "Scheduled build is red" 2>/dev/null || true
           open="$(gh issue list --label build-failure --state open --json number --jq '.[0].number')"
           if [ -n "$open" ]; then
-            gh issue comment "$open" --body "$body"
+            gh issue comment "$open" --body "Still red: $RUN_URL"
           else
-            gh issue create --title "Weekly build failed" --label build-failure --body "$body"
+            gh issue create --title "Scheduled build failed" --label build-failure --body "$RUN_URL"
           fi

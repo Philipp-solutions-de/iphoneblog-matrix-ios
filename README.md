@@ -1,88 +1,57 @@
-# iphoneblog for iPhone (Matrix)
+# iphoneblog chat for iPhone and iPad
 
-The iphoneblog chat app for iPhone. It is [Element X iOS](https://github.com/element-hq/element-x-ios)
-with a small set of changes: the iphoneblog name, icon and colours, one fixed server
-(`matrix.iphoneblog.de`), push through our own gateway, threads and QR sign-in on, calls
-hidden, no analytics and no crash reports.
+The iphoneblog community chat: our own SwiftUI app on the Matrix engine
+([matrix-rust-sdk](https://github.com/matrix-org/matrix-rust-sdk)), talking to
+`matrix.iphoneblog.de`. Members sign in with their iphoneblog.de account. Channels, threads,
+direct messages, mentions, images and reactions; nothing else.
 
-This repository holds only the changes. Each build takes Element X's newest release and
-applies them, so a new upstream release needs no hand work.
+**State: skeleton.** It signs in (blog sign-in, or username and password on a test server)
+and lists the channels. Timelines, threads and push come after the design is agreed.
 
-This app is not made, endorsed or supported by Element. "Element" is a trademark of
-Element Creations Ltd; the app carries none of its marks.
+How it is built and why: [docs/architecture.md](docs/architecture.md).
 
-## How upstream updates flow
+## Build it
 
-Every Monday the workflow in `.github/workflows/build.yml`:
-
-1. finds the newest `release/x.y.z` tag of `element-hq/element-x-ios`,
-2. runs `scripts/prepare.sh`, which clones that tag and applies the changes below,
-3. builds the app for the simulator on GitHub's `xcode-27` macOS runner (public preview; `macos-26` has no Xcode 27),
-4. uploads it to TestFlight, once that step is switched on (see "TestFlight").
-
-A red scheduled build opens an issue labelled `build-failure`, or comments on the open one.
-The last good TestFlight build stays installed on everyone's phone. A red build almost always
-means upstream moved a line that `scripts/brand.py` expects or changed a hook's signature;
-the error names the file.
-
-Run it by hand: Actions, "Build", "Run workflow", optionally with a tag.
-
-## What is changed
-
-All changes sit in five places. Nothing edits upstream source by hand.
-
-| Where | What it does |
-|---|---|
-| `brand.env` | The one config spot: display name, team id, bundle id, app group, server, push gateway, web pages, colours |
-| `overlay/ElementX/Sources/Iphoneblog/IphoneblogHooks.swift` | Registers Element X's own hooks (`AppHooks.setUp`): fixed account provider, no other servers, push gateway, OAuth pages on the Matrix host, threads and "link new device" on for new installs, the blog's teal for buttons, links and accents, call buttons hidden in rooms, room details, member details and profiles |
-| `overlay/ElementX/Resources/` | App icon, start-screen logo, start-screen and dialog backgrounds in the blog's colours. `scripts/make-assets.py` renders them from `brand/source/` |
-| `scripts/brand.py` | Edits upstream files and stops when a line moved: app name, bundle id, team and app group in `app.yml`; associated domains (Element's out, `matrix.iphoneblog.de` in); `Secrets.swift` emptied, which switches off analytics (PostHog), crash reports (Sentry), bug reports (rageshake) and the map key; Element's name out of the notification sound names; the accent colour; it writes `IphoneblogBrand.swift` from `brand.env` |
-| `patches/` | For changes no hook or script can make: `git apply --3way` applies each `*.patch` in name order. Empty today |
-
-`scripts/check-marks.sh` runs inside `prepare.sh` and fails the build if Element's icon, logo,
-name or domains survive.
-
-## Build it yourself
-
-You need Xcode 27 and `xcodegen` (`brew install xcodegen`).
+You need Xcode 27, `xcodegen` and, for the sign-in test, `uv` (`brew install xcodegen uv`).
 
 ```bash
-scripts/prepare.sh                  # newest release into build/element-x-ios
-scripts/prepare.sh release/26.11.0  # a given release
-scripts/build-simulator.sh          # unsigned simulator build
+scripts/configure.sh               # brand.env → App/Generated/Brand.swift, iphoneblog.xcodeproj
+scripts/build.sh build             # arm64 simulator build
+scripts/build.sh test              # unit tests
+scripts/test-homeserver.sh start   # throwaway Synapse on 127.0.0.1:8008 with a user and two rooms
+set -a; . build/test-homeserver.env; set +a
+scripts/build.sh integration       # sign in and list rooms against it
+scripts/test-homeserver.sh stop
 ```
 
-The app lands in `build/DerivedData/Build/Products/Debug-iphonesimulator/ElementX.app`
-(upstream's product name; the name on the home screen is `iphoneblog`).
+To see the app against the test server, launch it with `IPHONEBLOG_HOMESERVER`, and in a
+debug build `IPHONEBLOG_DEV_USER` and `IPHONEBLOG_DEV_PASSWORD` to sign in by itself.
 
-## What the server must provide
+## Where things are
 
-The app expects these on `matrix.iphoneblog.de`:
-
-- the Matrix client API, with the sign-in service (MAS) at `auth.matrix.iphoneblog.de`
-  and QR login (`experimental_features: msc4108_enabled: true` in Synapse);
-- Sygnal at `/_matrix/push/v1/notify`, with the app id `<BUNDLE_ID>.ios.prod`;
-- `/.well-known/apple-app-site-association` listing `<TEAM_ID>.<BUNDLE_ID>` under
-  `webcredentials` and `applinks`, so the OAuth redirect `https://matrix.iphoneblog.de/oauth/ios/<BUNDLE_ID>` returns to the app;
-- `/apps/ios`, `/app/logo.png`, `/app/impressum`, `/app/terms`, `/app/privacy`, the OAuth client
-  pages. Redirects to the blog's pages are fine; they must start on this host, because the
-  sign-in service rejects client pages on another host.
+| | |
+|---|---|
+| `brand.env` | The one config spot: name, team id, bundle id, server, sign-in pages, colours |
+| `project.yml` | The Xcode project for xcodegen, with the pinned SDK version |
+| `App/Sources/Matrix/` | Everything that touches the SDK: client, session, sync, room list |
+| `App/Sources/Screens/` | SwiftUI screens |
+| `App/Resources/Assets.xcassets` | Icon, logo, colours; `scripts/make-assets.py` renders them from `brand/source/` |
+| `Tests/` | Unit tests, and the sign-in test against a real Synapse |
+| `.github/workflows/build.yml` | Build and tests on every push and weekly; TestFlight when switched on |
+| `.github/workflows/sdk-bump.yml` | Weekly: move the SDK pin to the newest release on branch `sdk-bump` and build it |
 
 ## TestFlight
 
-The upload step is written and switched off. To switch it on, once the Apple developer
-account exists:
+The upload is written and switched off. Once Alex's company developer account exists:
 
-1. Put the account's team id into `TEAM_ID` in `brand.env`.
-2. In App Store Connect create an API key with the Admin role (Admin, because automatic
-   signing registers the app ids, app group and profiles), and the app record for `BUNDLE_ID`.
-3. Add repository secrets `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_KEY_P8_BASE64`
+1. Put its team id into `TEAM_ID` in `brand.env`.
+2. In App Store Connect create the app record for `BUNDLE_ID` and an API key with the Admin
+   role (automatic signing registers the app id, app group and profiles with it).
+3. Add the repository secrets `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_KEY_P8_BASE64`
    (`base64 -i AuthKey_XXXX.p8`).
-4. Create the APNs key for Sygnal (Certificates, Keys; Apple Push Notifications service).
-5. Set the repository variable `TESTFLIGHT_ENABLED` to `true` and run the workflow.
+4. Create the APNs key for Sygnal (app id `de.iphoneblog.matrix.ios.prod`).
+5. Set the repository variable `TESTFLIGHT_ENABLED` to `true`.
 
 ## License
 
-Element X iOS is licensed under the GNU Affero General Public License v3.0 (`LICENSE`).
-This repository and every build made from it are under the same licence, and the source of
-every build is this repository plus the upstream tag the build names.
+Apache License 2.0 (`LICENSE`), like the Matrix SDK it builds on.
