@@ -113,6 +113,16 @@ public final class ChatKitSession {
         })
     }
 
+    /// Every thread you take part in, across all rooms, newest first. The app gives it its title.
+    public func threadsView(host: ChatKitHost) -> AnyView {
+        AnyView(ChatThreadsListView(model: self.threadsModel,
+                                    mediaProvider: userSession.mediaProvider) { [weak host] entry in
+            host?.openThread(roomID: entry.roomID, rootEventID: entry.rootEventID)
+        })
+    }
+
+    private lazy var threadsModel = ChatThreadsListModel(client: self.clientProxy.client, ownUserID: self.clientProxy.userID)
+
     func joinedRoomProxy(_ roomID: String) async throws -> JoinedRoomProxyProtocol {
         if let proxy = roomProxies[roomID] { return proxy }
         let room = try roomListService.room(roomId: roomID)
