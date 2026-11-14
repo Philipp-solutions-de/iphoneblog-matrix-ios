@@ -415,3 +415,23 @@ ElementX/Sources/Screens/HomeScreen/View/Filters/RoomListFilterModels.swift
 !ElementX/Sources/Screens/RoomScreen/View/RoomScreenFooterView.swift
 !ElementX/Sources/Screens/RoomScreen/View/KnockRequestsBannerView.swift
 !ElementX/Sources/Screens/RoomScreen/View/PinnedItemsBanner
+
+# Implementations behind the protocols: Element X's wrappers around the SDK
+ElementX/Sources/Services/Room
+ElementX/Sources/Services/Timeline
+ElementX/Sources/Services/Media
+ElementX/Sources/Services/ComposerDraft
+ElementX/Sources/Services/LinkMetadata
+ElementX/Sources/Services/Users
+!ElementX/Sources/Services/Room/RoomPreview
+!ElementX/Sources/Services/Room/InvitedRoomProxy.swift
+!ElementX/Sources/Services/Room/KnockedRoomProxy.swift
+!ElementX/Sources/Services/Room/BannedRoomProxy.swift
+!ElementX/Sources/Services/Users/UserDiscoveryService.swift
+!ElementX/Sources/Services/Users/UserDiscoveryServiceProtocol.swift
+!ElementX/Sources/Services/Users/UserDiscoverySection.swift
+!ElementX/Sources/Services/Room/RoomSummary/RoomSummaryProvider.swift
+
+# Reactions and image sending
+ElementX/Sources/Screens/EmojiPickerScreen
+ElementX/Sources/Screens/MediaUploadPreviewScreen

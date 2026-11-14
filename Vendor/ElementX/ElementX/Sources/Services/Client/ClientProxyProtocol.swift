@@ -123,6 +123,8 @@ protocol ClientProxyProtocol: AnyObject {
     
     var mediaLoader: MediaLoaderProtocol { get }
     
+    var maxMediaUploadSize: Result<UInt, ClientProxyError> { get async }
+    
     func roomSummaryForIdentifier(_ identifier: String) -> RoomSummary?
     
     func roomSummaryForAlias(_ alias: String) -> RoomSummary?

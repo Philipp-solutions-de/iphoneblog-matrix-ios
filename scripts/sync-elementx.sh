@@ -116,7 +116,7 @@ case "$mode" in
             fail=0
             for top in ElementX compound-ios; do
                 [[ -d "$work/$top" || -d "$vendor/$top" ]] || continue
-                diff -rq -x .DS_Store "$work/$top" "$vendor/$top" || fail=1
+                diff -rq -x .DS_Store -x .swiftpm "$work/$top" "$vendor/$top" || fail=1
             done
             [[ $fail == 0 ]] && echo "sync-elementx: Vendor/ElementX matches $tag plus patches"
             exit $fail

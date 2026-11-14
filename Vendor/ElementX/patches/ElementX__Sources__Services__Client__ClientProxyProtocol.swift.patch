@@ -8,7 +8,7 @@
  import Foundation
  import MatrixRustSDK
  
-@@ -109,205 +108,26 @@
+@@ -109,205 +108,28 @@
      let isLive: Bool
  }
  
@@ -84,8 +84,8 @@
 -    
 -    var isLoginWithQRCodeSupported: Bool { get async }
 -    
--    var maxMediaUploadSize: Result<UInt, ClientProxyError> { get async }
--    
+     var maxMediaUploadSize: Result<UInt, ClientProxyError> { get async }
+     
 -    func isOnlyDeviceLeft() async -> Result<Bool, ClientProxyError>
 -    
 -    func hasDevicesToVerifyAgainst() async -> Result<Bool, ClientProxyError>

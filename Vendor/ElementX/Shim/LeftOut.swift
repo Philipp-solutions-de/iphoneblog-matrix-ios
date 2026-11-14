@@ -5,6 +5,7 @@
 // patch"). Each keeps the upstream name, so the vendored code that refers to it compiles unchanged.
 
 import Compound
+import MatrixRustSDK
 import SwiftUI
 
 // MARK: - Location (Element X draws a MapLibre map; we show a line that opens Apple Maps)
@@ -55,8 +56,16 @@ private struct LeftOutLocationLabel: View {
 /// Element Call is not part of our app. The room proxy's protocol still names the driver.
 protocol ElementCallWidgetDriverProtocol { }
 
+struct ElementCallWidgetDriver: ElementCallWidgetDriverProtocol {
+    init(room: RoomProtocol, deviceID: String) { }
+}
+
 /// Live location sharing is not part of our app. The room proxy's protocol still names it.
 protocol RoomLiveLocationServiceProtocol { }
+
+struct RoomLiveLocationService: RoomLiveLocationServiceProtocol {
+    init(liveLocationsObserver: LiveLocationsObserver) async { }
+}
 
 /// Element X's service that shares the user's own live location. We never share; stopping is a no-op.
 protocol LiveLocationServiceProtocol {

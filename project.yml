@@ -52,6 +52,9 @@ packages:
   LRUCache:
     url: https://github.com/nicklockwood/LRUCache
     exactVersion: 1.3.0
+  Mantis:
+    url: https://github.com/guoyingtao/Mantis
+    exactVersion: 3.1.0
   SwiftFlow:
     url: https://github.com/tevelee/SwiftUI-Flow.git
     exactVersion: 3.5.1
@@ -196,6 +199,7 @@ targets:
       - package: Emojibase
       - package: Kingfisher
       - package: LRUCache
+      - package: Mantis
       - package: SwiftFlow
         product: Flow
       - package: SwiftOGG

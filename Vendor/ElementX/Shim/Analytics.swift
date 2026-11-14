@@ -48,5 +48,15 @@ struct Signposter {
         case notificationToMessage
     }
 
+    enum SpanName {
+        case timelineLoad
+    }
+
+    struct Span {
+        func finish() { }
+    }
+
     func finishTransaction(_ transaction: Transaction) { }
+
+    func addSpan(_ name: SpanName, toTransaction transaction: Transaction) -> Span? { nil }
 }
