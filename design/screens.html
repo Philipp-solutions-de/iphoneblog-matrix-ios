@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>iphoneblog chat screens</title>
+<style>
+@font-face{font-family:'foro';src:url('https://www.iphoneblog.de/wp-content/themes/five_dot_five/fonts/ForoBol-webfont.woff2') format('woff2');font-weight:bold}
+@font-face{font-family:'foro';src:url('https://www.iphoneblog.de/wp-content/themes/five_dot_five/fonts/ForoReg-webfont.woff2') format('woff2');font-weight:normal}
+:root{
+  --teal:#149791; --teal-text:#0F7D78; --teal-soft:#E6F4F3; --coral:#EB686E; --coral-soft:#FDEDEE;
+  --ink:#1D2326; --ink-2:#5C676C; --ink-3:#97A1A5; --line:#ECEFF0; --bg:#FFFFFF; --bg-2:#F7F8F8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;background:var(--bg)}
+body{font-family:-apple-system,"SF Pro Text",system-ui,sans-serif;color:var(--ink);font-size:16px;-webkit-font-smoothing:antialiased;overflow:hidden}
+.screen{display:none;width:393px;height:852px;position:relative;flex-direction:column;background:var(--bg)}
+.screen.on{display:flex}
+.status{height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 30px 0 36px;font-weight:600;font-size:16px}
+.status .ic{display:flex;gap:6px;align-items:center}
+.status .bat{width:26px;height:12px;border:1.5px solid var(--ink);border-radius:4px;position:relative}
+.status .bat:after{content:"";position:absolute;inset:1.5px;background:var(--ink);border-radius:1.5px}
+.home{height:34px;flex:none;display:flex;justify-content:center;align-items:flex-end;padding-bottom:8px}
+.home i{width:134px;height:5px;border-radius:3px;background:var(--ink)}
+.serif{font-family:foro,Georgia,serif}
+.nav{display:flex;align-items:center;gap:10px;padding:6px 20px 10px;flex:none}
+.nav .back{color:var(--teal-text);font-size:28px;line-height:1;margin-right:2px}
+.nav h1{font-size:30px;font-weight:bold}
+.nav h2{font-size:18px;font-weight:600}
+.nav .sub{font-size:12.5px;color:var(--ink-3)}
+.nav .sp{flex:1}
+.av{width:36px;height:36px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:14px}
+.av.s{width:22px;height:22px;font-size:0;border:2px solid #fff}
+.a1{background:#149791}.a2{background:#E0A43A}.a3{background:#7C6BC4}.a4{background:#EB686E}.a5{background:#4C8DC9}.a6{background:#5F8C5A}
+.search{margin:0 20px 8px;background:var(--bg-2);border-radius:12px;height:38px;display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--ink-3);font-size:15.5px;flex:none}
+.scroll{flex:1;overflow:hidden}
+.sec{padding:16px 20px 6px;font-size:13px;font-weight:600;color:var(--ink-3);letter-spacing:.02em;text-transform:uppercase}
+.row{display:flex;align-items:center;gap:12px;padding:9px 20px;font-size:17px}
+.row .hash{width:28px;text-align:center;color:var(--ink-3);font-size:19px}
+.row .name{flex:1}
+.row.unread .name{font-weight:600}
+.row.unread .hash{color:var(--ink)}
+.badge{min-width:22px;height:22px;border-radius:11px;background:var(--coral);color:#fff;font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 7px}
+.badge.q{background:var(--line);color:var(--ink-2)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--teal)}
+.lock{font-size:12px;color:var(--ink-3)}
+.tabs{height:56px;flex:none;display:flex;justify-content:space-around;align-items:center;border-top:1px solid var(--line);padding-top:4px}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;color:var(--ink-3);font-weight:500}
+.tab svg{width:24px;height:24px}
+.tab.on{color:var(--teal-text)}
+/* timeline */
+.tl{flex:1;overflow:hidden;padding:4px 0 8px}
+.day{display:flex;align-items:center;gap:10px;color:var(--ink-3);font-size:12.5px;font-weight:600;padding:10px 20px}
+.day:before,.day:after{content:"";flex:1;height:1px;background:var(--line)}
+.msg{display:flex;gap:11px;padding:7px 20px}
+.msg .body{flex:1;min-width:0}
+.msg .who{display:flex;gap:7px;align-items:baseline}
+.msg .who b{font-size:15.5px}
+.msg .who span{font-size:12px;color:var(--ink-3)}
+.msg p{font-size:16px;line-height:1.38;margin-top:1px}
+.msg.cont{padding-top:0}
+.msg.cont .avspace{width:36px;flex:none}
+.mention{background:var(--teal-soft);color:var(--teal-text);border-radius:5px;padding:0 4px;font-weight:600}
+.mention.me{background:var(--coral-soft);color:#C4444B}
+.link{color:var(--teal-text);text-decoration:underline;text-decoration-color:#9fd2cf}
+.reacts{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.re{display:flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:12px;padding:2px 8px;font-size:13px;color:var(--ink-2);background:#fff}
+.re.mine{border-color:#9fd2cf;background:var(--teal-soft);color:var(--teal-text)}
+.thread{display:flex;align-items:center;gap:6px;margin-top:7px;font-size:13.5px}
+.thread .avs{display:flex}.thread .avs .av{margin-right:-6px}
+.thread b{color:var(--teal-text);margin-left:8px}
+.thread span{color:var(--ink-3)}
+.img{margin-top:7px;width:236px;height:160px;border-radius:12px;background:linear-gradient(135deg,#d8ecea,#a9d6d2 40%,#7cbcb7);position:relative;overflow:hidden}
+.img:after{content:"";position:absolute;left:28px;top:30px;width:70px;height:120px;border-radius:14px;background:#1D2326;box-shadow:90px 10px 0 0 #2b3236}
+.card{margin-top:7px;border:1px solid var(--line);border-left:3px solid var(--teal);border-radius:10px;padding:9px 12px;max-width:290px}
+.card b{display:block;font-size:14.5px;line-height:1.3}
+.card span{font-size:12.5px;color:var(--ink-3)}
+.composer{flex:none;display:flex;align-items:center;gap:10px;padding:8px 14px 6px;border-top:1px solid var(--line)}
+.composer .plus{width:34px;height:34px;border-radius:50%;background:var(--bg-2);display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--ink-2)}
+.composer .field{flex:1;height:38px;border-radius:19px;border:1px solid var(--line);display:flex;align-items:center;padding:0 14px;color:var(--ink-3);font-size:15.5px}
+.composer .send{width:34px;height:34px;border-radius:50%;background:var(--teal-text);display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px}
+.readonly{flex:none;text-align:center;color:var(--ink-3);font-size:13.5px;padding:12px 24px 8px;border-top:1px solid var(--line)}
+.note{margin:6px 20px 4px;padding:9px 12px;border-radius:10px;background:var(--bg-2);color:var(--ink-2);font-size:12.5px;line-height:1.4}
+.root{border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:4px}
+.replies{padding:8px 20px 2px;font-size:12.5px;color:var(--ink-3);font-weight:600}
+/* sign in */
+.signin{flex:1;display:flex;flex-direction:column;align-items:center;padding:0 30px}
+.signin img{width:112px;height:112px;margin-top:210px}
+.signin h1{font-size:30px;margin-top:26px;font-weight:bold}
+.signin p{color:var(--ink-2);margin-top:8px;font-size:16.5px;text-align:center}
+.signin .grow{flex:1}
+.btn{width:100%;height:52px;border-radius:13px;background:var(--teal-text);color:#fff;font-weight:600;font-size:17px;display:flex;align-items:center;justify-content:center}
+.signin small{color:var(--ink-3);font-size:13px;text-align:center;line-height:1.4;margin:16px 0 18px}
+/* settings */
+.prof{display:flex;flex-direction:column;align-items:center;padding:8px 0 14px}
+.prof .av{width:84px;height:84px;font-size:32px}
+.prof b{font-size:21px;margin-top:10px}
+.prof span{font-size:14px;color:var(--ink-3);margin-top:2px}
+.group{margin:8px 20px;border-radius:14px;background:var(--bg-2);overflow:hidden}
+.group .it{display:flex;align-items:center;padding:13px 16px;font-size:16.5px;border-bottom:1px solid #fff}
+.group .it:last-child{border-bottom:0}
+.group .it span{flex:1}
+.group .it em{font-style:normal;color:var(--ink-3);font-size:15.5px}
+.group .it .chev{color:var(--ink-3);margin-left:6px}
+.group .it.danger{color:#C4444B}
+.gh{padding:14px 36px 2px;font-size:13px;color:var(--ink-3);font-weight:600;text-transform:uppercase;letter-spacing:.02em}
+/* ipad */
+.ipad{width:1180px;height:820px;flex-direction:row}
+.ipad .side{width:330px;border-right:1px solid var(--line);display:flex;flex-direction:column;background:#FBFCFC}
+.ipad .main{flex:1;display:flex;flex-direction:column}
+.ipad .thr{width:360px;border-left:1px solid var(--line);display:flex;flex-direction:column}
+.ipad .row.sel{background:var(--teal-soft);border-radius:10px;margin:0 10px;padding:9px 10px}
+</style>
+</head>
+<body>
+
+<!-- 1. Sign in -->
+<div class="screen" id="signin">
+  <div class="status"><span>9:41</span><span class="ic">●●● <span class="bat"></span></span></div>
+  <div class="signin">
+    <img src="logo.png" alt="">
+    <h1 class="serif">Der iphoneblog-Chat</h1>
+    <p>Für alle, die mitlesen und mitreden.</p>
+    <div class="grow"></div>
+    <div class="btn">Mit iphoneblog.de anmelden</div>
+    <small>Du nutzt dein Konto vom Blog. Wer Mitglied bei #one ist, kann schreiben. Auf jedem weiteren Gerät genauso, ohne Code.</small>
+  </div>
+  <div class="home"><i></i></div>
+</div>
+
+<!-- 2. Channel list -->
+<div class="screen" id="channels">
+  <div class="status"><span>9:41</span><span class="ic">●●● <span class="bat"></span></span></div>
+  <div class="nav"><h1 class="serif">iphoneblog</h1><div class="sp"></div><div class="av a1">MK</div></div>
+  <div class="search">⌕&nbsp; Suchen</div>
+  <div class="scroll">
+    <div class="sec">Kanäle</div>
+    <div class="row unread"><span class="hash">📣</span><span class="name">ankündigungen</span><span class="dot"></span></div>
+    <div class="row unread"><span class="hash">#</span><span class="name">allgemein</span><span class="badge">@ 1</span></div>
+    <div class="row unread"><span class="hash">#</span><span class="name">iphone-17</span><span class="badge q">12</span></div>
+    <div class="row"><span class="hash">#</span><span class="name">apps</span></div>
+    <div class="row"><span class="hash">#</span><span class="name">podcast</span></div>
+    <div class="row"><span class="hash">#</span><span class="name">fotografie</span></div>
+    <div class="sec">Direktnachrichten</div>
+    <div class="row unread"><div class="av a2" style="width:28px;height:28px;font-size:12px">JS</div><span class="name">Jana Sommer</span><span class="badge">2</span></div>
+    <div class="row"><div class="av a3" style="width:28px;height:28px;font-size:12px">TB</div><span class="name">Tobias Brandt</span></div>
+    <div class="row"><div class="av a5" style="width:28px;height:28px;font-size:12px">LW</div><span class="name">Lea Weber</span></div>
+  </div>
+  <div class="tabs">
+    <div class="tab on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Chats</div>
+    <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 5h14v10H9l-4 4z"/></svg>Threads</div>
+    <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-4 7.5"/></svg>Erwähnungen</div>
+    <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="9" r="4"/><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Ich</div>
+  </div>
+  <div class="home"><i></i></div>
+</div>
+
+<!-- 3. Channel timeline -->
+<div class="screen" id="timeline">
+  <div class="status"><span>9:41</span><span class="ic">●●● <span class="bat"></span></span></div>
+  <div class="nav"><span class="back">‹</span><div><h2># allgemein</h2><div class="sub">148 Mitglieder</div></div><div class="sp"></div><span style="color:var(--teal-text);font-size:20px">⌕</span></div>
+  <div class="tl">
+    <div class="day">Heute</div>
+    <div class="msg"><div class="av a2">JS</div><div class="body">
+      <div class="who"><b>Jana Sommer</b><span>8:12</span></div>
+      <p>Hat schon jemand das Update auf iOS 27.2 gemacht? Bei mir ist der Akku seitdem deutlich besser.</p>
+      <div class="reacts"><span class="re mine">👍 7</span><span class="re">🔋 3</span></div>
+      <div class="thread"><span class="avs"><span class="av s a3">TB</span><span class="av s a5">LW</span><span class="av s a1">MK</span></span><b>5 Antworten</b><span>· zuletzt vor 4 Min.</span></div>
+    </div></div>
+    <div class="msg"><div class="av a3">TB</div><div class="body">
+      <div class="who"><b>Tobias Brandt</b><span>8:40</span></div>
+      <p>Neuer Artikel ist online:</p>
+      <div class="card"><b>iOS 27.2: Was sich beim Akku wirklich ändert</b><span>iphoneblog.de</span></div>
+    </div></div>
+    <div class="msg"><div class="av a5">LW</div><div class="body">
+      <div class="who"><b>Lea Weber</b><span>9:05</span></div>
+      <p>Mein Setup für den Podcast heute, endlich aufgeräumt 🎙️</p>
+      <div class="img"></div>
+      <div class="reacts"><span class="re">😍 4</span><span class="re">👏 2</span></div>
+    </div></div>
+    <div class="msg cont"><span class="avspace"></span><div class="body">
+      <p><span class="mention me">@Max</span> hast du die Halterung noch?</p>
+    </div></div>
+  </div>
+  <div class="composer"><span class="plus">+</span><span class="field">Nachricht an #allgemein</span><span class="send">↑</span></div>
+  <div class="home"><i></i></div>
+</div>
+
+<!-- 4. Thread -->
+<div class="screen" id="thread">
+  <div class="status"><span>9:41</span><span class="ic">●●● <span class="bat"></span></span></div>
+  <div class="nav"><span class="back">‹</span><div><h2>Thread</h2><div class="sub"># allgemein</div></div></div>
+  <div class="tl">
+    <div class="msg root"><div class="av a2">JS</div><div class="body">
+      <div class="who"><b>Jana Sommer</b><span>8:12</span></div>
+      <p>Hat schon jemand das Update auf iOS 27.2 gemacht? Bei mir ist der Akku seitdem deutlich besser.</p>
+      <div class="reacts"><span class="re mine">👍 7</span><span class="re">🔋 3</span></div>
+    </div></div>
+    <div class="replies">5 Antworten</div>
+    <div class="msg"><div class="av a3">TB</div><div class="body">
+      <div class="who"><b>Tobias Brandt</b><span>8:20</span></div>
+      <p>Ja, gestern Abend. Merke noch keinen Unterschied, aber der Tag ist ja jung.</p>
+    </div></div>
+    <div class="msg"><div class="av a5">LW</div><div class="body">
+      <div class="who"><b>Lea Weber</b><span>8:31</span></div>
+      <p>Bei mir dauert die Indizierung noch. Erfahrungsgemäß zwei, drei Tage.</p>
+      <div class="reacts"><span class="re">💯 2</span></div>
+    </div></div>
+    <div class="msg"><div class="av a1">MK</div><div class="body">
+      <div class="who"><b>Max Krüger</b><span>9:37</span></div>
+      <p><span class="mention">@Jana</span> welches Modell hast du? Beim 15 Pro war es bei mir umgekehrt.</p>
+    </div></div>
+  </div>
+  <div class="composer"><span class="plus">+</span><span class="field">Antworten</span><span class="send">↑</span></div>
+  <div class="home"><i></i></div>
+</div>
+
+<!-- 5. Direct message -->
+<div class="screen" id="dm">
+  <div class="status"><span>9:41</span><span class="ic">●●● <span class="bat"></span></span></div>
+  <div class="nav"><span class="back">‹</span><div class="av a2" style="width:30px;height:30px;font-size:12px">JS</div><div><h2>Jana Sommer</h2><div class="sub">@jana:iphoneblog.de</div></div></div>
+  <div class="note">Direktnachrichten sind nicht Ende-zu-Ende-verschlüsselt. Sie liegen auf dem Server von iphoneblog.de.</div>
+  <div class="tl">
+    <div class="day">Gestern</div>
+    <div class="msg"><div class="av a2">JS</div><div class="body">
+      <div class="who"><b>Jana Sommer</b><span>21:14</span></div>
+      <p>Danke nochmal für den Tipp mit der Schutzhülle! Ist heute gekommen.</p>
+    </div></div>
+    <div class="msg"><div class="av a1">MK</div><div class="body">
+      <div class="who"><b>Max Krüger</b><span>21:30</span></div>
+      <p>Gern! Passt sie gut zur MagSafe-Halterung?</p>
+    </div></div>
+    <div class="day">Heute</div>
+    <div class="msg"><div class="av a2">JS</div><div class="body">
+      <div class="who"><b>Jana Sommer</b><span>9:02</span></div>
+      <p>Perfekt. Kommst du Samstag zum Treffen in München?</p>
+      <div class="reacts"><span class="re mine">🙌 1</span></div>
+    </div></div>
+  </div>
+  <div class="composer"><span class="plus">+</span><span class="field">Nachricht an Jana</span><span class="send">↑</span></div>
+  <div class="home"><i></i></div>
+</div>
+
+<!-- 6. Settings -->
+<div class="screen" id="settings">
+  <div class="status"><span>9:41</span><span class="ic">●●● <span class="bat"></span></span></div>
+  <div class="nav"><h1 class="serif">Ich</h1></div>
+  <div class="scroll">
+    <div class="prof"><div class="av a1">MK</div><b>Max Krüger</b><span>@max:iphoneblog.de · Mitglied bei #one</span></div>
+    <div class="gh">Mitteilungen</div>
+    <div class="group">
+      <div class="it"><span>Neue Artikel</span><em>An</em></div>
+      <div class="it"><span>Kanäle</span><em>Nur Erwähnungen</em><span class="chev">›</span></div>
+      <div class="it"><span>Direktnachrichten</span><em>An</em></div>
+      <div class="it"><span>Antworten in meinen Threads</span><em>An</em></div>
+    </div>
+    <div class="gh">Konto</div>
+    <div class="group">
+      <div class="it"><span>Name und Bild</span><span class="chev">›</span></div>
+      <div class="it"><span>Konto auf iphoneblog.de</span><span class="chev">↗</span></div>
+      <div class="it"><span>Darstellung</span><em>System</em><span class="chev">›</span></div>
+      <div class="it"><span>Datenschutz</span><span class="chev">↗</span></div>
+    </div>
+    <div class="group"><div class="it danger"><span>Abmelden</span></div></div>
+  </div>
+  <div class="tabs">
+    <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Chats</div>
+    <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 5h14v10H9l-4 4z"/></svg>Threads</div>
+    <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-4 7.5"/></svg>Erwähnungen</div>
+    <div class="tab on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="9" r="4"/><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Ich</div>
+  </div>
+  <div class="home"><i></i></div>
+</div>
+
+<!-- 7. Announcements, read-only for most -->
+<div class="screen" id="announcements">
+  <div class="status"><span>9:41</span><span class="ic">●●● <span class="bat"></span></span></div>
+  <div class="nav"><span class="back">‹</span><div><h2>📣 ankündigungen</h2><div class="sub">Neue Artikel und Neuigkeiten</div></div></div>
+  <div class="tl">
+    <div class="day">Heute</div>
+    <div class="msg"><div class="av a1" style="background:#fff;border:1px solid var(--line)"><img src="logo.png" style="width:24px"></div><div class="body">
+      <div class="who"><b>iphoneblog</b><span>7:00</span></div>
+      <div class="card"><b>iOS 27.2: Was sich beim Akku wirklich ändert</b><span>iphoneblog.de · 6 Min. Lesezeit</span></div>
+      <div class="reacts"><span class="re">👍 21</span><span class="re">🔋 6</span></div>
+      <div class="thread"><span class="avs"><span class="av s a2">JS</span><span class="av s a6">PH</span></span><b>12 Antworten</b><span>· zuletzt vor 2 Min.</span></div>
+    </div></div>
+    <div class="msg"><div class="av a1" style="background:#fff;border:1px solid var(--line)"><img src="logo.png" style="width:24px"></div><div class="body">
+      <div class="who"><b>iphoneblog</b><span>12:30</span></div>
+      <div class="card"><b>Podcast 412: Die Vision Pro nach einem Jahr</b><span>iphoneblog.de · 58 Min.</span></div>
+    </div></div>
+  </div>
+  <div class="readonly">Hier schreibt die Redaktion. Antworten im Thread kann jedes Mitglied bei #one.</div>
+  <div class="home"><i></i></div>
+</div>
+
+<!-- 8. iPad -->
+<div class="screen ipad" id="ipad">
+  <div class="side">
+    <div class="status" style="height:40px"><span>9:41</span></div>
+    <div class="nav"><h1 class="serif" style="font-size:26px">iphoneblog</h1></div>
+    <div class="search" style="margin:0 14px 8px">⌕&nbsp; Suchen</div>
+    <div class="sec">Kanäle</div>
+    <div class="row unread"><span class="hash">📣</span><span class="name">ankündigungen</span><span class="dot"></span></div>
+    <div class="row sel"><span class="hash">#</span><span class="name">allgemein</span></div>
+    <div class="row unread"><span class="hash">#</span><span class="name">iphone-17</span><span class="badge q">12</span></div>
+    <div class="row"><span class="hash">#</span><span class="name">apps</span></div>
+    <div class="row"><span class="hash">#</span><span class="name">podcast</span></div>
+    <div class="sec">Direktnachrichten</div>
+    <div class="row unread"><div class="av a2" style="width:28px;height:28px;font-size:12px">JS</div><span class="name">Jana Sommer</span><span class="badge">2</span></div>
+    <div class="row"><div class="av a3" style="width:28px;height:28px;font-size:12px">TB</div><span class="name">Tobias Brandt</span></div>
+  </div>
+  <div class="main">
+    <div class="status" style="height:40px"></div>
+    <div class="nav"><div><h2># allgemein</h2><div class="sub">148 Mitglieder</div></div></div>
+    <div class="tl">
+      <div class="day">Heute</div>
+      <div class="msg"><div class="av a2">JS</div><div class="body">
+        <div class="who"><b>Jana Sommer</b><span>8:12</span></div>
+        <p>Hat schon jemand das Update auf iOS 27.2 gemacht? Bei mir ist der Akku seitdem deutlich besser.</p>
+        <div class="reacts"><span class="re mine">👍 7</span><span class="re">🔋 3</span></div>
+        <div class="thread"><span class="avs"><span class="av s a3">TB</span><span class="av s a5">LW</span><span class="av s a1">MK</span></span><b>5 Antworten</b><span>· zuletzt vor 4 Min.</span></div>
+      </div></div>
+      <div class="msg"><div class="av a3">TB</div><div class="body">
+        <div class="who"><b>Tobias Brandt</b><span>8:40</span></div>
+        <p>Neuer Artikel ist online:</p>
+        <div class="card"><b>iOS 27.2: Was sich beim Akku wirklich ändert</b><span>iphoneblog.de</span></div>
+      </div></div>
+      <div class="msg"><div class="av a5">LW</div><div class="body">
+        <div class="who"><b>Lea Weber</b><span>9:05</span></div>
+        <p>Mein Setup für den Podcast heute, endlich aufgeräumt 🎙️</p>
+        <div class="img"></div>
+      </div></div>
+    </div>
+    <div class="composer"><span class="plus">+</span><span class="field">Nachricht an #allgemein</span><span class="send">↑</span></div>
+  </div>
+  <div class="thr">
+    <div class="status" style="height:40px"></div>
+    <div class="nav"><div><h2>Thread</h2><div class="sub"># allgemein</div></div></div>
+    <div class="tl">
+      <div class="msg"><div class="av a3">TB</div><div class="body"><div class="who"><b>Tobias Brandt</b><span>8:20</span></div><p>Ja, gestern Abend. Merke noch keinen Unterschied.</p></div></div>
+      <div class="msg"><div class="av a5">LW</div><div class="body"><div class="who"><b>Lea Weber</b><span>8:31</span></div><p>Bei mir dauert die Indizierung noch.</p></div></div>
+      <div class="msg"><div class="av a1">MK</div><div class="body"><div class="who"><b>Max Krüger</b><span>9:37</span></div><p><span class="mention">@Jana</span> welches Modell hast du?</p></div></div>
+    </div>
+    <div class="composer"><span class="field">Antworten</span><span class="send">↑</span></div>
+  </div>
+</div>
+
+<script>
+const id = location.hash.slice(1) || 'signin';
+document.getElementById(id).classList.add('on');
+</script>
+</body>
+</html>
