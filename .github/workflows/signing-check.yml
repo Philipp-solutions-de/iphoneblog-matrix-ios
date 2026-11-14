@@ -1,0 +1,37 @@
+name: Signing check
+
+# Run by hand on main: builds, signs and exports the App Store .ipa with the Apple key,
+# without uploading. Proves signing works before TESTFLIGHT_ENABLED goes on.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-build:
+    if: github.ref == 'refs/heads/main'
+    environment: apple
+    runs-on: xcode-27
+    timeout-minutes: 60
+    env:
+      BUNDLE_FROZEN: "true"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: Select Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_27*.app | sort -V | tail -1)"
+      - name: Install tools (pinned)
+        run: |
+          scripts/install-xcodegen.sh build/tools >> "$GITHUB_PATH"
+          bundle install
+      - name: Build, sign and export
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: bundle exec fastlane ios signed_build

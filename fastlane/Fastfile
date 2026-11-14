@@ -53,6 +53,31 @@ def auth_args
 end
 
 platform :ios do
+  # Builds, signs (cloud-managed certificate) and exports the .ipa; returns the API key.
+  private_lane :archive do
+    key = api_key
+    sh(File.join(ROOT, "scripts/configure.sh"))
+
+    build_app(
+      project: File.join(ROOT, "iphoneblog.xcodeproj"),
+      scheme: "iphoneblog",
+      configuration: "Release",
+      export_method: "app-store",
+      export_team_id: team_id,
+      output_directory: File.join(ROOT, "build/ipa"),
+      xcargs: (auth_args + [
+        "-skipPackagePluginValidation",
+        "-skipMacroValidation",
+        "DEVELOPMENT_TEAM=#{team_id}",
+        "CODE_SIGN_STYLE=Automatic",
+        "CURRENT_PROJECT_VERSION=#{ENV.fetch('BUILD_NUMBER')}"
+      ]).join(" "),
+      export_xcargs: auth_args.join(" ")
+    )
+
+    key
+  end
+
   desc "Register the bundle ids and switch on their capabilities through the API"
   lane :register do
     Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.from(hash: api_key)
@@ -87,28 +112,14 @@ platform :ios do
     end
   end
 
+  desc "Build and sign for the App Store without uploading (proves signing works)"
+  lane :signed_build do
+    archive
+  end
+
   desc "Build the app and upload it to TestFlight"
   lane :beta do
-    key = api_key
-    sh(File.join(ROOT, "scripts/configure.sh"))
-
-    build_app(
-      project: File.join(ROOT, "iphoneblog.xcodeproj"),
-      scheme: "iphoneblog",
-      configuration: "Release",
-      export_method: "app-store",
-      export_team_id: team_id,
-      output_directory: File.join(ROOT, "build/ipa"),
-      xcargs: (auth_args + [
-        "-skipPackagePluginValidation",
-        "-skipMacroValidation",
-        "DEVELOPMENT_TEAM=#{team_id}",
-        "CODE_SIGN_STYLE=Automatic",
-        "CURRENT_PROJECT_VERSION=#{ENV.fetch('BUILD_NUMBER')}"
-      ]).join(" "),
-      export_xcargs: auth_args.join(" ")
-    )
-
+    key = archive
     upload_to_testflight(
       api_key: key,
       skip_waiting_for_build_processing: true,
