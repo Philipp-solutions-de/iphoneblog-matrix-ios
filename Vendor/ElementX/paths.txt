@@ -3,7 +3,6 @@
 
 # Design system
 compound-ios/Package.swift
-compound-ios/Package.resolved
 compound-ios/Sources
 
 # Resources
@@ -127,7 +126,6 @@ ElementX/Sources/Screens/RoomScreen/RoomScreenCoordinator.swift
 ElementX/Sources/Screens/RoomScreen/RoomScreenModels.swift
 ElementX/Sources/Screens/RoomScreen/RoomScreenViewModel.swift
 ElementX/Sources/Screens/RoomScreen/RoomScreenViewModelProtocol.swift
-ElementX/Sources/Screens/RoomScreen/View/KnockRequestsBannerView.swift
 ElementX/Sources/Screens/RoomScreen/View/LiveLocationSharingBannerView.swift
 ElementX/Sources/Screens/RoomScreen/View/PinnedItemsBanner/PinnedItemsBannerView.swift
 ElementX/Sources/Screens/RoomScreen/View/PinnedItemsBanner/PinnedItemsIndicatorView.swift
@@ -211,7 +209,6 @@ ElementX/Sources/Screens/Timeline/View/TimelineSenderAvatarView.swift
 ElementX/Sources/Screens/Timeline/View/TimelineView.swift
 ElementX/Sources/Screens/Timeline/View/TypingIndicatorView.swift
 ElementX/Sources/Screens/Timeline/View/VoiceMessageRoomPlaybackView.swift
-ElementX/Sources/Services/Audio/AudioConverter.swift
 ElementX/Sources/Services/Audio/AudioConverterProtocol.swift
 ElementX/Sources/Services/Audio/AudioSessionProtocol.swift
 ElementX/Sources/Services/Audio/Player/AudioPlayerProtocol.swift
@@ -219,8 +216,6 @@ ElementX/Sources/Services/Audio/Player/AudioPlayerState.swift
 ElementX/Sources/Services/Audio/Recorder/AudioRecorder.swift
 ElementX/Sources/Services/Audio/Recorder/AudioRecorderProtocol.swift
 ElementX/Sources/Services/Audio/Recorder/AudioRecorderState.swift
-ElementX/Sources/Services/BugReport/BugReportService.swift
-ElementX/Sources/Services/BugReport/BugReportServiceProtocol.swift
 ElementX/Sources/Services/Capabilities/HomeserverCapabilitiesProxyProtocol.swift
 ElementX/Sources/Services/Client/ClientProxyProtocol.swift
 ElementX/Sources/Services/Client/CreateRoomParameters.swift
@@ -230,9 +225,6 @@ ElementX/Sources/Services/ContentScanner/ContentScannerServiceProtocol.swift
 ElementX/Sources/Services/Emojis/EmojiLoaderProtocol.swift
 ElementX/Sources/Services/Emojis/EmojiProvider.swift
 ElementX/Sources/Services/Emojis/EmojiProviderProtocol.swift
-ElementX/Sources/Services/Keychain/KeychainController.swift
-ElementX/Sources/Services/Keychain/KeychainControllerMock.swift
-ElementX/Sources/Services/Keychain/KeychainControllerProtocol.swift
 ElementX/Sources/Services/LinkMetadata/LinkMetadataProvider.swift
 ElementX/Sources/Services/LinkMetadata/LinkMetadataProviderProtocol.swift
 ElementX/Sources/Services/Media/MediaUploadingPreprocessor.swift
@@ -337,3 +329,89 @@ ElementX/Sources/Services/VoiceMessage/VoiceMessageCacheProtocol.swift
 ElementX/Sources/Services/VoiceMessage/VoiceMessageMediaManagerProtocol.swift
 ElementX/Sources/Services/VoiceMessage/VoiceMessageRecorder.swift
 ElementX/Sources/Services/VoiceMessage/VoiceMessageRecorderProtocol.swift
+
+# Helpers taken whole: extensions and small views the screens call
+ElementX/Sources/Other/SwiftUI
+ElementX/Sources/Other/Extensions
+ElementX/Sources/Other/UserIndicator
+ElementX/Sources/Other/Logging
+ElementX/Sources/Other/Progress
+ElementX/Sources/Other/NetworkMonitor
+ElementX/Sources/Other/CollapsibleFlowLayout
+ElementX/Sources/Other/HTMLParsing
+ElementX/Sources/Other/Pills
+ElementX/Sources/Other/AccessibilityIdentifiers.swift
+ElementX/Sources/Other/Avatars.swift
+ElementX/Sources/Other/BlurHashDecode.swift
+ElementX/Sources/Other/BlurHashEncode.swift
+ElementX/Sources/Other/CancellableTask.swift
+ElementX/Sources/Other/Consumable.swift
+ElementX/Sources/Other/CurrentValuePublisher.swift
+ElementX/Sources/Other/ExpiringTaskRunner.swift
+ElementX/Sources/Other/InfoPlistReader.swift
+ElementX/Sources/Other/MatrixEntityRegex.swift
+ElementX/Sources/Other/Pagination.swift
+ElementX/Sources/Other/ScrollViewAdapter.swift
+ElementX/Sources/Other/SDKListener.swift
+ElementX/Sources/Other/TextFieldAdapter.swift
+ElementX/Sources/Other/UserAgentBuilder.swift
+
+# Left out: crash reporting, UI-test helpers, device model lookup
+!ElementX/Sources/Other/Extensions/SentryEvent.swift
+!ElementX/Sources/Other/Extensions/XCUIElement.swift
+!ElementX/Sources/Other/UserAgentBuilder.swift
+
+# Small app-level types the views need as they are
+ElementX/Sources/Application/CoordinatorProtocol.swift
+ElementX/Sources/Application/Settings/FrequentlyUsedEmoji.swift
+ElementX/Sources/Application/Settings/AudioPlaybackSpeed.swift
+
+# Left out by deletion: what needs an outside service or a large package (calls, maps), and
+# room administration, knock requests, pinned messages and test fixtures. Voice messages and
+# polls stay in the code and are hidden in the UI by small patches (UPSTREAM.md, "Hide, do not
+# delete"): fewer patches, cheaper re-syncs.
+!ElementX/Sources/Other/HTMLParsing/HTMLFixtures.swift
+!ElementX/Sources/Other/MapLibre/MapLibreModels.swift
+!ElementX/Sources/Other/MapLibre/MapLibreStaticMapView.swift
+!ElementX/Sources/Other/MapLibre/MapTilerURLBuilderProtocol.swift
+!ElementX/Sources/Other/SwiftUI/Views/JoinCallButton.swift
+!ElementX/Sources/Other/SwiftUI/Views/LocationMarkerView.swift
+!ElementX/Sources/Screens/RoomScreen/View/LiveLocationSharingBannerView.swift
+!ElementX/Sources/Screens/RoomScreen/View/RoomCallControlsToolbar.swift
+!ElementX/Sources/Screens/Timeline/View/TimelineItemViews/LiveLocationRoomTimelineView.swift
+!ElementX/Sources/Screens/Timeline/View/TimelineItemViews/LocationRoomTimelineView.swift
+!ElementX/Sources/Services/Timeline/Fixtures
+
+# Voice messages and polls: kept, hidden in the UI
+ElementX/Sources/Services/Audio
+ElementX/Sources/Services/VoiceMessage
+ElementX/Sources/Services/Polls
+ElementX/Sources/Services/MediaPlayer
+ElementX/Sources/Other/VoiceMessage
+
+ElementX/Sources/Other/MapLibre/StaticLocationData.swift
+ElementX/Sources/Screens/Timeline/View/TimelineItemViews/CallInviteRoomTimelineView.swift
+ElementX/Sources/Screens/Timeline/View/TimelineItemViews/CallNotificationRoomTimelineView.swift
+ElementX/Sources/Screens/Authentication/UIConstants.swift
+!ElementX/Sources/Other/SwiftUI/Views/AvatarSettingsButtonLabel.swift
+ElementX/Sources/Application/Windowing/OrientationManagerProtocol.swift
+ElementX/Sources/Screens/MediaEventsTimelineScreen/View/TimelineViews/ScanStateMediaEventsTimelineViews.swift
+ElementX/Sources/Screens/Timeline/View/TimelineItemViews/ActiveCallTimelineItemView.swift
+ElementX/Sources/Screens/ManageRoomMemberSheet
+ElementX/Sources/Application/Settings/MapTilerConfiguration.swift
+ElementX/Sources/Screens/FilePreviewScreen
+ElementX/Sources/Screens/MediaPickerScreen
+!ElementX/Sources/Other/Extensions/UNNotificationContent.swift
+ElementX/Sources/Services/NotificationSettings/RoomNotificationModeProxy.swift
+ElementX/Sources/Screens/HomeScreen/View/Filters/RoomListFilterModels.swift
+
+# Element X's room screen is a container for calls, pinned messages, knock requests and identity
+# warnings. Ours is Shim/ChatRoomView.swift, built from the same timeline and composer.
+!ElementX/Sources/Screens/RoomScreen/RoomScreenCoordinator.swift
+!ElementX/Sources/Screens/RoomScreen/RoomScreenModels.swift
+!ElementX/Sources/Screens/RoomScreen/RoomScreenViewModel.swift
+!ElementX/Sources/Screens/RoomScreen/RoomScreenViewModelProtocol.swift
+!ElementX/Sources/Screens/RoomScreen/View/RoomScreen.swift
+!ElementX/Sources/Screens/RoomScreen/View/RoomScreenFooterView.swift
+!ElementX/Sources/Screens/RoomScreen/View/KnockRequestsBannerView.swift
+!ElementX/Sources/Screens/RoomScreen/View/PinnedItemsBanner

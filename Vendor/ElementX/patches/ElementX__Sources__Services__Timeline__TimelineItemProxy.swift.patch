@@ -1,0 +1,23 @@
+--- a/ElementX/Sources/Services/Timeline/TimelineItemProxy.swift
++++ b/ElementX/Sources/Services/Timeline/TimelineItemProxy.swift
+@@ -8,7 +8,6 @@
+ 
+ import Foundation
+ import MatrixRustSDK
+-import MatrixRustSDKMocks
+ 
+ /// A light wrapper around timeline items returned from Rust.
+ nonisolated enum TimelineItemProxy {
+@@ -258,12 +257,6 @@
+     func hash(into hasher: inout Hasher) {
+         hasher.combine(itemID)
+     }
+-    
+-    static var mock: SendHandleProxy {
+-        .init(itemID: .event(uniqueID: .init(UUID().uuidString),
+-                             eventOrTransactionID: .eventID(UUID().uuidString)),
+-              underlyingHandle: SendHandleSDKMock())
+-    }
+ }
+ 
+ nonisolated struct VideoInfoProxy: Hashable {

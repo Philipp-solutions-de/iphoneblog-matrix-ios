@@ -68,28 +68,3 @@ public struct SendButton: View {
 }
 
 // MARK: - Previews
-
-public struct SendButton_Previews: PreviewProvider, TestablePreview {
-    public static var previews: some View {
-        VStack(spacing: 0) {
-            states
-                .padding(20)
-                .background(.compound.bgCanvasDefault)
-            states
-                .padding(20)
-                .background(.compound.bgCanvasDefault)
-                .environment(\.colorScheme, .dark)
-        }
-        .cornerRadius(20)
-    }
-    
-    public static var states: some View {
-        HStack(spacing: 30) {
-            SendButton { }
-                .disabled(true)
-            SendButton { }
-            
-            SendButton(mode: .edit) { }
-        }
-    }
-}

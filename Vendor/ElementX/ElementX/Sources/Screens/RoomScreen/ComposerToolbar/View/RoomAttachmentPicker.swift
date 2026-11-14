@@ -76,24 +76,3 @@ struct RoomAttachmentPicker: View {
         }
     }
 }
-
-struct RoomAttachmentPicker_Previews: PreviewProvider, TestablePreview {
-    static let viewModel = makeViewModel()
-    
-    static func makeViewModel() -> ComposerToolbarViewModel {
-        let userSettings = UserSettings.mock()
-        
-        return ComposerToolbarViewModel(roomProxy: JoinedRoomProxyMock(.init()),
-                                        wysiwygViewModel: WysiwygComposerViewModel(),
-                                        completionSuggestionService: CompletionSuggestionServiceMock(configuration: .init()),
-                                        mediaProvider: MediaProviderMock(.init()),
-                                        mentionDisplayHelper: ComposerMentionDisplayHelper.mock,
-                                        userSettings: userSettings,
-                                        analyticsService: AnalyticsServiceMock(.init()),
-                                        composerDraftService: ComposerDraftServiceMock(.init()))
-    }
-    
-    static var previews: some View {
-        RoomAttachmentPicker(context: viewModel.context)
-    }
-}

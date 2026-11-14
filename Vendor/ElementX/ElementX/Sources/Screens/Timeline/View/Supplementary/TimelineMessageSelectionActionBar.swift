@@ -26,25 +26,3 @@ struct TimelineMessageSelectionActionBar: View {
 }
 
 // MARK: - Previews
-
-struct TimelineMessageSelectionActionBar_Previews: PreviewProvider, TestablePreview {
-    static let viewModel = makeViewModel(selectedEventIDs: ["$1", "$2", "$3"])
-    static let emptyViewModel = makeViewModel(selectedEventIDs: [])
-    
-    static var previews: some View {
-        TimelineMessageSelectionActionBar(context: viewModel.context)
-            .previewLayout(.sizeThatFits)
-            .previewDisplayName("Selected")
-        
-        TimelineMessageSelectionActionBar(context: emptyViewModel.context)
-            .previewLayout(.sizeThatFits)
-            .previewDisplayName("Nothing selected")
-    }
-    
-    static func makeViewModel(selectedEventIDs: Set<String>) -> TimelineViewModel {
-        let viewModel = TimelineViewModel.mock() // A fresh instance so the shared mock isn't left selecting.
-        viewModel.state.messageSelection.isActive = true
-        viewModel.state.messageSelection.selectedEventIDs = selectedEventIDs
-        return viewModel
-    }
-}

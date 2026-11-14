@@ -110,14 +110,3 @@ extension WysiwygComposer.SuggestionPattern {
         }
     }
 }
-
-extension CompletionSuggestionServiceMock {
-    struct CompletionSuggestionServiceMockConfiguration {
-        var suggestions: [SuggestionItem] = []
-    }
-    
-    convenience init(configuration: CompletionSuggestionServiceMockConfiguration) {
-        self.init()
-        underlyingSuggestionsPublisher = Just(configuration.suggestions).eraseToAnyPublisher()
-    }
-}

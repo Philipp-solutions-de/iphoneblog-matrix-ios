@@ -123,18 +123,3 @@ struct TimelineScrollButton: View {
             .frame(width: badgeDotSize, height: badgeDotSize)
     }
 }
-
-struct TimelineScrollButton_Previews: PreviewProvider, TestablePreview {
-    static var previews: some View {
-        VStack(spacing: 16) {
-            TimelineScrollButton(direction: .down) { }
-            TimelineScrollButton(direction: .down, showsBadge: true) { }
-            TimelineScrollButton(direction: .up) { }
-            TimelineScrollButton(direction: .up, showsBadge: true) { }
-            TimelineScrollButton(direction: .up, isHidden: true, showsBadge: true) { }
-        }
-        .padding()
-        .background(Color.compound.bgCanvasDefault)
-        .previewLayout(.sizeThatFits)
-    }
-}

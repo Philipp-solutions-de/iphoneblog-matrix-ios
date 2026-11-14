@@ -37,30 +37,3 @@ public struct ListRowButtonStyle: PrimitiveButtonStyle {
 
 // TODO: @pixlwave Fix the previews, either the style should expand the label to fill or
 // the previews need to do this manually for demonstration purposes.
-
-public struct ListRowButtonStyle_Previews: PreviewProvider, TestablePreview {
-    public static var previews: some View {
-        Form {
-            Section {
-                Button("Title") { }
-                    .buttonStyle(ListRowButtonStyle.Style())
-            }
-            .listRowInsets(EdgeInsets())
-            
-            Section {
-                Button("Title") { }
-                Button("Title") { }
-                Button("Title") { }
-            }
-            .buttonStyle(ListRowButtonStyle())
-            .listRowInsets(EdgeInsets())
-            
-            Section {
-                ShareLink(item: "test")
-                    .buttonStyle(ListRowButtonStyle())
-            }
-            .listRowInsets(EdgeInsets())
-        }
-        .compoundList()
-    }
-}

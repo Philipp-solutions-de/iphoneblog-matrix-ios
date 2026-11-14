@@ -23,15 +23,3 @@ struct CallInviteRoomTimelineView: View {
         .padding()
     }
 }
-
-struct CallInviteRoomTimelineView_Previews: PreviewProvider, TestablePreview {
-    static let viewModel = TimelineViewModel.mock
-    
-    static var previews: some View {
-        body.environmentObject(viewModel.context)
-    }
-    
-    static var body: some View {
-        CallInviteRoomTimelineView()
-    }
-}

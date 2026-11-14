@@ -136,12 +136,3 @@ private struct ReactionSummarySenderView: View {
         .padding(.vertical, 8)
     }
 }
-
-struct ReactionsSummaryView_Previews: PreviewProvider, TestablePreview {
-    static var previews: some View {
-        ReactionsSummaryView(reactions: AggregatedReaction.mockReactions,
-                             members: [:],
-                             mediaProvider: MediaProviderMock(.init()),
-                             selectedReactionKey: AggregatedReaction.mockReactions[0].key)
-    }
-}

@@ -37,8 +37,11 @@ if [[ ! -d "$pristine/.git" ]]; then
 fi
 
 # Every listed path, expanded to files, comments and blank lines skipped.
+# A line "!path" leaves out that file or folder, also inside a listed folder.
 list_files() {
-    grep -v -E '^\s*(#|$)' "$vendor/paths.txt" | while read -r path; do
+    local excludes
+    excludes="$(grep -E '^!' "$vendor/paths.txt" | sed 's/^!//' || true)"
+    grep -v -E '^\s*(#|$|!)' "$vendor/paths.txt" | while read -r path; do
         if [[ -d "$pristine/$path" ]]; then
             (cd "$pristine" && find "$path" -type f ! -name '.DS_Store')
         elif [[ -f "$pristine/$path" ]]; then
@@ -47,22 +50,53 @@ list_files() {
             echo "sync-elementx: $path is not in $tag" >&2
             exit 1
         fi
-    done | sort -u
+    done | sort -u | while read -r file; do
+        skip=0
+        while read -r ex; do
+            [[ -n "$ex" && ( "$file" == "$ex" || "$file" == "$ex/"* ) ]] && { skip=1; break; }
+        done <<< "$excludes"
+        [[ $skip == 0 ]] && echo "$file"
+    done
 }
 
 patch_name() { echo "${1//\//__}.patch"; }
 
+# The listed files as copied from the tag, previews stripped: what patches/ applies to.
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+stage() {
+    local swift=()
+    while read -r path; do
+        mkdir -p "$work/$(dirname "$path")"
+        cp "$pristine/$path" "$work/$path"
+        [[ "$path" == *.swift ]] && swift+=("$work/$path")
+    done < <(list_files)
+    python3 "$vendor/strip-previews.py" "${swift[@]}"
+}
+stage
+
+# The strip script shapes the base that patches/ is cut against. Patches saved after it changed
+# but before a sync would record its effect as our edits, so saving then is refused.
+stamp="$vendor/.strip-stamp"
+strip_hash="$(shasum "$vendor/strip-previews.py" | cut -d' ' -f1)"
+
 case "$mode" in
     save)
+        if [[ -f "$stamp" && "$(cat "$stamp")" != "$strip_hash" ]]; then
+            echo "sync-elementx: strip-previews.py changed since the last sync. Undo that change, save your" >&2
+            echo "patches, then change it again and run a sync before saving." >&2
+            exit 1
+        fi
         rm -f "$vendor"/patches/*.patch
         mkdir -p "$vendor/patches"
         count=0
         while read -r path; do
             if [[ ! -f "$vendor/$path" ]]; then
-                echo "sync-elementx: $path is listed but missing; take it out of paths.txt instead" >&2
-                exit 1
-            elif ! cmp -s "$pristine/$path" "$vendor/$path"; then
-                diff -u --label "a/$path" --label "b/$path" "$pristine/$path" "$vendor/$path" \
+                # Newly listed: bring it in as published. (To drop a file, take it out of paths.txt.)
+                mkdir -p "$vendor/$(dirname "$path")"
+                cp "$work/$path" "$vendor/$path"
+            elif ! cmp -s "$work/$path" "$vendor/$path"; then
+                diff -u --label "a/$path" --label "b/$path" "$work/$path" "$vendor/$path" \
                     > "$vendor/patches/$(patch_name "$path")" || true
                 count=$((count + 1))
             fi
@@ -70,15 +104,10 @@ case "$mode" in
         echo "sync-elementx: $count patches in Vendor/ElementX/patches"
         ;;
     sync|check)
-        work="$(mktemp -d)"
-        trap 'rm -rf "$work"' EXIT
-        while read -r path; do
-            mkdir -p "$work/$(dirname "$path")"
-            cp "$pristine/$path" "$work/$path"
-        done < <(list_files)
         shopt -s nullglob
         for p in "$vendor"/patches/*.patch; do
-            if ! (cd "$work" && patch --quiet -p1 --no-backup-if-mismatch < "$p"); then
+            target="$(basename "$p" .patch)"; target="${target//__//}"
+            if ! patch --quiet --forward --no-backup-if-mismatch "$work/$target" < "$p"; then
                 echo "sync-elementx: $(basename "$p") no longer applies to $tag; fix it by hand, then --save-patches" >&2
                 exit 1
             fi
@@ -97,6 +126,7 @@ case "$mode" in
             [[ -d "$work/$top" ]] && cp -R "$work/$top" "$vendor/$top"
         done
         echo "$tag" > "$vendor/UPSTREAM.tag"
+        echo "$strip_hash" > "$stamp"
         patches=("$vendor"/patches/*.patch)
         echo "sync-elementx: Vendor/ElementX now holds $tag plus ${#patches[@]} patches"
         ;;

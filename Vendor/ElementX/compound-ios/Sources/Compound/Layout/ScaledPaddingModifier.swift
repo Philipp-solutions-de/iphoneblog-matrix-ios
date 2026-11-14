@@ -35,21 +35,3 @@ private struct ScaledPaddingModifier: ViewModifier {
 }
 
 // MARK: - Previews
-
-struct ScaledPaddingModifier_Previews: PreviewProvider, TestablePreview {
-    static var previews: some View {
-        VStack(spacing: 8) {
-            ForEach(DynamicTypeSize.allCases, id: \.self) { size in
-                userProfileButtonLabel
-                    .dynamicTypeSize(size)
-            }
-        }
-    }
-    
-    static var userProfileButtonLabel: some View {
-        CompoundIcon(\.userProfile, size: .medium, relativeTo: .title)
-            .foregroundStyle(.compound.iconOnSolidPrimary)
-            .scaledPadding(6, relativeTo: .title)
-            .background(.compound.bgAccentRest, in: Circle())
-    }
-}

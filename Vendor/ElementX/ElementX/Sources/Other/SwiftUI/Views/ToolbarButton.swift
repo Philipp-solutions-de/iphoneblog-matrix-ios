@@ -81,22 +81,3 @@ struct ToolbarButton: View {
         Button(role.title, action: action)
     }
 }
-
-struct ToolbarButton_Previews: PreviewProvider, TestablePreview {
-    static var previews: some View {
-        ElementNavigationStack {
-            Color.clear
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        ToolbarButton(role: .done) { }
-                    }
-                    ToolbarItem(placement: .cancellationAction) {
-                        ToolbarButton(role: .cancel) { }
-                    }
-                    ToolbarItem(placement: .primaryAction) {
-                        ToolbarButton(role: .destructive(title: L10n.actionRemove)) { }
-                    }
-                }
-        }
-    }
-}

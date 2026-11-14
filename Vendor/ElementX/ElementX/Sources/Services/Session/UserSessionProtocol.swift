@@ -18,19 +18,16 @@ struct SessionSecurityState: Equatable {
     let recoveryState: SecureBackupRecoveryState
 }
 
-// sourcery: AutoMockable
+// iphoneblog: calls, notifications and hooks left out; live location is a no-op (Shim/LeftOut.swift).
 protocol UserSessionProtocol: Sendable {
     var clientProxy: ClientProxyProtocol { get }
     var userSettings: UserSettings { get }
-    var userHooks: UserHooks { get }
     
     var mediaProvider: MediaProviderProtocol { get }
     var voiceMessageMediaManager: VoiceMessageMediaManagerProtocol { get }
     var liveLocationService: LiveLocationServiceProtocol { get }
     /// Scans media content, `nil` when no content scanner is configured for the server.
     var contentScannerService: ContentScannerServiceProtocol? { get }
-    var notificationService: NotificationServiceProtocol { get }
-    var elementCallService: ElementCallServiceProtocol { get }
     
     var sessionSecurityStatePublisher: CurrentValuePublisher<SessionSecurityState, Never> { get }
     

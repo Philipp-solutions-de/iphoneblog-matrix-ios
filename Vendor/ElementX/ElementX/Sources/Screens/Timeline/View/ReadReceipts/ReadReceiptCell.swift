@@ -57,27 +57,3 @@ struct ReadReceiptCell: View {
         .padding(.horizontal, 16)
     }
 }
-
-struct ReadReceiptCell_Previews: PreviewProvider, TestablePreview {
-    static var previews: some View {
-        ReadReceiptCell(readReceipt: .init(userID: "@test:matrix.org",
-                                           formattedTimestamp: "10:00"),
-                        memberState: .init(displayName: "Test",
-                                           avatarURL: nil,
-                                           status: .init()),
-                        mediaProvider: MediaProviderMock(.init()))
-            .previewDisplayName("No Image")
-        ReadReceiptCell(readReceipt: .init(userID: "@test:matrix.org",
-                                           formattedTimestamp: "10:00"),
-                        memberState: .init(displayName: "Test",
-                                           avatarURL: .mockMXCUserAvatar,
-                                           status: .init()),
-                        mediaProvider: MediaProviderMock(.init()))
-            .previewDisplayName("With Image")
-        ReadReceiptCell(readReceipt: .init(userID: "@test:matrix.org",
-                                           formattedTimestamp: "10:00"),
-                        memberState: nil,
-                        mediaProvider: MediaProviderMock(.init()))
-            .previewDisplayName("Loading Member")
-    }
-}

@@ -88,38 +88,3 @@ private struct BigIconModifier: ViewModifier {
 }
 
 // MARK: - Previews
-
-public struct BigIcon_Previews: PreviewProvider, TestablePreview {
-    public static var previews: some View {
-        VStack(spacing: 40) {
-            HStack(spacing: 20) {
-                BigIcon(icon: \.lockSolid)
-                Image(systemName: "hourglass")
-                    .bigIcon()
-                Image(systemSymbol: .serverRack)
-                    .bigIcon(insets: 19)
-            }
-            
-            states
-        }
-    }
-    
-    public static var states: some View {
-        VStack(spacing: 20) {
-            HStack(spacing: 20) {
-                BigIcon(icon: \.helpSolid)
-                BigIcon(icon: \.helpSolid, style: .default)
-            }
-            
-            HStack(spacing: 20) {
-                BigIcon(icon: \.errorSolid, style: .alertSolid)
-                BigIcon(icon: \.errorSolid, style: .alert)
-            }
-            
-            HStack(spacing: 20) {
-                BigIcon(icon: \.checkCircleSolid, style: .successSolid)
-                BigIcon(icon: \.checkCircleSolid, style: .success)
-            }
-        }
-    }
-}

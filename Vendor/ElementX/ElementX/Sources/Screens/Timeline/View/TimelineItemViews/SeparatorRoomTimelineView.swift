@@ -21,11 +21,3 @@ struct SeparatorRoomTimelineView: View {
             .padding(.vertical, 8.0)
     }
 }
-
-struct SeparatorRoomTimelineView_Previews: PreviewProvider, TestablePreview {
-    static var previews: some View {
-        let item = SeparatorRoomTimelineItem(id: .virtual(uniqueID: .init("Separator")),
-                                             timestamp: .mock)
-        SeparatorRoomTimelineView(timelineItem: item)
-    }
-}

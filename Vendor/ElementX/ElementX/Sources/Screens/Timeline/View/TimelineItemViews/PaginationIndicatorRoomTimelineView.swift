@@ -15,9 +15,3 @@ struct PaginationIndicatorRoomTimelineView: View {
             .padding(.top, 12) // Bottom spacing comes from the next item (date separator).
     }
 }
-
-struct PaginationIndicatorRoomTimelineView_Previews: PreviewProvider, TestablePreview {
-    static var previews: some View {
-        PaginationIndicatorRoomTimelineView()
-    }
-}

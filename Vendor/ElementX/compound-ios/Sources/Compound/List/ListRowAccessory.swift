@@ -88,38 +88,3 @@ public struct ListRowAccessory: View {
 }
 
 // MARK: - Previews
-
-struct ListRowAccessory_Previews: PreviewProvider, TestablePreview {
-    static var previews: some View {
-        Grid(alignment: .leading, verticalSpacing: 16) {
-            row(title: "Navigation Link", accessory: .navigationLink)
-            row(title: "Navigation Link disabled", accessory: .navigationLink)
-                .disabled(true)
-            
-            row(title: "Selected", accessory: .selection(true))
-            row(title: "Selected disabled", accessory: .selection(true))
-                .disabled(true)
-            
-            row(title: "Unselected", accessory: .selection(false))
-            row(title: "Unselected disabled", accessory: .selection(false))
-                .disabled(true)
-            
-            row(title: "Multi-selected", accessory: .multiSelection(true))
-            row(title: "Multi-selected disabled", accessory: .multiSelection(true))
-                .disabled(true)
-            
-            row(title: "Multi-unselected", accessory: .multiSelection(false))
-            row(title: "Multi-unselected disabled", accessory: .multiSelection(false))
-                .disabled(true)
-        }
-        .previewDisplayName("Accessories")
-    }
-    
-    static func row(title: String, accessory: ListRowAccessory) -> some View {
-        GridRow {
-            accessory
-            Text(title)
-                .foregroundStyle(.compound.textSecondary)
-        }
-    }
-}

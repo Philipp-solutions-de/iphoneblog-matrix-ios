@@ -111,13 +111,3 @@ private nonisolated struct WaveformShape: Shape {
         return path
     }
 }
-
-struct EstimatedWaveformView_Previews: PreviewProvider, TestablePreview {
-    static var previews: some View {
-        // Wrap the WaveformView in a VStack otherwise the preview test will fail (because of Prefire / GeometryReader)
-        VStack(spacing: 0) {
-            EstimatedWaveformView(waveform: EstimatedWaveform.mockWaveform, progress: 0.5)
-                .frame(width: 140, height: 50)
-        }
-    }
-}

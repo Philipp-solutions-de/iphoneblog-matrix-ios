@@ -12,8 +12,8 @@ let package = Package(
         .package(url: "https://github.com/element-hq/compound-design-tokens", exact: "11.3.1"),
         // .package(path: "../../compound-design-tokens"),
         .package(url: "https://github.com/siteline/SwiftUI-Introspect", exact: "27.1.0"),
-        .package(url: "https://github.com/SFSafeSymbols/SFSafeSymbols", exact: "7.0.0"),
-        .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", exact: "1.19.7")
+        .package(url: "https://github.com/SFSafeSymbols/SFSafeSymbols", exact: "7.0.0")
+        // iphoneblog: the snapshot tests are not vendored, so neither is their dependency.
     ],
     targets: [
         .target(
@@ -22,19 +22,6 @@ let package = Package(
                 .product(name: "CompoundDesignTokens", package: "compound-design-tokens"),
                 .product(name: "SwiftUIIntrospect", package: "SwiftUI-Introspect"),
                 .product(name: "SFSafeSymbols", package: "SFSafeSymbols")
-            ],
-            swiftSettings: [
-                .defaultIsolation(MainActor.self)
-            ]
-        ),
-        .testTarget(
-            name: "CompoundTests",
-            dependencies: [
-                "Compound",
-                .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
-            ],
-            exclude: [
-                "__Snapshots__"
             ],
             swiftSettings: [
                 .defaultIsolation(MainActor.self)

@@ -51,25 +51,3 @@ struct PlaceholderAvatarImage: View {
         Color.compound.decorativeColor(for: contentID)
     }
 }
-
-struct PlaceholderAvatarImage_Previews: PreviewProvider, TestablePreview {
-    static var previews: some View {
-        VStack(spacing: 75) {
-            PlaceholderAvatarImage(name: "Xavier", contentID: "@userid1:matrix.org")
-                .clipShape(Circle())
-                .frame(width: 150, height: 100)
-            
-            PlaceholderAvatarImage(name: "@*~AmazingName~*@", contentID: "@userid2:matrix.org")
-                .clipShape(Circle())
-                .frame(width: 150, height: 100)
-            
-            PlaceholderAvatarImage(name: nil, contentID: "@userid3:matrix.org")
-                .clipShape(Circle())
-                .frame(width: 150, height: 100)
-            
-            PlaceholderAvatarImage(name: nil, contentID: "@fooserid:matrix.org")
-                .clipShape(Circle())
-                .frame(width: 30, height: 30)
-        }
-    }
-}

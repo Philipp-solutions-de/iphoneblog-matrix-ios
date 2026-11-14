@@ -1334,34 +1334,6 @@ extension TimelineViewModel {
     }
 }
 
-// MARK: - Mocks
-
-extension TimelineViewModel {
-    static let mock = mock(timelineKind: .live)
-    
-    static func mock(timelineKind: TimelineKind = .live,
-                     timelineController: TimelineControllerMock? = nil,
-                     hasPredecessor: Bool = false,
-                     contentScannerService: ContentScannerServiceProtocol? = nil) -> TimelineViewModel {
-        let clientProxyMock = ClientProxyMock(.init())
-        clientProxyMock.roomSummaryForAliasReturnValue = .mock(id: "!room:matrix.org", name: "Room")
-        clientProxyMock.roomSummaryForIdentifierReturnValue = .mock(id: "!room:matrix.org", name: "Room", canonicalAlias: "#room:matrix.org")
-        let roomProxy = JoinedRoomProxyMock(.init(name: "Preview room", predecessor: hasPredecessor ? .init(roomId: UUID().uuidString) : nil))
-        
-        return TimelineViewModel(roomProxy: roomProxy,
-                                 focussedEventID: nil,
-                                 timelineController: timelineController ?? TimelineControllerMock(.init(timelineKind: timelineKind)),
-                                 userSession: UserSessionMock(.init(clientProxy: clientProxyMock, contentScannerService: contentScannerService)),
-                                 mediaPlayerProvider: MediaPlayerProviderMock(),
-                                 userIndicatorController: UserIndicatorControllerMock(),
-                                 appMediator: AppMediatorMock(.init()),
-                                 analyticsService: AnalyticsServiceMock(.init()),
-                                 emojiProvider: EmojiProvider(userSettings: .mock()),
-                                 linkMetadataProvider: LinkMetadataProvider(),
-                                 timelineControllerFactory: TimelineControllerFactoryMock(.init()))
-    }
-}
-
 extension EnvironmentValues {
     /// Used to access and inject the room context without observing it
     @Entry var timelineContext: TimelineViewModel.Context?

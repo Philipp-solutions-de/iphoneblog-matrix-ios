@@ -30,24 +30,3 @@ private struct ScaledOffsetModifier: ViewModifier {
 }
 
 // MARK: - Previews
-
-struct ScaledOffsetModifier_Previews: PreviewProvider, TestablePreview {
-    static var previews: some View {
-        VStack(spacing: 8) {
-            ForEach(DynamicTypeSize.allCases, id: \.self) { size in
-                verifiedUserComposite
-                    .dynamicTypeSize(size)
-            }
-        }
-    }
-    
-    static var verifiedUserComposite: some View {
-        CompoundIcon(\.userSolid)
-            .foregroundStyle(.compound.iconAccentTertiary)
-            .overlay {
-                CompoundIcon(\.verified, size: .custom(10), relativeTo: .body)
-                    .scaledOffset(x: 6, y: 6)
-                    .foregroundStyle(.compound.gradientActionStop1)
-            }
-    }
-}

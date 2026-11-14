@@ -67,12 +67,3 @@ private struct VoiceMessageRecordingBadge: View {
             }
     }
 }
-
-struct VoiceMessageRecordingView_Previews: PreviewProvider, TestablePreview {
-    static let recorderState = AudioRecorderState()
-    
-    static var previews: some View {
-        VoiceMessageRecordingView(recorderState: recorderState)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-}

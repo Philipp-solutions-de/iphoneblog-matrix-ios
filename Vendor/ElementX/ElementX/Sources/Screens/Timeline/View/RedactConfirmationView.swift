@@ -86,13 +86,3 @@ struct RedactConfirmationView: View {
 }
 
 // MARK: - Previews
-
-struct RedactConfirmationView_Previews: PreviewProvider, TestablePreview {
-    static var previews: some View {
-        RedactConfirmationView { _ in }
-            .previewDisplayName("Empty")
-        
-        RedactConfirmationView(reason: "Posted in the wrong room.") { _ in }
-            .previewDisplayName("Reason")
-    }
-}

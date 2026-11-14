@@ -22,9 +22,3 @@ struct ThreadDecorator: View {
         .labelStyle(.custom(spacing: 4))
     }
 }
-
-struct ThreadDecorator_Previews: PreviewProvider, TestablePreview {
-    static var previews: some View {
-        ThreadDecorator()
-    }
-}

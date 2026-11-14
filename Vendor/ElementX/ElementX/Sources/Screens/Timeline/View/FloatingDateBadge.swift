@@ -48,15 +48,3 @@ struct FloatingDateBadge: View {
 }
 
 // MARK: - Previews
-
-struct FloatingDateBadge_Previews: PreviewProvider, TestablePreview {
-    static var previews: some View {
-        VStack(spacing: 20) {
-            FloatingDateBadge(dateText: "Today")
-            FloatingDateBadge(dateText: "Yesterday")
-            FloatingDateBadge(dateText: "Tuesday, January 9, 2007")
-        }
-        .padding()
-        .previewLayout(.sizeThatFits)
-    }
-}

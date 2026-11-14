@@ -51,14 +51,3 @@ struct ContentScanningFailureView: View {
 }
 
 // MARK: - Previews
-
-struct ContentScanningFailureView_Previews: PreviewProvider, TestablePreview {
-    static var previews: some View {
-        VStack(spacing: 16) {
-            ContentScanningFailureView(failure: .notSafe)
-            ContentScanningFailureView(failure: .notFound)
-        }
-        .frame(width: 260)
-        .padding()
-    }
-}

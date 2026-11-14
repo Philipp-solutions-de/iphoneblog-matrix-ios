@@ -58,17 +58,3 @@ struct TimelineStartRoomTimelineView: View {
         return text
     }
 }
-
-struct TimelineStartRoomTimelineView_Previews: PreviewProvider, TestablePreview {
-    static let viewModel = TimelineViewModel.mock(hasPredecessor: true)
-    
-    static var previews: some View {
-        let item = TimelineStartRoomTimelineItem(name: "Alice and Bob")
-        TimelineStartRoomTimelineView(timelineItem: item)
-            .previewLayout(.sizeThatFits)
-        TimelineStartRoomTimelineView(timelineItem: item)
-            .environment(\.timelineContext, viewModel.context)
-            .previewLayout(.sizeThatFits)
-            .previewDisplayName("with predecessor")
-    }
-}

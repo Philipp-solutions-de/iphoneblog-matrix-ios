@@ -53,13 +53,3 @@ struct VoiceMessageTrashButton: View {
 }
 
 // MARK: - Previews
-
-struct VoiceMessageTrashButton_Previews: PreviewProvider, TestablePreview {
-    static var previews: some View {
-        HStack(spacing: 12) {
-            VoiceMessageTrashButton { }
-                .disabled(true)
-            VoiceMessageTrashButton { }
-        }
-    }
-}

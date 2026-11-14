@@ -37,21 +37,3 @@ private struct ScaledFrameModifier: ViewModifier {
 }
 
 // MARK: - Previews
-
-struct ScaledFrameModifier_Previews: PreviewProvider, TestablePreview {
-    static var previews: some View {
-        VStack(spacing: 8) {
-            ForEach(DynamicTypeSize.allCases, id: \.self) { size in
-                likeButtonLabel
-                    .dynamicTypeSize(size)
-            }
-        }
-    }
-    
-    static var likeButtonLabel: some View {
-        Image(systemSymbol: .heartCircleFill)
-            .resizable()
-            .foregroundStyle(.compound.iconAccentTertiary)
-            .scaledFrame(size: 24, relativeTo: .title)
-    }
-}
