@@ -67,6 +67,27 @@ A tap opens the channel or the thread. Unencrypted rooms make this simple: no ke
 with the extension. Apple's notification-filtering entitlement is requested for Alex's
 account so the extension may drop pushes it cannot show.
 
+**Reuse before writing.** The Matrix engine's UI layer (`matrix-sdk-ui`, part of
+matrix-rust-sdk, Apache-2.0, shipped inside the Swift bindings) already does the hard part of
+every screen: it keeps the lists, merges events, pages back, handles threads and sends. Our
+code is the SwiftUI views on top. Element X's own views are AGPL-3.0; copying them would make
+this app AGPL too, so we read them for how they use the SDK and write our own views.
+
+| Part | From matrix-sdk-ui / open source | Our own code |
+|---|---|---|
+| Sync | `SyncService` (sliding sync, offline, restart) | start and stop with the app's life cycle |
+| Room list | `RoomListService`, `RoomList` with filters and diffs, unread counts and mention counts per room | `RoomListModel` applies the diffs; the list view |
+| Timeline | `Timeline`: items with sender, grouping, day dividers, edits, redactions, reactions, read receipts, back-pagination, local echo | message row, image row, link card, reaction chips |
+| Threads | `Timeline` focused on a thread (`TimelineConfiguration` with a thread focus), thread summaries on root events, thread subscriptions | thread view, the "5 Antworten" line, the Threads tab |
+| Composer | send queue with retries (`sendQueue`), replies, edits, mentions as `m.mentions`, media upload | the text field, the @-completion list (user search via the SDK) |
+| Media | `getMediaThumbnail`, `getMediaFile`, upload with progress; caches in the SDK store | image view, full-screen viewer |
+| Push | `NotificationClient` in the extension: fetches the event and the sender's name | the extension's text ("Name in #channel: text"), the pusher registration, the tap to open |
+| Sign-in | OAuth 2.0 with PKCE and dynamic client registration in `Client` | one button and `ASWebAuthenticationSession` |
+
+Not reused on purpose: Element X's screens and its design system compound-ios (both AGPL);
+rich-text editors (we send plain text with mentions). Standby 7's survey of further reuse
+(`2026-11-14_research-matrix-reuse.md`) may move a row; this table follows its ranking.
+
 **What the screens offer** (see the design proposal): channel list with unread markers,
 channel timeline with thread summaries, a thread view, direct messages, mentions with
 @-completion, images (send and view), reactions, a settings screen (name, picture, push,
