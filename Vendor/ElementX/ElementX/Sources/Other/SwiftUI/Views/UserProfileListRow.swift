@@ -1,0 +1,64 @@
+//
+// Copyright 2025 Element Creations Ltd.
+// Copyright 2023-2025 New Vector Ltd.
+//
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial.
+// Please see LICENSE files in the repository root for full details.
+//
+
+import Compound
+import MatrixRustSDK
+import SwiftUI
+
+struct UserProfileListRow: View {
+    let user: UserProfile
+    let membership: MembershipState?
+    let mediaProvider: MediaProviderProtocol?
+    
+    let kind: ListRow<LoadableAvatarImage, EmptyView, EmptyView, Bool>.Kind<EmptyView, Bool>
+    
+    var isUnknownProfile: Bool {
+        !user.isVerified && membership == nil
+    }
+    
+    private var subtitle: String? {
+        guard !isUnknownProfile else { return L10n.commonInviteUnknownProfile }
+        
+        if let membershipText = membership?.localizedDescription {
+            return membershipText
+        } else if user.displayName != nil {
+            return user.id
+        } else {
+            return nil
+        }
+    }
+    
+    var body: some View {
+        ListRow(label: .avatar(title: user.displayName ?? user.id,
+                               description: subtitle,
+                               icon: avatar,
+                               role: isUnknownProfile ? .error : nil),
+                kind: kind)
+    }
+    
+    var avatar: LoadableAvatarImage {
+        LoadableAvatarImage(url: user.avatarURL,
+                            name: user.displayName,
+                            contentID: user.id,
+                            avatarSize: .user(on: .startChat),
+                            mediaProvider: mediaProvider)
+    }
+}
+
+private extension MembershipState {
+    var localizedDescription: String? {
+        switch self {
+        case .join:
+            return L10n.screenInviteUsersAlreadyAMember
+        case .invite:
+            return L10n.screenInviteUsersAlreadyInvited
+        default:
+            return nil
+        }
+    }
+}

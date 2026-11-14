@@ -4,7 +4,7 @@ Copyright 2026 the iphoneblog-matrix-ios authors
 This program is free software: you can redistribute it and/or modify it under the terms
 of the GNU Affero General Public License version 3 (LICENSE).
 
-It contains, or will contain under Vendor/ElementX/, code from Element X iOS
+It contains under Vendor/ElementX/ code from Element X iOS
 (https://github.com/element-hq/element-x-ios):
   Copyright 2025 Element Creations Ltd.
   Copyright 2022-2025 New Vector Ltd.
@@ -15,3 +15,11 @@ neither and is not made, endorsed or supported by Element.
 
 It uses matrix-rust-sdk through matrix-rust-components-swift
 (https://github.com/element-hq/matrix-rust-components-swift), Apache License 2.0.
+
+Swift packages ChatKit (Vendor/ElementX) builds with, each under its own licence:
+  Compound and compound-design-tokens, matrix-rich-text-editor-swift (Element, AGPL-3.0);
+  matrix-analytics-events and emojibase-bindings (matrix.org, Apache-2.0);
+  swift-algorithms and swift-collections (Apple, Apache-2.0); Kingfisher (MIT);
+  LRUCache (MIT); Mantis (MIT); SwiftUI-Flow (MIT); SwiftSoup (MIT);
+  DSWaveformImage (MIT); swift-ogg (element-hq, Apache-2.0); SwiftUI-Introspect (MIT);
+  SFSafeSymbols (MIT).

@@ -48,5 +48,5 @@ protocol ChatScreenProviding: AnyObject {
 /// The views the app uses. Vendor/ replaces the placeholder in one line here.
 @MainActor
 enum ChatScreens {
-    static var provider: ChatScreenProviding = PlaceholderChatScreens()
+    static var provider: ChatScreenProviding = ElementXChatScreens()
 }

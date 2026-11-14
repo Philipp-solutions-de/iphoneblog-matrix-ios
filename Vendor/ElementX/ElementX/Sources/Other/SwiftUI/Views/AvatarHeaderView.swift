@@ -1,0 +1,259 @@
+//
+// Copyright 2025 Element Creations Ltd.
+// Copyright 2023-2025 New Vector Ltd.
+//
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial.
+// Please see LICENSE files in the repository root for full details.
+//
+
+import Compound
+import Flow
+import SwiftUI
+
+struct AvatarHeaderView<Footer: View>: View {
+    private enum AvatarInfo {
+        case room(RoomAvatar)
+        case user(UserProfile)
+    }
+    
+    private enum Badge: Hashable {
+        case encrypted(Bool)
+        case historySharingState(RoomHistorySharingState)
+        case `public`
+        case verified
+    }
+    
+    private let avatarInfo: AvatarInfo
+    private let title: String
+    private let status: UserStatus?
+    private let subtitle: String?
+    private let badges: [Badge]
+    
+    private let avatarSize: Avatars.Size
+    private let mediaProvider: MediaProviderProtocol?
+    private var onAvatarTap: ((URL) -> Void)?
+    @ViewBuilder private var footer: () -> Footer
+    
+    init(room: RoomDetails,
+         avatarSize: Avatars.Size,
+         mediaProvider: MediaProviderProtocol? = nil,
+         onAvatarTap: ((URL) -> Void)? = nil,
+         @ViewBuilder footer: @escaping () -> Footer) {
+        avatarInfo = .room(room.avatar)
+        title = room.name ?? room.id
+        
+        if let roomAlias = room.canonicalAlias {
+            subtitle = roomAlias
+            status = nil
+        } else if room.isDirect, case let .heroes(heroes) = room.avatar, heroes.count == 1 {
+            subtitle = heroes[0].id
+            status = heroes[0].status
+        } else {
+            subtitle = nil
+            status = nil
+        }
+        
+        self.avatarSize = avatarSize
+        self.mediaProvider = mediaProvider
+        self.onAvatarTap = onAvatarTap
+        self.footer = footer
+        
+        var badges = [Badge]()
+        badges.append(.encrypted(room.isEncrypted))
+        if room.isPublic {
+            badges.append(.public)
+        }
+        if let state = room.historySharingState {
+            badges.append(.historySharingState(state))
+        }
+        self.badges = badges
+    }
+    
+    init(accountOwner: RoomMemberDetails,
+         dmRecipient: RoomMemberDetails,
+         mediaProvider: MediaProviderProtocol? = nil,
+         onAvatarTap: ((URL) -> Void)? = nil,
+         @ViewBuilder footer: @escaping () -> Footer) {
+        let dmRecipientProfile = UserProfile(member: dmRecipient)
+        avatarInfo = .room(.heroes([dmRecipientProfile, UserProfile(member: accountOwner)]))
+        title = dmRecipientProfile.displayName ?? dmRecipientProfile.id
+        subtitle = dmRecipientProfile.displayName == nil ? nil : dmRecipientProfile.id
+        status = dmRecipientProfile.status
+        
+        avatarSize = .user(on: .dmDetails)
+        self.mediaProvider = mediaProvider
+        self.onAvatarTap = onAvatarTap
+        self.footer = footer
+        // In EL-X a DM is by definition always encrypted
+        badges = [.encrypted(true)]
+    }
+    
+    init(member: RoomMemberDetails,
+         isVerified: Bool = false,
+         avatarSize: Avatars.Size,
+         mediaProvider: MediaProviderProtocol? = nil,
+         onAvatarTap: ((URL) -> Void)? = nil,
+         @ViewBuilder footer: @escaping () -> Footer) {
+        let profile = UserProfile(member: member)
+        
+        self.init(user: profile,
+                  isVerified: isVerified,
+                  avatarSize: avatarSize,
+                  mediaProvider: mediaProvider,
+                  onAvatarTap: onAvatarTap,
+                  footer: footer)
+    }
+    
+    init(user: UserProfile,
+         isVerified: Bool,
+         avatarSize: Avatars.Size,
+         mediaProvider: MediaProviderProtocol? = nil,
+         onAvatarTap: ((URL) -> Void)? = nil,
+         @ViewBuilder footer: @escaping () -> Footer) {
+        avatarInfo = .user(user)
+        title = user.displayName ?? user.id
+        status = user.status
+        subtitle = user.displayName == nil ? nil : user.id
+        
+        self.avatarSize = avatarSize
+        self.mediaProvider = mediaProvider
+        self.onAvatarTap = onAvatarTap
+        self.footer = footer
+        badges = isVerified ? [.verified] : []
+    }
+    
+    /// Initialises the view by using the sender,
+    /// only to be used when a room member has not been loaded yet.
+    init(sender: TimelineItemSender,
+         avatarSize: Avatars.Size,
+         mediaProvider: MediaProviderProtocol? = nil,
+         onAvatarTap: ((URL) -> Void)? = nil,
+         @ViewBuilder footer: @escaping () -> Footer) {
+        let profile = UserProfile(sender: sender)
+        
+        self.init(user: profile,
+                  isVerified: false,
+                  avatarSize: avatarSize,
+                  mediaProvider: mediaProvider,
+                  onAvatarTap: onAvatarTap,
+                  footer: footer)
+    }
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            avatar
+            
+            VStack(spacing: 12) {
+                Text(title)
+                    .foregroundStyle(.compound.textPrimary)
+                    .font(.compound.headingMDBold)
+                    .multilineTextAlignment(.center)
+                    .textSelection(.enabled)
+                
+                if let displayedStatus = status?.displayed {
+                    HStack(spacing: 6) {
+                        Text(String(displayedStatus.emoji))
+                            .foregroundStyle(.compound.textPrimary)
+                        Text(displayedStatus.text)
+                            .foregroundStyle(.compound.textSecondary)
+                    }
+                    .font(.compound.bodyMDSemibold)
+                    .multilineTextAlignment(.center)
+                }
+                
+                if let subtitle {
+                    Text(subtitle)
+                        .foregroundStyle(.compound.textSecondary)
+                        .font(.compound.bodyLG)
+                        .multilineTextAlignment(.center)
+                        .textSelection(.enabled)
+                }
+                
+                if !badges.isEmpty {
+                    badgesStack
+                }
+            }
+            
+            footer()
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 11,
+                                  leading: 0,
+                                  bottom: 11,
+                                  trailing: 0))
+    }
+    
+    @ViewBuilder
+    private var avatar: some View {
+        switch avatarInfo {
+        case .room(let roomAvatar):
+            RoomAvatarImage(avatar: roomAvatar,
+                            avatarSize: avatarSize,
+                            mediaProvider: mediaProvider,
+                            onAvatarTap: onAvatarTap)
+                .accessibilityLabel(avatarAccessibilityLabel)
+            
+        case .user(let userProfile):
+            LoadableAvatarImage(url: userProfile.avatarURL,
+                                name: userProfile.displayName,
+                                contentID: userProfile.id,
+                                avatarSize: avatarSize,
+                                mediaProvider: mediaProvider,
+                                onTap: onAvatarTap)
+                .accessibilityLabel(avatarAccessibilityLabel)
+        }
+    }
+    
+    private var avatarAccessibilityLabel: String {
+        guard onAvatarTap != nil else {
+            return L10n.a11yAvatar
+        }
+        switch avatarInfo {
+        case .room(let roomAvatar):
+            return roomAvatar.hasURL ? L10n.a11yViewAvatar : L10n.a11yAvatar
+        case .user(let userProfile):
+            return userProfile.avatarURL != nil ? L10n.a11yViewAvatar : L10n.a11yAvatar
+        }
+    }
+    
+    private var badgesStack: some View {
+        HFlow(horizontalAlignment: .center,
+              verticalAlignment: .top,
+              horizontalSpacing: 8.0,
+              verticalSpacing: 8.0) {
+            ForEach(badges, id: \.self) { badge in
+                switch badge {
+                case .encrypted(true):
+                    BadgeLabel(title: L10n.screenRoomDetailsBadgeEncrypted,
+                               icon: \.lockSolid,
+                               style: .accent)
+                case .encrypted(false):
+                    BadgeLabel(title: L10n.screenRoomDetailsBadgeNotEncrypted,
+                               icon: \.lockOff,
+                               style: .info)
+                case .public:
+                    BadgeLabel(title: L10n.screenRoomDetailsBadgePublic,
+                               icon: \.public,
+                               style: .info)
+                case .verified:
+                    BadgeLabel(title: L10n.commonVerified,
+                               icon: \.verified,
+                               style: .accent)
+                case .historySharingState(.hidden):
+                    BadgeLabel(title: L10n.cryptoHistorySharingRoomInfoHiddenBadgeContent,
+                               icon: \.visibilityOff,
+                               style: .info)
+                case .historySharingState(.shared):
+                    BadgeLabel(title: L10n.cryptoHistorySharingRoomInfoSharedBadgeContent,
+                               icon: \.history,
+                               style: .info)
+                case .historySharingState(.worldReadable):
+                    BadgeLabel(title: L10n.cryptoHistorySharingRoomInfoWorldReadableBadgeContent,
+                               icon: \.userProfileSolid,
+                               style: .info)
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,53 @@
+//
+// Copyright 2025 Element Creations Ltd.
+// Copyright 2022-2025 New Vector Ltd.
+//
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial.
+// Please see LICENSE files in the repository root for full details.
+//
+
+import Compound
+import SwiftUI
+
+struct PlaceholderAvatarImage: View {
+    @Environment(\.redactionReasons) private var redactionReasons
+    
+    private let textForImage: String
+    private let contentID: String
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .center) {
+                backgroundColor
+                
+                // This text's frame doesn't look right when redacted
+                if redactionReasons != .placeholder {
+                    Text(textForImage)
+                        .foregroundColor(avatarColor?.text ?? .white)
+                        .font(.system(size: geometry.size.width * 0.5625, weight: .semibold))
+                        .minimumScaleFactor(0.001)
+                        .frame(alignment: .center)
+                }
+            }
+        }
+        .aspectRatio(1, contentMode: .fill)
+    }
+    
+    init(name: String?, contentID: String) {
+        let baseName = name ?? contentID.trimmingCharacters(in: .punctuationCharacters)
+        textForImage = baseName.first?.uppercased() ?? ""
+        self.contentID = contentID
+    }
+    
+    private var backgroundColor: Color {
+        if redactionReasons.contains(.placeholder) {
+            return Color(.systemGray4) // matches the default text redaction
+        }
+        
+        return avatarColor?.background ?? .compound.iconPrimary
+    }
+    
+    private var avatarColor: DecorativeColor? {
+        Color.compound.decorativeColor(for: contentID)
+    }
+}

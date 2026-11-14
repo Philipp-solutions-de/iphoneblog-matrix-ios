@@ -26,10 +26,10 @@ iPad and Apple-silicon Macs.
 
 ## Decisions
 
-**SwiftUI, iOS 17 and later.** One view tree for iPhone and iPad: `NavigationSplitView`
+**SwiftUI, iOS 18.5 and later.** One view tree for iPhone and iPad: `NavigationSplitView`
 gives the iPad a channel column beside the conversation, and the iPhone a stack. The same
 build runs on Apple-silicon Macs as an iPad app ("Designed for iPad"); no Mac-specific work.
-iOS 17 covers every iPhone from the XS on.
+iOS 18 covers every iPhone from the XS on, the same set as iOS 17; ChatKit (below) needs 18.5.
 
 **The Matrix engine as a pinned Swift package.** `matrix-rust-components-swift`, the same
 binding Element X uses, pinned with `exactVersion` in `project.yml`. The SDK does sync,
@@ -85,29 +85,35 @@ That code is AGPL-3.0, so this app is AGPL-3.0 too; the repository is public, as
 | Push | `NotificationClient` | | extension text, pusher registration, tap routing |
 | Sign-in | OAuth 2.0, PKCE, dynamic registration | | one button, `ASWebAuthenticationSession` |
 
-Cut while transplanting: encryption and verification UI, calls, polls, location, voice
-messages, the rich-text editor (`WysiwygComposer`), analytics. Element's name and logo never
-appear (trademark).
+Left out while transplanting: encryption and verification UI, calls, location (it needs a map
+provider), pinned messages, analytics and crash reporting. Voice messages and polls from other
+clients still show; our app cannot record or create them. Element's name and logo never appear
+(trademark). The full list with reasons: `Vendor/ElementX/UPSTREAM.md`.
 
-**Kept apart so it can be re-synced or swapped.**
+**Kept apart so it can be re-synced or swapped.** Element X's code is Swift 6 with main-actor
+default isolation, so it builds as its own framework, `ChatKit`; the app imports it.
 
 ```
-Vendor/ElementX/            Element X files, unchanged where possible; Element's headers kept
-  UPSTREAM.md               upstream tag, the list of copied paths, every local edit and why
-  Sources/...               same relative paths as upstream (ElementX/Sources/...)
-  compound-ios/
-App/Sources/Bridge/         our adapters: the protocols the copied views expect
-                            (media provider, timeline controller, user indicators, L10n, routing)
+Vendor/ElementX/            Element X files (Element's headers kept) and our code around them
+  UPSTREAM.md               upstream tag, what is copied and left out, every local edit and why
+  paths.txt, patches/       what scripts/sync-elementx.sh copies, and our edits to those files
+  ElementX/, compound-ios/  the copy, same relative paths as upstream
+  Shim/                     our code in ChatKit: ChatKitSession, room and thread screens, stand-ins
+  Adapter/                  our code in the app target: implements ChatScreenProviding
+App/Sources/Bridge/         the app's contract: ChatHost (app) and ChatScreenProviding (Vendor)
 App/Sources/...             our shell: sign-in, room list, settings, navigation, push
 ```
 
 - `scripts/sync-elementx.sh <tag>` copies the listed paths from an Element X release into
-  `Vendor/ElementX/` and reapplies `Vendor/ElementX/patches/*.patch` (our local edits, small and
-  named). A re-sync is a diff to review, not a hand merge. We re-sync when a fix we need lands
-  upstream, not on every release.
-- Our code never reaches into Element X's coordinators or services; it talks to the copied
-  views only through `App/Sources/Bridge/`. Swapping the views for exyte/Chat (MIT) later means
-  replacing `Vendor/ElementX/` and the bridge, not the shell.
+  `Vendor/ElementX/`, strips SwiftUI previews and mocks, and reapplies
+  `Vendor/ElementX/patches/*.patch` (nine small, named edits today). A re-sync is a diff to
+  review, not a hand merge. We re-sync when a fix we need lands upstream, not on every release.
+  CI checks that the copy matches tag plus patches.
+- Where upstream code names a part we left out, a same-named file in `Shim/` stands in, so the
+  upstream file needs no patch.
+- Our shell never reaches into Element X's code; it talks to ChatKit only through
+  `App/Sources/Bridge/` and `Vendor/ElementX/Adapter/`. Swapping the views for exyte/Chat (MIT)
+  later means replacing `Vendor/ElementX/`, not the shell.
 - The SDK pin and the vendored Element X tag move separately. The bump workflow moves the SDK;
   a red build after an SDK bump may need a re-sync of the matching Element X release, which
   pins the same SDK line.

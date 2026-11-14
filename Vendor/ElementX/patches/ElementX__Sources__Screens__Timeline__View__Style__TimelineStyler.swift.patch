@@ -1,0 +1,11 @@
+--- a/ElementX/Sources/Screens/Timeline/View/Style/TimelineStyler.swift
++++ b/ElementX/Sources/Screens/Timeline/View/Style/TimelineStyler.swift
+@@ -50,6 +50,7 @@
+     }
+     
+     var mainContent: some View {
+-        TimelineItemBubbledStylerView(timelineItem: timelineItem, adjustedDeliveryStatus: adjustedDeliveryStatus, content: content)
++        // iphoneblog: rows in the design's Slack style instead of bubbles (Shim/TimelineRowStyler.swift).
++        TimelineItemRowStylerView(timelineItem: timelineItem, adjustedDeliveryStatus: adjustedDeliveryStatus, content: content)
+     }
+ }

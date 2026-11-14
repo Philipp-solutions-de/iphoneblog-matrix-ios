@@ -1,0 +1,35 @@
+--- a/ElementX/Sources/Screens/Timeline/View/Supplementary/TimelineReactionsView.swift
++++ b/ElementX/Sources/Screens/Timeline/View/Supplementary/TimelineReactionsView.swift
+@@ -254,32 +254,6 @@
+                 .padding(.horizontal, 12)
+                 .foregroundColor(.compound.iconSecondary)
+                 .accessibilityLabel(L10n.actionReact)
+-        }
+-    }
+-}
+-
+-struct TimelineReactionViewPreviewsContainer: View {
+-    var body: some View {
+-        VStack(spacing: 8) {
+-            TimelineReactionsView(context: TimelineViewModel.mock.context,
+-                                  itemID: .randomEvent,
+-                                  reactions: [AggregatedReaction.mockReactionWithLongText,
+-                                              AggregatedReaction.mockReactionWithLongTextRTL])
+-            Divider()
+-            TimelineReactionsView(context: TimelineViewModel.mock.context,
+-                                  itemID: .randomEvent,
+-                                  reactions: Array(AggregatedReaction.mockReactions.prefix(3)))
+-            Divider()
+-            TimelineReactionsView(context: TimelineViewModel.mock.context,
+-                                  itemID: .randomEvent,
+-                                  reactions: AggregatedReaction.mockReactions)
+-            Divider()
+-            TimelineReactionsView(context: TimelineViewModel.mock.context,
+-                                  itemID: .randomEvent,
+-                                  reactions: AggregatedReaction.mockReactions,
+-                                  isLayoutRTL: true)
+         }
+-        .background(Color.red)
+-        .frame(maxWidth: 250, alignment: .leading)
+     }
+ }

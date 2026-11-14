@@ -43,6 +43,9 @@ jobs:
           scripts/install-xcodegen.sh build/tools >> "$GITHUB_PATH"
           brew install uv
 
+      - name: Vendor/ElementX matches its Element X release plus our patches
+        run: scripts/sync-elementx.sh --check
+
       - name: Generate the project
         run: scripts/configure.sh
 
@@ -101,6 +104,9 @@ jobs:
         run: |
           scripts/install-xcodegen.sh build/tools >> "$GITHUB_PATH"
           bundle install
+      - name: Vendor/ElementX matches its Element X release plus our patches
+        run: scripts/sync-elementx.sh --check
+
       - name: Generate the project
         run: scripts/configure.sh
       - name: Build and upload

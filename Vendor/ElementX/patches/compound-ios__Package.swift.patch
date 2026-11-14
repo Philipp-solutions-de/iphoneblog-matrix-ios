@@ -1,0 +1,33 @@
+--- a/compound-ios/Package.swift
++++ b/compound-ios/Package.swift
+@@ -12,8 +12,8 @@
+         .package(url: "https://github.com/element-hq/compound-design-tokens", exact: "11.3.1"),
+         // .package(path: "../../compound-design-tokens"),
+         .package(url: "https://github.com/siteline/SwiftUI-Introspect", exact: "27.1.0"),
+-        .package(url: "https://github.com/SFSafeSymbols/SFSafeSymbols", exact: "7.0.0"),
+-        .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", exact: "1.19.7")
++        .package(url: "https://github.com/SFSafeSymbols/SFSafeSymbols", exact: "7.0.0")
++        // iphoneblog: the snapshot tests are not vendored, so neither is their dependency.
+     ],
+     targets: [
+         .target(
+@@ -26,19 +26,6 @@
+             swiftSettings: [
+                 .defaultIsolation(MainActor.self)
+             ]
+-        ),
+-        .testTarget(
+-            name: "CompoundTests",
+-            dependencies: [
+-                "Compound",
+-                .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
+-            ],
+-            exclude: [
+-                "__Snapshots__"
+-            ],
+-            swiftSettings: [
+-                .defaultIsolation(MainActor.self)
+-            ]
+         )
+     ]
+ )

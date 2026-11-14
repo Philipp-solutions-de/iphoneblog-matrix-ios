@@ -1,0 +1,124 @@
+//
+// Copyright 2025 Element Creations Ltd.
+// Copyright 2023-2025 New Vector Ltd.
+//
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial.
+// Please see LICENSE files in the repository root for full details.
+//
+
+import DSWaveformImage
+import DSWaveformImageViews
+import SwiftUI
+
+struct VoiceMessageRoomPlaybackView: View {
+    @ObservedObject var playerState: AudioPlayerState
+    @ScaledMetric private var waveformLineWidth = 2.0
+    @ScaledMetric private var waveformLinePadding = 2.0
+    @GestureState var isDragging = false
+    
+    /// Whether the voice message is being scanned by the content scanner, in which case
+    /// the play button shows a spinner and playback isn't available (which prevents the audio file from being downloaded).
+    var isScanning = false
+    
+    let onPlayPause: () -> Void
+    let onSeek: (Double) -> Void
+    let onScrubbing: (Bool) -> Void
+    let onPlaybackSpeedChange: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            VoiceMessageButton(state: isScanning ? .loading : .init(playerState.playerButtonPlaybackState),
+                               size: .medium,
+                               action: onPlayPause)
+            VStack(spacing: 2) {
+                PlaybackSpeedButton(speed: playerState.playbackSpeed,
+                                    onTap: onPlaybackSpeedChange)
+                Text(timeLabelContent)
+                    .lineLimit(1)
+                    .font(.compound.bodyXSSemibold)
+                    .foregroundColor(.compound.textSecondary)
+                    .monospacedDigit()
+                    .fixedSize(horizontal: true, vertical: true)
+            }
+            
+            waveformView
+                .waveformInteraction(isDragging: $isDragging,
+                                     progress: playerState.progress,
+                                     showCursor: playerState.showProgressIndicator,
+                                     onSeek: onSeek)
+        }
+        .padding(.leading, 2)
+        .padding(.trailing, 8)
+        .onChange(of: isDragging) { _, newValue in
+            onScrubbing(newValue)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel)
+    }
+    
+    // MARK: - Private
+    
+    private var durationString: String {
+        let duration = Date(timeIntervalSinceReferenceDate: playerState.duration)
+        return if playerState.duration >= 600 {
+            DateFormatter.longElapsedTimeFormatter.string(from: duration)
+        } else {
+            DateFormatter.elapsedTimeFormatter.string(from: duration)
+        }
+    }
+    
+    private var timeLabelContent: String {
+        // Display the duration if progress is 0.0
+        let percent = playerState.progress > 0.0 ? playerState.progress : 1.0
+        // If the duration is greater or equal 10 minutes, use the long format
+        let elapsed = Date(timeIntervalSinceReferenceDate: playerState.duration * percent)
+        if playerState.duration >= 600 {
+            return DateFormatter.longElapsedTimeFormatter.string(from: elapsed)
+        } else {
+            return DateFormatter.elapsedTimeFormatter.string(from: elapsed)
+        }
+    }
+    
+    private var accessibilityLabel: String {
+        if playerState.progress > 0.0 {
+            L10n.a11yPausedVoiceMessage(durationString, timeLabelContent)
+        } else {
+            L10n.a11yVoiceMessage(durationString)
+        }
+    }
+    
+    @ViewBuilder
+    private var waveformView: some View {
+        if let url = playerState.fileURL {
+            WaveformView(audioURL: url,
+                         configuration: .init(style: .striped(.init(color: .black, width: waveformLineWidth, spacing: waveformLinePadding)),
+                                              verticalScalingFactor: 1.0)) {
+                estimatedWaveformView
+            }
+            .progressMask(progress: playerState.progress)
+        } else {
+            estimatedWaveformView
+        }
+    }
+    
+    private var estimatedWaveformView: some View {
+        EstimatedWaveformView(lineWidth: waveformLineWidth,
+                              linePadding: waveformLinePadding,
+                              waveform: playerState.waveform,
+                              progress: playerState.progress)
+    }
+}
+
+private extension DateFormatter {
+    static let elapsedTimeFormatter: DateFormatter = {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "m:ss"
+        return dateFormatter
+    }()
+    
+    static let longElapsedTimeFormatter: DateFormatter = {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "mm:ss"
+        return dateFormatter
+    }()
+}

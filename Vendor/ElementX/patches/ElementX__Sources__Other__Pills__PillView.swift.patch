@@ -1,0 +1,16 @@
+--- a/ElementX/Sources/Other/Pills/PillView.swift
++++ b/ElementX/Sources/Other/Pills/PillView.swift
+@@ -15,11 +15,11 @@
+     let didChangeText: () -> Void
+     
+     var textColor: Color {
+-        context.viewState.isOwnMention ? .compound.textBadgeAccent : .compound.textOnSolidPrimary
++        context.viewState.isOwnMention ? .compound.textBadgeAccent : MentionPillColors.foreground
+     }
+     
+     var backgroundColor: Color {
+-        context.viewState.isOwnMention ? .compound.bgBadgeAccent : .compound.bgBadgePrimary
++        context.viewState.isOwnMention ? .compound.bgBadgeAccent : MentionPillColors.background
+     }
+     
+     var body: some View {
