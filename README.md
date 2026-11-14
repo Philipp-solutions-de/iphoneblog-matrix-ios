@@ -42,15 +42,10 @@ debug build `IPHONEBLOG_DEV_USER` and `IPHONEBLOG_DEV_PASSWORD` to sign in by it
 
 ## TestFlight
 
-The upload is written and switched off. Once Alex's company developer account exists:
-
-1. Put its team id into `TEAM_ID` in `brand.env`.
-2. In App Store Connect create the app record for `BUNDLE_ID` and an API key with the Admin
-   role (automatic signing registers the app id, app group and profiles with it).
-3. Add the repository secrets `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_KEY_P8_BASE64`
-   (`base64 -i AuthKey_XXXX.p8`).
-4. Create the APNs key for Sygnal (app id `de.iphoneblog.matrix.ios.prod`).
-5. Set the repository variable `TESTFLIGHT_ENABLED` to `true`.
+The upload is written and switched off. Until Alex's company account exists the app ships as
+`de.iphoneblog.matrix.preview` under Thorsten's personal team. The steps a person does at
+Apple, in order, with the commands that put the key into the repository:
+[docs/apple-setup.md](docs/apple-setup.md).
 
 ## License
 

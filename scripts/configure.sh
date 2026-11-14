@@ -11,6 +11,7 @@ set -a
 # shellcheck source=../brand.env
 . ./brand.env
 set +a
+TEAM_ID="${APPLE_TEAM_ID:-}"
 
 if (( ${#APP_DISPLAY_NAME} > 12 )); then
     echo "configure.sh: APP_DISPLAY_NAME is longer than 12 characters" >&2
@@ -28,6 +29,7 @@ enum Brand {
     static let appName = "$APP_DISPLAY_NAME"
     static let bundleID = "$BUNDLE_ID"
     static let appGroupID = "$APP_GROUP_ID"
+    static let notificationExtensionBundleID = "$BUNDLE_ID.nse"
 
     static let serverName = "$MATRIX_SERVER_NAME"
     static let homeserverURL = "$MATRIX_HOMESERVER_URL"

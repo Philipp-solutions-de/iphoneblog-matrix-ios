@@ -60,7 +60,7 @@ encrypted room. A second or third device signs in and sees all history at once; 
 room list loads in one round trip whatever the number of rooms.
 
 **Push through our own Sygnal.** The app registers a pusher with app id
-`de.iphoneblog.matrix.ios.prod` and the gateway `https://matrix.iphoneblog.de/_matrix/push/v1/notify`.
+`<BUNDLE_ID>.ios.prod` (today `de.iphoneblog.matrix.preview.ios.prod`, Thorsten's team; see apple-setup.md) and the gateway `https://matrix.iphoneblog.de/_matrix/push/v1/notify`.
 A notification service extension (second target, shared app group) receives each push,
 fetches the event with the SDK's notification client and writes "Name in #channel: text".
 A tap opens the channel or the thread. Unencrypted rooms make this simple: no keys to share

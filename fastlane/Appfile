@@ -1,6 +1,4 @@
-# Read from brand.env so the bundle id and team live in one place.
+# Bundle id from brand.env, team id from the APPLE_TEAM_ID variable (docs/apple-setup.md).
 brand = File.read(File.expand_path("../brand.env", __dir__))
-value = ->(key) { brand[/^#{key}="?([^"\n]*)"?/, 1] }
-
-app_identifier(value.call("BUNDLE_ID"))
-team_id(value.call("TEAM_ID"))
+app_identifier(brand[/^BUNDLE_ID="?([^"\n]*)"?/, 1])
+team_id(ENV.fetch("APPLE_TEAM_ID", ""))

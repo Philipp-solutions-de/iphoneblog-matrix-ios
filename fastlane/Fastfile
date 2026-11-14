@@ -1,49 +1,110 @@
-# TestFlight upload. Off until Alex's company developer account exists:
-# the workflow runs this lane only when the repository variable TESTFLIGHT_ENABLED is "true".
+# TestFlight for the iphoneblog chat app. Everything runs with an App Store Connect API key
+# from repository secrets; nobody's Apple ID password is used. Setup: docs/apple-setup.md.
 #
-# Needs these repository secrets (README, "TestFlight"):
-#   ASC_KEY_ID, ASC_ISSUER_ID   the App Store Connect API key's id and issuer
-#   ASC_KEY_P8_BASE64           the .p8 file, base64-encoded
-# Signing is automatic: Xcode creates certificates and profiles with the same key.
+#   bundle exec fastlane ios register   identifiers and capabilities (Apple setup workflow)
+#   bundle exec fastlane ios beta       build, sign and upload to TestFlight
+#
+# Environment:
+#   ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8_BASE64   the API key (secrets)
+#   APPLE_TEAM_ID                                  the team (repository variable)
+#   BUILD_NUMBER                                   CFBundleVersion for the upload
 
 require "base64"
 require "tmpdir"
 
 default_platform(:ios)
 
+ROOT = File.expand_path("..", __dir__)
+
+def brand(key)
+  value = File.read(File.join(ROOT, "brand.env"))[/^#{key}="?([^"\n]*)"?/, 1]
+  UI.user_error!("brand.env has no #{key}") if value.to_s.empty?
+  value
+end
+
+def team_id
+  ENV.fetch("APPLE_TEAM_ID") { UI.user_error!("APPLE_TEAM_ID is not set") }
+end
+
+# Writes the key for xcodebuild (it needs a file) and returns fastlane's api_key hash.
+def api_key
+  @api_key ||= begin
+    key_id = ENV.fetch("ASC_KEY_ID")
+    path = File.join(Dir.tmpdir, "AuthKey_#{key_id}.p8")
+    File.write(path, Base64.decode64(ENV.fetch("ASC_KEY_P8_BASE64")))
+    File.chmod(0o600, path)
+    @key_path = path
+    app_store_connect_api_key(
+      key_id: key_id,
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_filepath: path,
+      in_house: false
+    )
+  end
+end
+
+def auth_args
+  [
+    "-allowProvisioningUpdates",
+    "-authenticationKeyPath #{@key_path}",
+    "-authenticationKeyID #{ENV.fetch('ASC_KEY_ID')}",
+    "-authenticationKeyIssuerID #{ENV.fetch('ASC_ISSUER_ID')}"
+  ]
+end
+
 platform :ios do
+  desc "Register the bundle ids and switch on their capabilities through the API"
+  lane :register do
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.from(hash: api_key)
+    bundle_id = brand("BUNDLE_ID")
+    store_name = brand("APP_STORE_NAME")
+    ids = {
+      bundle_id => store_name,
+      "#{bundle_id}.nse" => "#{store_name} Notifications"
+    }
+    caps = Spaceship::ConnectAPI::BundleIdCapability::Type
+    ids.each do |identifier, name|
+      bundle = Spaceship::ConnectAPI::BundleId.find(identifier)
+      if bundle
+        UI.message("#{identifier}: already registered")
+      else
+        bundle = Spaceship::ConnectAPI::BundleId.create(name: name, platform: "IOS", identifier: identifier)
+        UI.success("#{identifier}: registered")
+      end
+      # The app receives pushes; app and extension share the app group.
+      wanted = identifier == bundle_id ? [caps::PUSH_NOTIFICATIONS, caps::APP_GROUPS] : [caps::APP_GROUPS]
+      present = bundle.get_capabilities.map(&:capability_type)
+      (wanted - present).each do |cap|
+        bundle.update_capability(cap, enabled: true)
+        UI.success("#{identifier}: #{cap} on")
+      end
+    end
+  end
+
   desc "Build the app and upload it to TestFlight"
   lane :beta do
-    root = File.expand_path("..", __dir__)
-    key_path = File.join(Dir.tmpdir, "AuthKey_#{ENV.fetch('ASC_KEY_ID')}.p8")
-    File.write(key_path, Base64.decode64(ENV.fetch("ASC_KEY_P8_BASE64")))
-
-    api_key = app_store_connect_api_key(
-      key_id: ENV.fetch("ASC_KEY_ID"),
-      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
-      key_filepath: key_path
-    )
+    key = api_key
+    sh(File.join(ROOT, "scripts/configure.sh"))
 
     build_app(
-      project: File.join(root, "iphoneblog.xcodeproj"),
+      project: File.join(ROOT, "iphoneblog.xcodeproj"),
       scheme: "iphoneblog",
       configuration: "Release",
       export_method: "app-store",
-      output_directory: File.join(root, "build/ipa"),
-      xcargs: [
-        "-allowProvisioningUpdates",
-        "-authenticationKeyPath #{key_path}",
-        "-authenticationKeyID #{ENV.fetch('ASC_KEY_ID')}",
-        "-authenticationKeyIssuerID #{ENV.fetch('ASC_ISSUER_ID')}",
-        "CURRENT_PROJECT_VERSION=#{ENV.fetch('BUILD_NUMBER')}",
+      export_team_id: team_id,
+      output_directory: File.join(ROOT, "build/ipa"),
+      xcargs: (auth_args + [
         "-skipPackagePluginValidation",
-        "-skipMacroValidation"
-      ].join(" "),
-      export_xcargs: "-allowProvisioningUpdates"
+        "-skipMacroValidation",
+        "DEVELOPMENT_TEAM=#{team_id}",
+        "CODE_SIGN_STYLE=Automatic",
+        "CURRENT_PROJECT_VERSION=#{ENV.fetch('BUILD_NUMBER')}"
+      ]).join(" "),
+      export_xcargs: auth_args.join(" ")
     )
 
     upload_to_testflight(
-      api_key: api_key,
+      api_key: key,
       skip_waiting_for_build_processing: true,
       changelog: "Build #{ENV.fetch('BUILD_NUMBER')} from #{ENV.fetch('GITHUB_SHA', 'local')[0, 7]}."
     )

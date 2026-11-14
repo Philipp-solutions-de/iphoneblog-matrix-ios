@@ -1,0 +1,29 @@
+name: Apple setup
+
+# Run by hand once the App Store Connect key is in the secrets (docs/apple-setup.md):
+# registers the bundle ids and switches on Push Notifications and App Groups.
+# Safe to run again; it only adds what is missing.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  register:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install fastlane
+        run: bundle install
+      - name: Register identifiers and capabilities
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: bundle exec fastlane ios register
