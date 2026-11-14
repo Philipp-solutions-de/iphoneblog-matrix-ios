@@ -81,8 +81,11 @@ jobs:
     name: TestFlight
     needs: build
     # The Apple key lives in the environment `apple`, which only main may use. This job runs
-    # only for a push to main: reviewed code, never a pull request, fork or other branch.
-    if: vars.TESTFLIGHT_ENABLED == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # only for a push to main or a hand run on main: reviewed code, never a pull request,
+    # fork or other branch.
+    if: >-
+      vars.TESTFLIGHT_ENABLED == 'true' && github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     environment: apple
     runs-on: xcode-27
     timeout-minutes: 60
