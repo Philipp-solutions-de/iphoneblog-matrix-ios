@@ -117,6 +117,10 @@ platform :ios do
         "-skipPackagePluginValidation",
         "-skipMacroValidation",
         "OTHER_CODE_SIGN_FLAGS='--keychain #{keychain}'",
+        # Swift packages with resources (Kingfisher, DTCoreText, Compound's tokens, ...) build
+        # resource bundles that Xcode refuses to sign without a team. The team on the command
+        # line reaches every target; the app, extension and ChatKit keep their manual settings.
+        "DEVELOPMENT_TEAM=#{team_id}",
         "CURRENT_PROJECT_VERSION=#{ENV.fetch('BUILD_NUMBER')}"
       ].join(" "),
       export_team_id: team_id,
