@@ -25,9 +25,19 @@ final class Router: ObservableObject {
         selectedRoomID = roomID
     }
 
+    /// A thread to open once its channel's screen exists (set from another tab or a push).
+    @Published var pendingThread: ThreadRoute?
+
     func openThread(roomID: String, rootEventID: String) {
-        if selectedRoomID != roomID { openRoom(roomID) }
-        threadPath = [ThreadRoute(roomID: roomID, rootEventID: rootEventID)]
+        let route = ThreadRoute(roomID: roomID, rootEventID: rootEventID)
+        if tab == .chats, selectedRoomID == roomID {
+            threadPath = [route]
+        } else {
+            // Switching tab or channel rebuilds the channel's navigation stack, which would drop a
+            // path set now. ChatsView opens the pending thread once the stack is on screen.
+            pendingThread = route
+            openRoom(roomID)
+        }
     }
 }
 
