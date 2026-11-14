@@ -116,6 +116,23 @@ platform :ios do
     end
   end
 
+  desc "Create the team's Apple Distribution certificate from a CSR (certificate workflow)"
+  lane :create_certificate do
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.from(hash: api_key)
+    csr = ENV.fetch("CSR_PEM")
+    UI.user_error!("CSR_PEM is not a certificate signing request") unless csr.include?("BEGIN CERTIFICATE REQUEST")
+
+    existing = Spaceship::ConnectAPI::Certificate.all(filter: { certificateType: "DISTRIBUTION" })
+    existing.each { |c| UI.message("existing: #{c.name} #{c.serial_number} until #{c.expiration_date}") }
+
+    cert = Spaceship::ConnectAPI::Certificate.create(certificate_type: "DISTRIBUTION", csr_content: csr)
+    UI.success("created: #{cert.name} #{cert.serial_number} until #{cert.expiration_date}")
+    # The certificate is public (it holds no private key); printing it is safe.
+    puts "CERTIFICATE_BASE64_BEGIN"
+    puts cert.certificate_content
+    puts "CERTIFICATE_BASE64_END"
+  end
+
   desc "Build and sign for the App Store without uploading (proves signing works)"
   lane :signed_build do
     archive

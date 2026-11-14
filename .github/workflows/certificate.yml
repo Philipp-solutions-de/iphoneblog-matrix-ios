@@ -1,0 +1,39 @@
+name: Distribution certificate
+
+# Run by hand on main, once a year: turns a certificate signing request (public) into the
+# team's Apple Distribution certificate (public) through the App Store Connect API.
+# The private key never comes here: it is made on a Mac, and the .p12 goes straight into
+# the environment `apple` of both app repositories (README, "Signing certificate").
+
+on:
+  workflow_dispatch:
+    inputs:
+      csr:
+        description: "Certificate signing request, PEM (public)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  create:
+    if: github.ref == 'refs/heads/main'
+    environment: apple
+    runs-on: xcode-27
+    timeout-minutes: 15
+    env:
+      BUNDLE_FROZEN: "true"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: Install fastlane
+        run: bundle install
+      - name: Create the certificate
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          CSR_PEM: ${{ inputs.csr }}
+        run: bundle exec fastlane ios create_certificate
