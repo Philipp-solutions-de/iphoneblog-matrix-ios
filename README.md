@@ -47,6 +47,28 @@ The upload is written and switched off. Until Alex's company account exists the 
 Apple, in order, with the commands that put the key into the repository:
 [docs/apple-setup.md](docs/apple-setup.md).
 
+## Signing certificate
+
+Both chat apps (this one and `iphoneblog-zulip-ios`) sign with one Apple Distribution
+certificate of Thorsten's team W9N692KH39: `Apple Distribution: Thorsten Philipp (W9N692KH39)`,
+serial `123B7106234E1B22943005A94C3A9B37`, **valid until 2027-11-14**. Its `.p12` and passphrase
+are the secrets `DIST_CERT_P12_BASE64` and `DIST_CERT_PASSWORD` in the environment `apple` of
+both repositories. Builds import it into a throwaway keychain; App Store profiles come from the
+API (`fastlane/Fastfile`, lane `archive`).
+
+Renewal, in October 2027 (one year, Apple's limit):
+
+1. On a Mac: `openssl genrsa -out dist.key 2048` and
+   `openssl req -new -key dist.key -subj "/CN=iphoneblog CI Distribution/C=DE" -out dist.csr`.
+2. `gh workflow run certificate.yml --repo Philipp-solutions-de/iphoneblog-matrix-ios --ref main -f csr="$(cat dist.csr)"`;
+   the run prints the new certificate (public) between `CERTIFICATE_BASE64_BEGIN` and `_END`.
+3. Decode it to `dist.cer`, build `dist.p12` with
+   `openssl pkcs12 -export -legacy -inkey dist.key -in <(openssl x509 -inform DER -in dist.cer) -passout file:pass -out dist.p12`
+   (`pass` from `openssl rand -hex 24`), and set both secrets in both repositories' `apple`
+   environment from the files (`base64 -i dist.p12 | gh secret set DIST_CERT_P12_BASE64 --env apple --repo …`,
+   `gh secret set DIST_CERT_PASSWORD --env apple --repo … < pass`).
+4. Run the Signing check, then revoke the old certificate in developer.apple.com.
+
 ## License
 
 GNU Affero General Public License v3.0 (`LICENSE`). The app takes its timeline, thread and

@@ -11,6 +11,7 @@
 
 require "base64"
 require "tmpdir"
+require "securerandom"
 
 default_platform(:ios)
 
@@ -43,39 +44,62 @@ def api_key
   end
 end
 
-def auth_args
-  [
-    "-allowProvisioningUpdates",
-    "-authenticationKeyPath #{@key_path}",
-    "-authenticationKeyID #{ENV.fetch('ASC_KEY_ID')}",
-    "-authenticationKeyIssuerID #{ENV.fetch('ASC_ISSUER_ID')}"
-  ]
-end
-
 platform :ios do
-  # Builds, signs (cloud-managed certificate) and exports the .ipa; returns the API key.
+  # Builds, signs and exports the App Store .ipa; returns the API key.
+  # Signing is manual: the team's one Apple Distribution certificate comes from the
+  # environment secrets DIST_CERT_P12_BASE64 and DIST_CERT_PASSWORD into a throwaway
+  # keychain, and sigh fetches (or creates) the App Store profile through the API.
+  # No device, no Apple ID, no xcodebuild login.
   private_lane :archive do
     key = api_key
     sh(File.join(ROOT, "scripts/configure.sh"))
 
+    keychain = File.join(Dir.tmpdir, "iphoneblog-signing.keychain-db")
+    keychain_password = SecureRandom.hex(24)
+    create_keychain(path: keychain, password: keychain_password, default_keychain: false,
+                    unlock: true, timeout: 3600, lock_when_sleeps: false, add_to_search_list: true)
+    p12 = File.join(Dir.tmpdir, "distribution.p12")
+    File.binwrite(p12, Base64.decode64(ENV.fetch("DIST_CERT_P12_BASE64")))
+    File.chmod(0o600, p12)
+    begin
+      import_certificate(certificate_path: p12, certificate_password: ENV.fetch("DIST_CERT_PASSWORD"),
+                         keychain_path: keychain, keychain_password: keychain_password, log_output: false)
+    ensure
+      File.delete(p12) if File.exist?(p12)
+    end
+
+    project = File.join(ROOT, "iphoneblog.xcodeproj")
+    profiles = {}
+    # One entry per signed target; the notification extension joins when it exists.
+    { "App" => brand("BUNDLE_ID") }.each do |target, identifier|
+      get_provisioning_profile(api_key: key, app_identifier: identifier, team_id: team_id,
+                               output_path: File.join(ROOT, "build/profiles"))
+      name = lane_context[SharedValues::SIGH_NAME]
+      profiles[identifier] = name
+      update_code_signing_settings(path: project, targets: [target], use_automatic_signing: false,
+                                   team_id: team_id, code_sign_identity: "Apple Distribution",
+                                   profile_name: name, bundle_identifier: identifier)
+    end
+
     build_app(
-      project: File.join(ROOT, "iphoneblog.xcodeproj"),
+      project: project,
       scheme: "iphoneblog",
       configuration: "Release",
-      export_team_id: team_id,
       output_directory: File.join(ROOT, "build/ipa"),
-      xcargs: (auth_args + [
+      codesigning_identity: "Apple Distribution",
+      xcargs: [
         "-skipPackagePluginValidation",
         "-skipMacroValidation",
-        "DEVELOPMENT_TEAM=#{team_id}",
-        "CODE_SIGN_STYLE=Automatic",
+        "OTHER_CODE_SIGN_FLAGS='--keychain #{keychain}'",
         "CURRENT_PROJECT_VERSION=#{ENV.fetch('BUILD_NUMBER')}"
-      ]).join(" "),
-      export_xcargs: auth_args.join(" "),
+      ].join(" "),
+      export_team_id: team_id,
       export_options: {
         method: "app-store-connect",
-        signingStyle: "automatic",
-        teamID: team_id
+        signingStyle: "manual",
+        teamID: team_id,
+        signingCertificate: "Apple Distribution",
+        provisioningProfiles: profiles
       }
     )
 
