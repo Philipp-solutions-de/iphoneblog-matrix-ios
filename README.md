@@ -17,7 +17,7 @@ Every Monday the workflow in `.github/workflows/build.yml`:
 
 1. finds the newest `release/x.y.z` tag of `element-hq/element-x-ios`,
 2. runs `scripts/prepare.sh`, which clones that tag and applies the changes below,
-3. builds the app for the simulator on GitHub's macOS runner,
+3. builds the app for the simulator on GitHub's `xcode-27` macOS runner (public preview; `macos-26` has no Xcode 27),
 4. uploads it to TestFlight, once that step is switched on (see "TestFlight").
 
 A red scheduled build opens an issue labelled `build-failure`, or comments on the open one.

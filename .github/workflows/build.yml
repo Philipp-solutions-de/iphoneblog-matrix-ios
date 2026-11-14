@@ -28,12 +28,12 @@ concurrency:
 jobs:
   build:
     name: Simulator build
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 120
     outputs:
       tag: ${{ steps.prepare.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
@@ -56,7 +56,7 @@ jobs:
           echo "tag=$(tail -1 prepare.log | sed 's/^tag=//')" >> "$GITHUB_OUTPUT"
 
       - name: Cache Swift packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: build/DerivedData/SourcePackages
           key: spm-${{ hashFiles('build/element-x-ios/Package.resolved', 'build/element-x-ios/ElementX.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
@@ -67,14 +67,14 @@ jobs:
 
       - name: Keep the build log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: xcodebuild-log
           path: build/xcodebuild.log
           if-no-files-found: ignore
 
       - name: Keep the simulator app
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: iphoneblog-simulator-app
           path: build/DerivedData/Build/Products/Debug-iphonesimulator/ElementX.app
@@ -84,10 +84,10 @@ jobs:
     name: TestFlight
     needs: build
     if: vars.TESTFLIGHT_ENABLED == 'true' && github.event_name != 'pull_request'
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
