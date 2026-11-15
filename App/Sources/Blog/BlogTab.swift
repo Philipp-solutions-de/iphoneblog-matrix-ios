@@ -1,3 +1,4 @@
+import OSLog
 import SwiftUI
 import WebKit
 
@@ -28,6 +29,15 @@ struct BlogTab: View {
         }
         .onAppear {
             web.openDiscussion = { [weak router] article in router?.blogPath.append(.article(article)) }
+        }
+        // Signed in: the web view gets the member's WordPress session (#one articles open);
+        // signed out: WordPress's cookies go too.
+        .task(id: session?.userID) {
+            web.setMember(session.map { session in
+                BlogWebModel.Member(userID: session.userID,
+                                    token: { try? session.client.session().accessToken },
+                                    refresh: { _ = try? await session.client.displayName() })
+            })
         }
     }
 
@@ -109,6 +119,22 @@ final class BlogWebModel: NSObject, ObservableObject, WKNavigationDelegate, WKUI
     /// A tap on "Diskussion": the article's permalink.
     var openDiscussion: ((URL) -> Void)?
 
+    /// The signed-in person, for WordPress's web login (BlogWebLogin.swift).
+    struct Member {
+        let userID: String
+        /// The current Matrix access token.
+        let token: () async -> String?
+        /// Makes the SDK refresh an expired token (any authenticated call does).
+        let refresh: () async -> Void
+    }
+
+    private var member: Member?
+    /// Asked once per app start and person; a used or expired link may ask once more.
+    private var webLoginDone: String?
+    private var webLoginRunning = false
+    private var webLoginRetries = 0
+    private let log = Logger(subsystem: Brand.bundleID, category: "blog")
+
     init(start: URL) {
         self.start = start
         let configuration = WKWebViewConfiguration()
@@ -162,6 +188,73 @@ final class BlogWebModel: NSObject, ObservableObject, WKNavigationDelegate, WKUI
     private func finished(failed: Bool) {
         webView.scrollView.refreshControl?.endRefreshing()
         if !failed { phase = .ready } else if phase != .ready { phase = .failed }
+        if !failed { Task { await webLoginIfNeeded() } }
+    }
+
+    // MARK: WordPress session for members
+
+    func setMember(_ new: Member?) {
+        let before = member?.userID
+        member = new
+        guard new?.userID != before else { return }
+        webLoginDone = nil
+        webLoginRetries = 0
+        if new == nil, before != nil {
+            Task { await removeWordPressCookies() }
+        } else if phase == .ready {
+            Task { await webLoginIfNeeded() }
+        }
+    }
+
+    /// POST web-login from the page (same origin, past beta's gate), then open the one-time
+    /// address it returns. Only from a blog page: on the gate's sign-in page it waits.
+    private func webLoginIfNeeded() async {
+        guard let member, webLoginDone != member.userID, !webLoginRunning,
+              let page = webView.url, let host = page.host()?.lowercased(),
+              BlogLinks.blogHosts.contains(host) || host == start.host()?.lowercased(),
+              !page.path().hasPrefix("/chat/web-login") else { return }
+        webLoginRunning = true
+        defer { webLoginRunning = false }
+        for attempt in 0..<2 {
+            guard let token = await member.token() else { return }
+            let answer: Any?
+            do {
+                answer = try await webView.callAsyncJavaScript(
+                    WebLogin.script,
+                    arguments: ["path": WebLogin.path, "token": token, "weiter": WebLogin.weiter(for: page)],
+                    in: nil, contentWorld: .defaultClient)
+            } catch {
+                log.error("web login: \(error.localizedDescription, privacy: .public)")
+                webLoginDone = member.userID
+                return
+            }
+            let result = answer as? [String: Any]
+            let status = (result?["status"] as? NSNumber)?.intValue ?? 0
+            switch WebLogin.outcome(status: status, body: result?["body"] as? String ?? "", pageHost: host) {
+            case .open(let url):
+                webLoginDone = member.userID
+                webView.load(URLRequest(url: url))
+                return
+            case .refreshToken where attempt == 0:
+                await member.refresh()
+            case .refreshToken:
+                log.error("web login: token refused twice")
+                webLoginDone = member.userID
+                return
+            case .stop(let reason):
+                log.info("web login: \(reason, privacy: .public)")
+                webLoginDone = member.userID
+                return
+            }
+        }
+    }
+
+    private func removeWordPressCookies() async {
+        let store = webView.configuration.websiteDataStore.httpCookieStore
+        for cookie in await store.allCookies() where WordPressCookies.isWordPress(cookie) {
+            await store.deleteCookie(cookie)
+        }
+        webView.reload()
     }
 
     // MARK: WKNavigationDelegate
@@ -191,6 +284,18 @@ final class BlogWebModel: NSObject, ObservableObject, WKNavigationDelegate, WKUI
         case .ignore:
             decisionHandler(url.scheme == "iphoneblog-chat" ? .cancel : .allow)
         }
+    }
+
+    /// A used or expired one-time link answers 410: stay on the page and ask for a new one, once.
+    func webView(_ webView: WKWebView, decidePolicyFor response: WKNavigationResponse) async -> WKNavigationResponsePolicy {
+        guard let http = response.response as? HTTPURLResponse, http.statusCode == 410,
+              http.url?.path().hasPrefix("/chat/web-login") == true else { return .allow }
+        if webLoginRetries < 1 {
+            webLoginRetries += 1
+            webLoginDone = nil
+            Task { await webLoginIfNeeded() }
+        }
+        return .cancel
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {

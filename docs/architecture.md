@@ -87,6 +87,16 @@ and `beta` find the same one; `threads/<root>.json` holds the replies; a key is 
 slash, and a miss in a copy older than a minute reads the file again). #one members get the
 conversation views and write in the thread.
 
+**Members read #one articles in the Blog tab.** Once the page shows a blog page, a signed-in
+app asks WordPress for a one-time sign-in address (`POST /wp-json/iphoneblog/v1/chat/web-login`
+with the Matrix access token, iphoneblog-wordpress PR #276) and opens it; WordPress sets its
+cookie (14 days, read-only) and returns to the page. The request is a `fetch` from inside the
+web view, because on beta only the web view holds the staff gate's cookie, and it runs in its
+own JavaScript world, so the blog's scripts never see the token. Asked once per app start and
+person; a 401 refreshes the token and asks once more; a used link (410) asks once more. Only
+tokens of the app's static MAS client count, so sign-in must use that fixed client id.
+Signing out removes WordPress's cookies from the web view.
+
 **@Mentions from the server.** The tab lists `GET /notifications?only=highlight`: the server
 already decides what mentions me and keeps the read state across devices. The push switches
 on Ich are server push rules for the same reason: "Neue Artikel" is an override rule
