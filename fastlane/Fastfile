@@ -191,6 +191,16 @@ platform :ios do
     puts "CERTIFICATE_BASE64_END"
   end
 
+  desc "The newest builds in App Store Connect with Apple's processing state"
+  lane :build_status do
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.from(hash: api_key)
+    app = Spaceship::ConnectAPI::App.find(brand("BUNDLE_ID"))
+    UI.user_error!("no app record for #{brand('BUNDLE_ID')}") unless app
+    Spaceship::ConnectAPI::Build.all(app_id: app.id, sort: "-uploadedDate", limit: 8).each do |b|
+      UI.message("#{b.app_version} (#{b.version}) #{b.processing_state} uploaded #{b.uploaded_date}")
+    end
+  end
+
   desc "Build and sign for the App Store without uploading (proves signing works)"
   lane :signed_build do
     archive
