@@ -117,10 +117,14 @@ platform :ios do
         "-skipPackagePluginValidation",
         "-skipMacroValidation",
         "OTHER_CODE_SIGN_FLAGS='--keychain #{keychain}'",
-        # Swift packages with resources (Kingfisher, DTCoreText, Compound's tokens, ...) build
-        # resource bundles that Xcode refuses to sign without a team. The team on the command
-        # line reaches every target; the app, extension and ChatKit keep their manual settings.
+        # Swift packages build frameworks and resource bundles (MatrixRustSDK, Kingfisher,
+        # DTCoreText, Compound's tokens, ...) that are signed automatically unless told otherwise,
+        # and automatic signing clashes with our identity. On the command line these reach every
+        # target: manual, Apple Distribution, our team. Profiles stay per target in the project
+        # (app and extension); frameworks and bundles need none.
         "DEVELOPMENT_TEAM=#{team_id}",
+        "CODE_SIGN_STYLE=Manual",
+        "CODE_SIGN_IDENTITY='Apple Distribution'",
         "CURRENT_PROJECT_VERSION=#{ENV.fetch('BUILD_NUMBER')}"
       ].join(" "),
       export_team_id: team_id,
