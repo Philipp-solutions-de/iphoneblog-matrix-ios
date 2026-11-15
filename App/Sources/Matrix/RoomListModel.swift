@@ -25,7 +25,9 @@ final class RoomListModel: ObservableObject {
 
     /// Rooms the #one-Chat tab leaves out (the Blog room has its own tab).
     var hidden: Set<String> = []
-    var channels: [RoomSummary] { rooms.filter { !$0.isDirect && !hidden.contains($0.id) } }
+    /// The #one space's children: the channels #one-Chat shows.
+    @Published var channelIDs: Set<String> = []
+    var channels: [RoomSummary] { rooms.filter { !$0.isDirect && !hidden.contains($0.id) && channelIDs.contains($0.id) } }
     var directMessages: [RoomSummary] { rooms.filter(\.isDirect) }
     var withMentions: [RoomSummary] { rooms.filter { $0.unreadMentions > 0 && !hidden.contains($0.id) } }
     /// Direct messages count as mentions: they are meant for you.

@@ -47,6 +47,26 @@ final class SignInAndRoomListTests: XCTestCase {
             XCTAssertEqual(session.rooms.withMentions.map(\.name), [mentionRoom])
         }
 
+        // #one: the space makes the tester a member; its child Allgemein is the one channel.
+        if env["IPHONEBLOG_ONE_ALIAS"] != nil {
+            let until = Date().addingTimeInterval(30)
+            while Date() < until, !session.isOneMember { try await Task.sleep(for: .milliseconds(250)) }
+            XCTAssertTrue(session.isOneMember, "not a #one member")
+            XCTAssertEqual(session.rooms.channels.map(\.name), ["Allgemein"])
+        }
+
+        // Blog, signed in: the article's title and teaser come from the bot's field.
+        if let title = env["IPHONEBLOG_TEST_ARTICLE_TITLE"], !title.isEmpty {
+            let feed = try XCTUnwrap(session.blogFeed, "no Blog room")
+            await feed.load()
+            let until = Date().addingTimeInterval(30)
+            while Date() < until, feed.articles.first?.teaser == nil { try await Task.sleep(for: .milliseconds(250)) }
+            let article = try XCTUnwrap(feed.articles.first)
+            XCTAssertEqual(article.title, title)
+            XCTAssertEqual(article.teaser, "Zwei Zeilen Vorschau auf den Artikel.")
+            XCTAssertEqual(article.replyCount, 1)
+        }
+
         await model.signOut()
         store.delete()
     }

@@ -116,10 +116,10 @@ final class GuestBlogFeed: ObservableObject, BlogFeed {
         await fetch(replacing: false)
     }
 
+    /// The static index the bot rewrites every minute: the newest 100 threads, no paging
+    /// (2026-11-14_interfaces.md, "Matrix Blog feed").
     private func fetch(replacing: Bool) async {
-        var components = URLComponents(url: base.appending(path: "threads"), resolvingAgainstBaseURL: false)
-        components?.queryItems = [URLQueryItem(name: "limit", value: "20")] + (next.map { [URLQueryItem(name: "from", value: $0)] } ?? [])
-        guard let url = components?.url else { return }
+        let url = base.appending(path: "threads.json")
         do {
             let (data, response) = try await session.data(from: url)
             guard (response as? HTTPURLResponse)?.statusCode == 200 else {
@@ -127,9 +127,8 @@ final class GuestBlogFeed: ObservableObject, BlogFeed {
                 return
             }
             let page = try GuestAPI.decoder.decode(GuestAPI.ThreadsPage.self, from: data)
-            let new = page.threads.map(\.article)
-            articles = replacing ? new : articles + new
-            next = page.next
+            articles = page.threads.map(\.article)
+            next = nil
             state = .ready
         } catch {
             log.error("blog feed failed: \(error.localizedDescription, privacy: .public)")
@@ -139,7 +138,8 @@ final class GuestBlogFeed: ObservableObject, BlogFeed {
 
     /// One article thread with its replies, for the signed-out thread screen.
     func thread(_ rootEventID: String) async throws -> (BlogArticle, [BlogReply]) {
-        let url = base.appending(path: "threads").appending(path: rootEventID).appending(queryItems: [URLQueryItem(name: "limit", value: "100")])
+        // One static file per thread; appending(path:) encodes the event ID's "$" as %24.
+        let url = base.appending(path: "threads").appending(path: "\(rootEventID).json")
         let (data, _) = try await session.data(from: url)
         let page = try GuestAPI.decoder.decode(GuestAPI.ThreadPage.self, from: data)
         return (page.root.article, page.replies.map(\.reply))
@@ -165,43 +165,52 @@ enum GuestAPI {
         let next: String?
     }
 
+    /// One article thread, as in threads.json.
     struct Thread: Decodable {
         let rootEventId: String
-        let ts: Int64
         let title: String
-        let imageUrl: String?
         let link: String?
+        let imageUrl: String?
+        let teaser: String?
+        let publishedTs: Int64
         let replyCount: Int
         let latestReplyTs: Int64?
-        let teaser: String?
         let lastRepliers: [Replier]?
 
+        /// Names only: the server shows no avatars (Synapse's media needs a token).
         struct Replier: Decodable {
             let name: String
-            let avatarUrl: String?
         }
 
         var article: BlogArticle {
             BlogArticle(id: rootEventId, title: title, link: link.flatMap(URL.init(string:)),
                         imageURL: imageUrl.flatMap(URL.init(string:)), imageSource: nil,
-                        date: Date(milliseconds: ts), replyCount: replyCount,
+                        date: Date(milliseconds: publishedTs), replyCount: replyCount,
                         latestReply: latestReplyTs.map(Date.init(milliseconds:)),
                         teaser: teaser,
-                        repliers: (lastRepliers ?? []).map { .init(name: $0.name, avatarURL: $0.avatarUrl.flatMap(URL.init(string:))) })
+                        repliers: (lastRepliers ?? []).map { .init(name: $0.name, avatarURL: nil) })
         }
     }
 
+    /// A reply in a thread file, oldest first.
     struct Reply: Decodable {
         let eventId: String
         let ts: Int64
         let senderName: String
-        let senderAvatarUrl: String?
         let body: String
 
         var reply: BlogReply {
-            BlogReply(id: eventId, sender: senderName, avatarURL: senderAvatarUrl.flatMap(URL.init(string:)),
-                      body: body, date: Date(milliseconds: ts))
+            BlogReply(id: eventId, sender: senderName, avatarURL: nil, body: body, date: Date(milliseconds: ts))
         }
+    }
+
+    /// The bot's field on every article root event: `de.iphoneblog.article`.
+    struct ArticleField: Decodable {
+        let title: String?
+        let link: String?
+        let teaser: String?
+        let imageUrl: String?
+        let publishedTs: Int64?
     }
 }
 
@@ -218,12 +227,19 @@ final class MatrixBlogFeed: ObservableObject, BlogFeed {
     @Published private(set) var state: BlogFeedState = .loading
 
     let roomID: String
+    private let room: Room
     private let service: ThreadListService
     private var items: [ThreadListItem] = []
+    /// The bot's article field per root event, read once from the event's JSON.
+    private var fields: [String: GuestAPI.ArticleField] = [:]
+    private var reading: Set<String> = []
+    private let client: Client?
     private var handle: TaskHandle?
     private var consumer: Task<Void, Never>?
 
-    init(room: Room) {
+    init(room: Room, client: Client? = nil) {
+        self.room = room
+        self.client = client
         roomID = room.id()
         service = room.threadListService()
         let (stream, continuation) = AsyncStream.makeStream(of: [ThreadListUpdate].self)
@@ -263,9 +279,61 @@ final class MatrixBlogFeed: ObservableObject, BlogFeed {
             case .reset(let values): items = values
             }
         }
-        articles = items.map(Self.article)
-            .sorted { ($0.latestReply ?? $0.date) > ($1.latestReply ?? $1.date) }
+        rebuild()
         if state == .loading, !articles.isEmpty { state = .ready }
+        Task { await readFields() }
+    }
+
+    private func rebuild() {
+        articles = items.map { item in
+            var article = Self.article(item)
+            if let field = fields[article.id] { Self.merge(field, into: &article) }
+            return article
+        }
+        .sorted { ($0.latestReply ?? $0.date) > ($1.latestReply ?? $1.date) }
+    }
+
+    /// The SDK's thread list carries the root's text, not its custom fields, and its timeline
+    /// only knows events it has loaded. So the root event comes from the client API
+    /// (GET /rooms/{room}/event/{event}) with the session's current token; the bot's field holds
+    /// title, teaser, image and link. Read once per article.
+    private func readFields() async {
+        let missing = items.map(\.rootEvent.eventId).filter { fields[$0] == nil && !reading.contains($0) }
+        guard !missing.isEmpty, let client else { return }
+        reading.formUnion(missing)
+        for eventID in missing {
+            guard let session = try? client.session(),
+                  let url = URL(string: session.homeserverUrl)?
+                    .appending(path: "_matrix/client/v3/rooms").appending(path: roomID)
+                    .appending(path: "event").appending(path: eventID) else { continue }
+            var request = URLRequest(url: url)
+            request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+            guard let (data, response) = try? await URLSession.shared.data(for: request),
+                  (response as? HTTPURLResponse)?.statusCode == 200,
+                  let field = Self.articleField(fromEventJSON: String(decoding: data, as: UTF8.self)) else {
+                reading.remove(eventID)
+                continue
+            }
+            fields[eventID] = field
+        }
+        rebuild()
+    }
+
+    /// `content["de.iphoneblog.article"]` of a raw event, or nil.
+    static func articleField(fromEventJSON json: String) -> GuestAPI.ArticleField? {
+        guard let object = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any],
+              let content = object["content"] as? [String: Any],
+              let field = content["de.iphoneblog.article"],
+              let data = try? JSONSerialization.data(withJSONObject: field) else { return nil }
+        return try? GuestAPI.decoder.decode(GuestAPI.ArticleField.self, from: data)
+    }
+
+    static func merge(_ field: GuestAPI.ArticleField, into article: inout BlogArticle) {
+        if let title = field.title, !title.isEmpty { article.title = title }
+        if let link = field.link.flatMap(URL.init(string:)) { article.link = link }
+        if let teaser = field.teaser, !teaser.isEmpty { article.teaser = teaser }
+        if let image = field.imageUrl.flatMap(URL.init(string:)) { article.imageURL = image }
+        if let published = field.publishedTs { article.date = Date(milliseconds: published) }
     }
 
     private static func article(_ item: ThreadListItem) -> BlogArticle {

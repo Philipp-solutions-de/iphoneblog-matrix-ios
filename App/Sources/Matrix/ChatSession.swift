@@ -23,6 +23,7 @@ final class ChatSession: ObservableObject, ChatHost {
     @Published private(set) var blogFeed: MatrixBlogFeed?
     private var oneRoomID: String?
     private var membershipWatch: AnyCancellable?
+    private var membershipTimer: Task<Void, Never>?
 
     private var syncService: SyncService?
     private var stateHandle: TaskHandle?
@@ -67,16 +68,58 @@ final class ChatSession: ObservableObject, ChatHost {
             rooms.hidden = [blog.roomId]
             var room = try? client.getRoom(roomId: blog.roomId)
             if room == nil { room = try? await client.joinRoomById(roomId: blog.roomId) }
-            if let room, blogFeed == nil { blogFeed = MatrixBlogFeed(room: room) }
+            if let room, blogFeed == nil { blogFeed = MatrixBlogFeed(room: room, client: client) }
         } else {
             log.error("blog room alias does not resolve")
         }
         oneRoomID = try? await client.resolveRoomAlias(roomAlias: Self.alias("IPHONEBLOG_ONE_ALIAS", Brand.oneRoomAlias))?.roomId
-        membershipWatch = rooms.$rooms.sink { [weak self] list in
-            guard let self, let one = self.oneRoomID else { return }
-            let member = list.contains { $0.id == one }
-            if member != self.isOneMember { self.isOneMember = member }
+        await refreshMembership()
+        // The bot invites and removes; every change in the room list is a moment to look again,
+        // and a slow timer catches an invite that arrives while nothing else moves.
+        membershipWatch = rooms.$rooms
+            .debounce(for: .seconds(2), scheduler: RunLoop.main)
+            .sink { [weak self] _ in Task { await self?.refreshMembership() } }
+        membershipTimer = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(300))
+                await self?.refreshMembership()
+            }
         }
+    }
+
+    /// #one membership is the space #one (2026-11-14_interfaces.md, "Matrix Blog feed"): a member
+    /// is joined or invited. Invites to the space and its children are accepted here, and
+    /// #one-Chat lists exactly the space's children.
+    func refreshMembership() async {
+        guard let one = oneRoomID, let space = try? client.getRoom(roomId: one) else {
+            setMembership(false, channels: [])
+            return
+        }
+        switch space.membership() {
+        case .invited:
+            _ = try? await client.joinRoomById(roomId: one)
+        case .joined:
+            break
+        default:
+            setMembership(false, channels: [])
+            return
+        }
+        var children: Set<String> = []
+        if let list = try? await client.spaceService().spaceRoomList(spaceId: one) {
+            try? await list.paginate()
+            for child in await list.rooms() {
+                children.insert(child.roomId)
+                if child.state == .invited || child.state == nil {
+                    _ = try? await client.joinRoomById(roomId: child.roomId)
+                }
+            }
+        }
+        setMembership(true, channels: children)
+    }
+
+    private func setMembership(_ member: Bool, channels: Set<String>) {
+        if member != isOneMember { isOneMember = member }
+        if rooms.channelIDs != channels { rooms.channelIDs = channels }
     }
 
     /// Room aliases from brand.env; debug runs against a test server may name others.
@@ -86,6 +129,8 @@ final class ChatSession: ObservableObject, ChatHost {
         #endif
         return fallback
     }
+
+    deinit { membershipTimer?.cancel() }
 
     func stop() async {
         await syncService?.stop()
