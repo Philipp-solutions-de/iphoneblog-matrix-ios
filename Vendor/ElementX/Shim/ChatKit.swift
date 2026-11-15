@@ -55,6 +55,18 @@ public enum ChatKitTheme {
         // Mentions of you: coral on soft coral. Others' mentions: Shim/LeftOut.swift, MentionPillColors.
         colors.override(\.bgBadgeAccent, with: c.highlightSoft)
         colors.override(\.textBadgeAccent, with: c.highlight)
+        // Raised canvas (sheets, menus) and dividers, so dark mode sits on the blog's #111.
+        colors.override(\.bgCanvasDefaultLevel1, with: c.surface)
+        colors.override(\.bgSubtleSecondaryLevel0, with: c.surface)
+        colors.override(\.borderInteractiveSecondary, with: c.line)
+        // UIKit parts (the timeline's table view, its separators) read Compound's UIColor tokens.
+        // A UIColor made from these Colors keeps their light and dark variants.
+        let ui = UIColor.compound
+        ui.override(\.bgCanvasDefault, with: UIColor(c.background))
+        ui.override(\.textPrimary, with: UIColor(c.ink))
+        ui.override(\.textSecondary, with: UIColor(c.ink2))
+        ui.override(\.iconTertiary, with: UIColor(c.ink3))
+        ui.override(\.borderInteractiveSecondary, with: UIColor(c.line))
     }
 
     /// Element X's app delegate registers the view that draws a mention as a name pill.

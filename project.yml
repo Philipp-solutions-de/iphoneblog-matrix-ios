@@ -114,6 +114,10 @@ targets:
         # The + menu in a conversation offers the camera.
         NSCameraUsageDescription: Damit du Fotos direkt im Chat aufnehmen kannst.
         UIBackgroundModes: [remote-notification]
+        # Plain http only to this device and the local network: test servers and sample data in
+        # debug runs. Everything on the internet stays https.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
         # Read by SharedStorage to name the keychain group the extension shares.
         AppIdentifierPrefix: $(AppIdentifierPrefix)
         # Keys the Element X views in ChatKit read from the app's Info.plist (InfoPlistReader);

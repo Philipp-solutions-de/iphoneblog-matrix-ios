@@ -77,9 +77,9 @@ def main():
     # Colours: teal dark enough for white text in light mode, light enough for black text in dark mode.
     color("AccentColor", e["BRAND_TEAL_TEXT"], e["BRAND_TEAL_ON_DARK"])
     color("BrandTeal", e["BRAND_TEAL_TEXT"], e["BRAND_TEAL_ON_DARK"])
-    color("BrandCoral", e["BRAND_CORAL"], e["BRAND_CORAL"])
-    color("Background", "#FAFAFA", "#111315")
-    color("LaunchBackground", "#FFFFFF", "#111315")
+    color("BrandCoral", e["BRAND_CORAL"], e["BRAND_CORAL_ON_DARK"])
+    color("Background", "#FFFFFF", "#111111")
+    color("LaunchBackground", "#FFFFFF", "#111111")
     print("make-assets.py: done")
 
 

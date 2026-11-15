@@ -73,18 +73,34 @@ token="$(login "$user" "$password")"
 writer="$(login writer "$writer_password")"
 rooms=(Allgemein Artikel)
 allgemein=""
+create() { # token, json → room id
+    curl -fs -X POST "$url/_matrix/client/v3/createRoom" -H "Authorization: Bearer $1" -d "$2" \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin)["room_id"])'
+}
 for name in "${rooms[@]}"; do
-    id="$(curl -fs -X POST "$url/_matrix/client/v3/createRoom" -H "Authorization: Bearer $token" \
-        -d "{\"name\":\"$name\",\"preset\":\"public_chat\"}" \
-        | python3 -c 'import json,sys; print(json.load(sys.stdin)["room_id"])')"
+    id="$(create "$token" "{\"name\":\"$name\",\"preset\":\"public_chat\"}")"
     [[ "$name" == Allgemein ]] && allgemein="$id"
 done
+
+# As on the real server (2026-11-14_interfaces.md, "Matrix Blog feed"): #one is a space whose
+# children are the #one-Chat channels; the tester is a member, Allgemein its child.
+one="$(create "$token" '{"name":"#one","preset":"private_chat","room_alias_name":"one","creation_content":{"type":"m.space"}}')"
+curl -fs -X PUT "$url/_matrix/client/v3/rooms/$one/state/m.space.child/$allgemein" \
+    -H "Authorization: Bearer $token" -d '{"via":["localhost"]}' >/dev/null
+
 curl -fs -X POST "$url/_matrix/client/v3/join/$allgemein" -H "Authorization: Bearer $writer" -d '{}' >/dev/null
-send() {
-    curl -fs -X PUT "$url/_matrix/client/v3/rooms/$allgemein/send/m.room.message/$1" -H "Authorization: Bearer $writer" -d "$2" >/dev/null
+send() { # room, txn, json
+    curl -fs -X PUT "$url/_matrix/client/v3/rooms/$1/send/m.room.message/$2" -H "Authorization: Bearer $writer" -d "$3" \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin)["event_id"])'
 }
-send t1 '{"msgtype":"m.text","body":"Hallo zusammen"}'
-send t2 "{\"msgtype\":\"m.text\",\"body\":\"tester: schau mal\",\"m.mentions\":{\"user_ids\":[\"@$user:localhost\"]}}"
+send "$allgemein" t1 '{"msgtype":"m.text","body":"Hallo zusammen"}' >/dev/null
+send "$allgemein" t2 "{\"msgtype\":\"m.text\",\"body\":\"tester: schau mal\",\"m.mentions\":{\"user_ids\":[\"@$user:localhost\"]}}" >/dev/null
+
+# The Blog room: the writer plays the article bot, one article root with the bot's field and a
+# reply in its thread. The app joins it by itself (public).
+blog="$(create "$writer" '{"name":"Blog","preset":"public_chat","room_alias_name":"blog"}')"
+root="$(send "$blog" a1 '{"msgtype":"m.text","body":"Ein Testartikel\nhttps://www.iphoneblog.de/test/","de.iphoneblog.article":{"title":"Ein Testartikel","link":"https://www.iphoneblog.de/test/","teaser":"Zwei Zeilen Vorschau auf den Artikel.","image_url":null,"published_ts":1763200000000}}')"
+send "$blog" a2 "{\"msgtype\":\"m.text\",\"body\":\"Erste Antwort\",\"m.relates_to\":{\"rel_type\":\"m.thread\",\"event_id\":\"$root\"}}" >/dev/null
 curl -fs -X POST "$url/_matrix/client/v3/logout" -H "Authorization: Bearer $token" >/dev/null
 
 cat > "$here/build/test-homeserver.env" <<EOF
@@ -93,5 +109,8 @@ IPHONEBLOG_TEST_USER=$user
 IPHONEBLOG_TEST_PASSWORD=$password
 IPHONEBLOG_TEST_ROOMS=$(IFS=,; echo "${rooms[*]}")
 IPHONEBLOG_TEST_MENTION_ROOM=Allgemein
+IPHONEBLOG_ONE_ALIAS=#one:localhost
+IPHONEBLOG_BLOG_ALIAS=#blog:localhost
+IPHONEBLOG_TEST_ARTICLE_TITLE="Ein Testartikel"
 EOF
 echo "test-homeserver: running at $url with user $user and rooms ${rooms[*]}"

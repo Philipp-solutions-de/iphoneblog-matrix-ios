@@ -68,6 +68,9 @@ case "$action" in
         export TEST_RUNNER_IPHONEBLOG_TEST_PASSWORD="${IPHONEBLOG_TEST_PASSWORD:?}"
         export TEST_RUNNER_IPHONEBLOG_TEST_ROOMS="${IPHONEBLOG_TEST_ROOMS:-}"
         export TEST_RUNNER_IPHONEBLOG_TEST_MENTION_ROOM="${IPHONEBLOG_TEST_MENTION_ROOM:-}"
+        export TEST_RUNNER_IPHONEBLOG_ONE_ALIAS="${IPHONEBLOG_ONE_ALIAS:-}"
+        export TEST_RUNNER_IPHONEBLOG_BLOG_ALIAS="${IPHONEBLOG_BLOG_ALIAS:-}"
+        export TEST_RUNNER_IPHONEBLOG_TEST_ARTICLE_TITLE="${IPHONEBLOG_TEST_ARTICLE_TITLE:-}"
         run integration "${common[@]}" -scheme Integration -destination "id=$device" test
         ;;
     *)

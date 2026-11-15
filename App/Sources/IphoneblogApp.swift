@@ -17,15 +17,16 @@ struct IphoneblogApp: App {
 
 struct RootView: View {
     @EnvironmentObject private var model: AppModel
+    @StateObject private var guestFeed = GuestBlogFeed()
 
     var body: some View {
         switch model.state {
         case .starting:
             ProgressView()
         case .signedOut, .signingIn:
-            SignInView()
+            MainView(router: model.router, guestFeed: guestFeed, session: nil)
         case .signedIn(let session):
-            MainView(session: session, router: session.router, rooms: session.rooms)
+            MainView(router: model.router, guestFeed: guestFeed, session: session)
         }
     }
 }

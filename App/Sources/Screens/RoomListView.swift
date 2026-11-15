@@ -81,7 +81,7 @@ struct ChatsView: View {
     /// "iphoneblog" in the blog's serif, your initials on the right (a tap opens Ich).
     private var header: some View {
         HStack {
-            Text(Brand.appName)
+            Text("#one-Chat")
                 .font(Theme.Font.screenTitle)
                 .foregroundStyle(Theme.ink)
             Spacer()

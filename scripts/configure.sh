@@ -41,6 +41,11 @@ enum Brand {
     static let oauthTermsURI = "$OAUTH_TOS_URI"
     static let oauthPolicyURI = "$OAUTH_POLICY_URI"
 
+    static let blogRoomAlias = "$BLOG_ROOM_ALIAS"
+    static let oneRoomAlias = "$ONE_ROOM_ALIAS"
+    static let blogAPIURL = "$BLOG_API_URL"
+    static let oneOfferURL = "$ONE_OFFER_URL"
+
     static let pushGatewayURL = "$PUSH_GATEWAY_URL"
     static let pusherAppID = "$BUNDLE_ID.ios.prod"
 }
