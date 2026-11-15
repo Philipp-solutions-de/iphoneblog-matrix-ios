@@ -41,6 +41,12 @@ Vendor/ElementX/
 
 ## The rules we follow
 
+**A package more than one target links is embedded in the app.** ChatKit, the app and the
+notification extension all link MatrixRustSDK, and ChatKit links SwiftOGG's Opus and Ogg. Each
+such dynamic package gets `embed: true` (or a plain dependency) on the App target in
+project.yml. Without it the simulator still runs, because Xcode's build folder is on the search
+path, but the archive misses the framework and Apple rejects the build ("Library missing").
+
 **Shim before patch.** Where upstream code names something we left out, we add a small file of
 the same name in `Shim/` (a no-op analytics service, location views that open Apple Maps,
 settings with threads on) instead of editing the upstream file. Every patch is a merge conflict
