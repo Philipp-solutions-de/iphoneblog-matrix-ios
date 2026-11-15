@@ -42,7 +42,9 @@ directly; people are `@name:iphoneblog.de`. No `.well-known/matrix` on the blog 
 Members never see a server field.
 
 **Sign-in through the blog.** The app registers itself with the Matrix Authentication
-Service at `auth.iphoneblog.de` (dynamic client registration), opens the sign-in page in
+Service at `auth.iphoneblog.de` as one static client (`OAUTH_CLIENT_ID` in brand.env; WordPress's
+web-login accepts only that client's tokens; empty, as on test servers, means dynamic
+registration), opens the sign-in page in
 `ASWebAuthenticationSession`, and MAS sends the member on to WordPress. The callback uses the
 custom scheme `de.iphoneblog.chat:/oauth/callback` with the client URI
 `https://chat.iphoneblog.de/app`; MAS accepts a custom scheme when it is the reverse of the

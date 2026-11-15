@@ -34,6 +34,8 @@ enum Brand {
     static let serverName = "$MATRIX_SERVER_NAME"
     static let homeserverURL = "$MATRIX_HOMESERVER_URL"
 
+    static let oauthClientID = "$OAUTH_CLIENT_ID"
+    static let oauthIssuerURL = "$OAUTH_ISSUER_URL"
     static let oauthClientURI = "$OAUTH_CLIENT_URI"
     static let oauthRedirectURI = "$OAUTH_REDIRECT_URI"
     static let oauthRedirectScheme = "$scheme"
