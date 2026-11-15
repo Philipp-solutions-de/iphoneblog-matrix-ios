@@ -98,7 +98,7 @@ struct DiscussionView: View {
         case .ready:
             if isMember, let session, let roomID = session.blogRoomID, let rootEventID {
                 // Members: the conversation views, with the composer that answers in the thread.
-                ChatScreens.provider.threadScreen(roomID: roomID, rootEventID: rootEventID, host: session)
+                ChatScreens.provider.discussionScreen(roomID: roomID, rootEventID: rootEventID, host: session)
             } else {
                 readOnly
             }

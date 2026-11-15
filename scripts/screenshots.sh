@@ -28,7 +28,7 @@ shoot() { # mode who tab name [VAR=value ...]
     fi
     for pair in "$@"; do extra+=("SIMCTL_CHILD_$pair"); done
     env ${extra[@]+"${extra[@]}"} SIMCTL_CHILD_IPHONEBLOG_BLOG_API="$api" SIMCTL_CHILD_IPHONEBLOG_BLOG_WEB="$web" \
-        SIMCTL_CHILD_IPHONEBLOG_START_TAB="$tab" xcrun simctl launch "$dev" "$id" >/dev/null
+        SIMCTL_CHILD_IPHONEBLOG_START_TAB="$tab" SIMCTL_CHILD_IPHONEBLOG_NO_PUSH_PROMPT=1 xcrun simctl launch "$dev" "$id" >/dev/null
     sleep 14
     xcrun simctl io "$dev" screenshot "$out/$name-$mode.png" >/dev/null 2>&1
 }

@@ -13,6 +13,8 @@ struct ThreadTimelineScreen: View {
     @ObservedObject private var context: ThreadTimelineScreenViewModelType.Context
     @ObservedObject private var timelineContext: TimelineViewModelType.Context
     private let composerToolbar: ComposerToolbar
+    /// iphoneblog: the article discussion draws its own header above the thread.
+    @Environment(\.chatThreadHeaderHidden) private var headerHidden
     
     init(context: ThreadTimelineScreenViewModelType.Context,
          timelineContext: TimelineViewModelType.Context,
@@ -27,7 +29,7 @@ struct ThreadTimelineScreen: View {
             .background(.compound.bgCanvasDefault)
             .toolbarRole(RoomHeaderView.toolbarRole)
             .fixesTitleViewOnCancelledPop()
-            .navigationTitle(L10n.commonThread)
+            .navigationTitle(headerHidden ? "" : L10n.commonThread)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbar }
             .toolbarBackground(.visible, for: .navigationBar) // Fix the toolbar's background.
@@ -80,6 +82,7 @@ struct ThreadTimelineScreen: View {
     private var toolbar: some ToolbarContent {
         // .principal + .primaryAction works better than .navigation leading + trailing
         // as the latter disables interaction in the action button for rooms with long names
+        if !headerHidden {
         ToolbarItem(placement: .principal) {
             RoomHeaderView(roomName: L10n.commonThread,
                            roomSubtitle: context.viewState.roomTitle,
@@ -89,6 +92,7 @@ struct ThreadTimelineScreen: View {
                            mediaProvider: context.mediaProvider) {
                 // There is no action but the iOS 26 designs have it looking like a button.
             }
+        }
         }
         
         if isMessageSelectionActive {

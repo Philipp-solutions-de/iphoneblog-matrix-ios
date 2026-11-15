@@ -21,7 +21,14 @@ final class PushCenter: NSObject, ObservableObject {
         self.session = session
         let center = UNUserNotificationCenter.current()
         center.delegate = self
-        let granted = (try? await center.requestAuthorization(options: [.alert, .badge, .sound])) ?? false
+        // Screenshot runs (IPHONEBLOG_NO_PUSH_PROMPT=1) keep the system prompt off the screen.
+        var granted = false
+        #if DEBUG
+        let prompt = ProcessInfo.processInfo.environment["IPHONEBLOG_NO_PUSH_PROMPT"] != "1"
+        #else
+        let prompt = true
+        #endif
+        if prompt { granted = (try? await center.requestAuthorization(options: [.alert, .badge, .sound])) ?? false }
         await refreshAuthorization()
         if granted { UIApplication.shared.registerForRemoteNotifications() }
         if let token { await session.registerPusher(token: token) }

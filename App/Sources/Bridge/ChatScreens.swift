@@ -46,6 +46,15 @@ protocol ChatScreenProviding: AnyObject {
     /// The Threads tab: every thread you take part in across channels, newest activity first,
     /// unread marked. A tap calls `host.openThread(roomID:rootEventID:)`.
     func threadsScreen(host: ChatHost) -> AnyView
+    /// An article's thread under the app's own discussion header: the thread screen without
+    /// its "Thread" title.
+    func discussionScreen(roomID: String, rootEventID: String, host: ChatHost) -> AnyView
+}
+
+extension ChatScreenProviding {
+    func discussionScreen(roomID: String, rootEventID: String, host: ChatHost) -> AnyView {
+        threadScreen(roomID: roomID, rootEventID: rootEventID, host: host)
+    }
 }
 
 /// The views the app uses. Vendor/ replaces the placeholder in one line here.
