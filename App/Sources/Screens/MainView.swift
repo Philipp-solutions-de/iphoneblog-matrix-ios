@@ -144,11 +144,8 @@ struct GuestMeView: View {
             }
             .scrollContentBackground(.hidden)
             .background(Theme.background)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Text("Ich").font(Theme.Font.screenTitle).foregroundStyle(Theme.ink)
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) { ScreenTitle("Ich") }
         }
     }
 }

@@ -74,8 +74,11 @@ writer="$(login writer "$writer_password")"
 rooms=(Allgemein Artikel)
 allgemein=""
 for name in "${rooms[@]}"; do
+    # Allgemein carries the alias #one:localhost, so the app (IPHONEBLOG_ONE_ALIAS) sees a member.
+    extra=""
+    [[ "$name" == Allgemein ]] && extra=',"room_alias_name":"one"'
     id="$(curl -fs -X POST "$url/_matrix/client/v3/createRoom" -H "Authorization: Bearer $token" \
-        -d "{\"name\":\"$name\",\"preset\":\"public_chat\"}" \
+        -d "{\"name\":\"$name\",\"preset\":\"public_chat\"$extra}" \
         | python3 -c 'import json,sys; print(json.load(sys.stdin)["room_id"])')"
     [[ "$name" == Allgemein ]] && allgemein="$id"
 done

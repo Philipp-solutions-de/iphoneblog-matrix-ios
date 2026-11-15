@@ -14,6 +14,15 @@ struct BlogArticle: Identifiable, Hashable {
     var date: Date
     var replyCount: Int
     var latestReply: Date?
+    /// Two lines under the title.
+    var teaser: String?
+    /// The last people who replied, newest first (names; avatars where the source has them).
+    var repliers: [Replier] = []
+
+    struct Replier: Hashable {
+        var name: String
+        var avatarURL: URL?
+    }
 
     /// Reads the bot's post: the first line without a web address is the title, the first web
     /// address is the article. An image post carries its picture.
@@ -26,9 +35,14 @@ struct BlogArticle: Identifiable, Hashable {
         let title = lines.first { !$0.isEmpty && $0.range(of: #"^https?://"#, options: .regularExpression) == nil }
             .map { $0.replacingOccurrences(of: #"https?://\S+"#, with: "", options: .regularExpression)
                 .trimmingCharacters(in: .whitespacesAndNewlines) } ?? body
+        // Everything after the title line that is not just a web address is the teaser.
+        let titleIndex = lines.firstIndex { !$0.isEmpty && $0.range(of: #"^https?://"#, options: .regularExpression) == nil }
+        let after: [String] = titleIndex.map { Array(lines[($0 + 1)...]) } ?? []
+        let rest = after.filter { !$0.isEmpty && $0.range(of: #"^https?://\S+$"#, options: .regularExpression) == nil }
         return BlogArticle(id: eventID, title: title.isEmpty ? (link?.absoluteString ?? "Artikel") : title,
                            link: link, imageURL: nil, imageSource: nil, date: date,
-                           replyCount: replies, latestReply: latest)
+                           replyCount: replies, latestReply: latest,
+                           teaser: rest.isEmpty ? nil : rest.joined(separator: " "))
     }
 }
 
@@ -77,9 +91,19 @@ final class GuestBlogFeed: ObservableObject, BlogFeed {
     private let session: URLSession
     private let log = Logger(subsystem: Brand.bundleID, category: "blog")
 
-    init(base: URL = URL(string: Brand.blogAPIURL)!, session: URLSession = .shared) { // swiftlint:disable:this force_unwrapping
+    init(base: URL = GuestBlogFeed.defaultBase, session: URLSession = .shared) {
         self.base = base
         self.session = session
+    }
+
+    /// The read-only API; debug builds may point elsewhere for screenshots and tests.
+    nonisolated static var defaultBase: URL {
+        #if DEBUG
+        if let override = ProcessInfo.processInfo.environment["IPHONEBLOG_BLOG_API"], let url = URL(string: override) {
+            return url
+        }
+        #endif
+        return URL(string: Brand.blogAPIURL)! // swiftlint:disable:this force_unwrapping
     }
 
     func load() async {
@@ -149,12 +173,21 @@ enum GuestAPI {
         let link: String?
         let replyCount: Int
         let latestReplyTs: Int64?
+        let teaser: String?
+        let lastRepliers: [Replier]?
+
+        struct Replier: Decodable {
+            let name: String
+            let avatarUrl: String?
+        }
 
         var article: BlogArticle {
             BlogArticle(id: rootEventId, title: title, link: link.flatMap(URL.init(string:)),
                         imageURL: imageUrl.flatMap(URL.init(string:)), imageSource: nil,
                         date: Date(milliseconds: ts), replyCount: replyCount,
-                        latestReply: latestReplyTs.map(Date.init(milliseconds:)))
+                        latestReply: latestReplyTs.map(Date.init(milliseconds:)),
+                        teaser: teaser,
+                        repliers: (lastRepliers ?? []).map { .init(name: $0.name, avatarURL: $0.avatarUrl.flatMap(URL.init(string:))) })
         }
     }
 
@@ -251,6 +284,13 @@ final class MatrixBlogFeed: ObservableObject, BlogFeed {
                                         replies: Int(item.numReplies),
                                         latest: item.latestEvent.map { Date(milliseconds: Int64($0.timestamp)) })
         article.imageSource = image.map(MediaSourceBox.init)
+        if item.numReplies > 0, let latest = item.latestEvent {
+            if case .ready(let name, _, _, _, _) = latest.senderProfile {
+                article.repliers = [.init(name: name ?? latest.sender, avatarURL: nil)]
+            } else {
+                article.repliers = [.init(name: latest.sender, avatarURL: nil)]
+            }
+        }
         return article
     }
 }

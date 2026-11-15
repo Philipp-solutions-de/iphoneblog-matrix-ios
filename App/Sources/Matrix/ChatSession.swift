@@ -61,7 +61,7 @@ final class ChatSession: ObservableObject, ChatHost {
     /// whose presence among the joined rooms makes someone a member. A lapsed membership drops
     /// the room and locks #one-Chat on the next sync.
     private func resolveRooms() async {
-        if let blog = try? await client.resolveRoomAlias(roomAlias: Brand.blogRoomAlias) {
+        if let blog = try? await client.resolveRoomAlias(roomAlias: Self.alias("IPHONEBLOG_BLOG_ALIAS", Brand.blogRoomAlias)) {
             blogRoomID = blog.roomId
             router.blogRoomID = blog.roomId
             rooms.hidden = [blog.roomId]
@@ -71,12 +71,20 @@ final class ChatSession: ObservableObject, ChatHost {
         } else {
             log.error("blog room alias does not resolve")
         }
-        oneRoomID = try? await client.resolveRoomAlias(roomAlias: Brand.oneRoomAlias)?.roomId
+        oneRoomID = try? await client.resolveRoomAlias(roomAlias: Self.alias("IPHONEBLOG_ONE_ALIAS", Brand.oneRoomAlias))?.roomId
         membershipWatch = rooms.$rooms.sink { [weak self] list in
             guard let self, let one = self.oneRoomID else { return }
             let member = list.contains { $0.id == one }
             if member != self.isOneMember { self.isOneMember = member }
         }
+    }
+
+    /// Room aliases from brand.env; debug runs against a test server may name others.
+    private static func alias(_ key: String, _ fallback: String) -> String {
+        #if DEBUG
+        if let value = ProcessInfo.processInfo.environment[key], !value.isEmpty { return value }
+        #endif
+        return fallback
     }
 
     func stop() async {

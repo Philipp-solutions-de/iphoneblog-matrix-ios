@@ -11,7 +11,7 @@ final class Router: ObservableObject {
         let rootEventID: String
     }
 
-    @Published var tab: Tab = .blog
+    @Published var tab: Tab = Router.startTab
     /// #one-Chat: the open channel and the thread on top of it.
     @Published var selectedRoomID: String?
     @Published var threadPath: [ThreadRoute] = []
@@ -26,6 +26,20 @@ final class Router: ObservableObject {
     @Published var notice: String?
     /// The sign-in sheet, offered where reading ends and writing would start.
     @Published var showSignIn = false
+
+    /// Blog, except in debug screenshot runs (IPHONEBLOG_START_TAB=blog|chat|mentions|me).
+    private static var startTab: Tab {
+        #if DEBUG
+        switch ProcessInfo.processInfo.environment["IPHONEBLOG_START_TAB"] {
+        case "chat": return .chat
+        case "mentions": return .mentions
+        case "me": return .me
+        default: return .blog
+        }
+        #else
+        return .blog
+        #endif
+    }
 
     func openRoom(_ roomID: String) {
         if roomID == blogRoomID {

@@ -15,15 +15,40 @@ struct MentionsView: View {
                     RoomRow(room: room)
                 }
                 .tint(.primary)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Theme.background)
             .overlay {
                 if rooms.withMentions.isEmpty {
                     ContentUnavailableView("Keine neuen Erwähnungen", systemImage: "at",
                                            description: Text("Wenn dich jemand mit @ erwähnt, steht es hier."))
                 }
             }
-            .navigationTitle("Erwähnungen")
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                ScreenTitle("@Erwähnungen")
+            }
         }
+    }
+}
+
+/// The serif title at the top of a tab, as on the Blog tab. The glass toolbar would cut it off.
+struct ScreenTitle: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        Text(text)
+            .font(Theme.Font.screenTitle)
+            .foregroundStyle(Theme.ink)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Theme.Space.page)
+            .padding(.top, 6)
+            .padding(.bottom, 4)
+            .background(Theme.background)
     }
 }
 
@@ -79,11 +104,8 @@ struct MeView: View {
             }
             .scrollContentBackground(.hidden)
             .background(Theme.background)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Text("Ich").font(Theme.Font.screenTitle).foregroundStyle(Theme.ink)
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) { ScreenTitle("Ich") }
             .task { await push.refreshAuthorization() }
             .confirmationDialog("Auf diesem Gerät abmelden?", isPresented: $confirmSignOut, titleVisibility: .visible) {
                 Button("Abmelden", role: .destructive) {

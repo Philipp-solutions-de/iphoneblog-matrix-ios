@@ -39,10 +39,12 @@ private struct BlogList<Feed: BlogFeed & ObservableObject>: View {
         List {
             Section {
                 ForEach(feed.articles) { article in
-                    NavigationLink(value: article.id) {
-                        ArticleCard(article: article, client: client)
-                    }
-                    .listRowSeparator(.hidden)
+                    // A hidden link: the card keeps the full width, without the list's arrow.
+                    ArticleCard(article: article, client: client)
+                        .background(NavigationLink(value: article.id) { EmptyView() }.opacity(0))
+                    .listRowSeparator(.visible, edges: .bottom)
+                    .listRowSeparatorTint(Theme.Blog.divider)
+                    .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
                     .listRowInsets(EdgeInsets(top: Theme.Blog.cardGap / 2, leading: Theme.Space.page,
                                               bottom: Theme.Blog.cardGap / 2, trailing: Theme.Space.page))
                     .listRowBackground(Color.clear)
@@ -80,56 +82,100 @@ private struct BlogList<Feed: BlogFeed & ObservableObject>: View {
     }
 }
 
-/// One article: picture, title, how many replied and when.
+/// One article in the feed: the picture large, the title, two lines of teaser, then how
+/// many replied, who replied last and when. Values in `Theme.Blog`.
 struct ArticleCard: View {
     let article: BlogArticle
     let client: Client?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Theme.Blog.cardInnerGap) {
             ArticleImage(article: article, client: client)
             Text(article.title)
                 .font(Theme.Blog.title)
                 .foregroundStyle(Theme.ink)
                 .lineLimit(3)
-            HStack(spacing: 6) {
+                .fixedSize(horizontal: false, vertical: true)
+            if let teaser = article.teaser, !teaser.isEmpty {
+                Text(teaser)
+                    .font(Theme.Blog.teaser)
+                    .foregroundStyle(Theme.ink2)
+                    .lineLimit(2)
+            }
+            HStack(spacing: 8) {
+                if !article.repliers.isEmpty {
+                    ReplierStack(repliers: Array(article.repliers.prefix(Theme.Blog.maxRepliers)))
+                }
                 if article.replyCount > 0 {
                     Text(article.replyCount == 1 ? "1 Antwort" : "\(article.replyCount) Antworten")
                         .fontWeight(.semibold)
                         .foregroundStyle(Theme.teal)
-                    Text("·")
+                    Text("·").foregroundStyle(Theme.ink3)
                 }
                 Text(article.latestReply ?? article.date, format: .relative(presentation: .named))
+                    .foregroundStyle(Theme.ink3)
             }
             .font(Theme.Blog.meta)
-            .foregroundStyle(Theme.ink3)
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
     }
 }
 
-/// The article's picture: from the web while signed out, through the SDK while signed in.
+/// The last repliers' faces, overlapping, newest in front.
+private struct ReplierStack: View {
+    let repliers: [BlogArticle.Replier]
+
+    var body: some View {
+        HStack(spacing: -Theme.Blog.replierAvatar / 3) {
+            ForEach(Array(repliers.enumerated()), id: \.offset) { index, replier in
+                Group {
+                    if let url = replier.avatarURL {
+                        AsyncImage(url: url) { $0.resizable().scaledToFill() } placeholder: {
+                            InitialsAvatar(name: replier.name, size: Theme.Blog.replierAvatar)
+                        }
+                    } else {
+                        InitialsAvatar(name: replier.name, size: Theme.Blog.replierAvatar)
+                    }
+                }
+                .frame(width: Theme.Blog.replierAvatar, height: Theme.Blog.replierAvatar)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Theme.background, lineWidth: 2))
+                .zIndex(Double(repliers.count - index))
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// The article's picture, full card width at 16:9: from the web while signed out, through the
+/// SDK while signed in. No picture, no space.
 private struct ArticleImage: View {
     let article: BlogArticle
     let client: Client?
     @State private var image: UIImage?
 
+    private var hasImage: Bool { article.imageURL != nil || article.imageSource != nil }
+
     var body: some View {
-        Group {
-            if let image {
-                Image(uiImage: image).resizable().scaledToFill()
-            } else if let url = article.imageURL {
-                AsyncImage(url: url) { $0.resizable().scaledToFill() } placeholder: { Theme.surface }
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: article.imageURL == nil && article.imageSource == nil ? 0 : Theme.Blog.imageHeight)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Size.corner))
-        .task(id: article.imageSource) {
-            guard let client, let source = article.imageSource?.source,
-                  let data = try? await client.getMediaThumbnail(mediaSource: source, width: 800, height: 450) else { return }
-            image = UIImage(data: data)
+        if hasImage {
+            Color.clear
+                .aspectRatio(Theme.Blog.imageAspect, contentMode: .fit)
+                .overlay {
+                    if let image {
+                        Image(uiImage: image).resizable().scaledToFill()
+                    } else if let url = article.imageURL {
+                        AsyncImage(url: url) { $0.resizable().scaledToFill() } placeholder: { Theme.surface }
+                    } else {
+                        Theme.surface
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Blog.imageCorner))
+                .task(id: article.imageSource) {
+                    guard let client, let source = article.imageSource?.source,
+                          let data = try? await client.getMediaThumbnail(mediaSource: source, width: 1200, height: 675) else { return }
+                    image = UIImage(data: data)
+                }
         }
     }
 }
