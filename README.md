@@ -5,11 +5,11 @@ The iphoneblog community chat: our own SwiftUI app on the Matrix engine
 `matrix.iphoneblog.de`. Members sign in with their iphoneblog.de account. Channels, threads,
 direct messages, mentions, images and reactions; nothing else.
 
-**State:** four tabs (decisions 2026-11-15). **Blog** opens first and needs no account: one
-card per article thread (the bot's post), a tap opens the thread; members reply there. Signed
-out it reads the static files the article bot writes on the Matrix host (`BLOG_API_URL`:
-`threads.json`, `threads/<root>.json`), signed in the Blog room through the SDK plus the bot's
-`de.iphoneblog.article` field on each root. **#one-Chat** holds the children of the space `#one:iphoneblog.de` and the direct messages;
+**State:** four tabs (decisions 2026-11-15). **Blog** opens first and needs no account: the
+blog's own pages in a web view (`?app=1`, without the site's header and menu), and under each
+article a "Diskussion" link that opens the article's Matrix thread natively. #one members reply
+there; everyone else reads, with "Anmelden" and "#one werden" where the composer would be
+(docs/architecture.md, "The Blog tab"). **#one-Chat** holds the children of the space `#one:iphoneblog.de` and the direct messages;
 membership is being joined or invited to that space (invites are accepted by the app).
 Non-members see it locked with a link to the #one offer. **@Erwähnungen** and **Ich** as before. Sign-in
 through the blog (MAS at `auth.iphoneblog.de`) is offered where writing starts. Push through

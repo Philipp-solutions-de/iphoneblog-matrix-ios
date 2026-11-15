@@ -128,6 +128,36 @@ channel timeline with thread summaries, a thread view, direct messages, mentions
 @-completion, images (send and view), reactions, a settings screen (name, picture, push,
 sign out). Left out: calls, spaces, polls, location, voice messages, encryption UI.
 
+## The Blog tab
+
+**The blog's own pages, not a native feed** (Thorsten, 2026-11-15). The tab is a `WKWebView` of
+`BlogWeb.defaultHome` (`App/Sources/Blog/BlogLinks.swift`; beta now, `https://www.iphoneblog.de/?app=1`
+at launch). With `app=1` WordPress drops its header, menu, footer and sidebar, keeps the flag on
+its own links, and writes under each article
+`iphoneblog-chat://diskussion?url=<permalink>` (iphoneblog-wordpress PR #274). The rules for
+every navigation are one pure function, `BlogNavigation.decide`, so they are unit-tested:
+
+- `iphoneblog-chat://diskussion` opens the Diskussion view; nothing loads.
+- A blog host (`iphoneblog.de`, `www`, the start page's host) without `app=1` loads again with it.
+- `auth.phso.de` stays inside: beta's staff gate signs in there (but a passkey cannot work in a
+  web view, so beta is reachable only where the gate already let the device in).
+- Every other site, mail and phone link opens in Safari; embeds inside a page load as they are.
+
+The web view lives as long as the app (one `BlogWebModel` in `BlogTab`), pulls to refresh, and
+follows light and dark through the page's own `prefers-color-scheme`; the app paints the same
+background under it so nothing flashes white.
+
+**Diskussion finds its thread by the article's path.** The permalink carries the host that served
+it (beta or www); `links.json` on the Matrix host is keyed by the www address. Both become
+`ArticlePath.key` (decoded path, lower case, one trailing slash) before they are compared. The
+file is read at most once a minute and again on a miss. No key means no thread yet, and the view
+says so. Title and reply count come from the public thread file (`threads/<root>.json`) for
+everyone. A signed-in #one member then gets the conversation views' thread screen with its
+composer (`ChatScreens.provider.threadScreen`); anyone else gets the replies from the thread file,
+read-only, with "Anmelden" (signed out) and "#one werden" where a composer would be. A push or a
+link into the Blog room still lands here: `Router.blogPath` holds either a thread root (`$…`) or
+`article:<permalink>` (`BlogRoute`).
+
 ## Following the SDK with near-zero upkeep
 
 The bindings ship about twice a week and change their API often. The app follows them in
