@@ -11,6 +11,8 @@ final class ChatSession: ObservableObject, ChatHost {
     let client: Client
     let userID: String
     let rooms = RoomListModel()
+    let mentions = MentionsModel()
+    let notificationPrefs = NotificationPrefs()
     let router: Router
     /// The Blog room and whether this person may use #one-Chat; set once sync runs.
     @Published private(set) var blogRoomID: String?
@@ -19,8 +21,8 @@ final class ChatSession: ObservableObject, ChatHost {
     @Published private(set) var syncState: SyncServiceState = .idle
     @Published private(set) var displayName: String?
 
-    /// The Blog tab's articles through the SDK, once the Blog room is known.
-    @Published private(set) var blogFeed: MatrixBlogFeed?
+    /// #one-Chat's one channel (#allgemein, a child of the space #one).
+    @Published private(set) var oneChannelID: String?
     private var oneRoomID: String?
     private var membershipWatch: AnyCancellable?
     private var membershipTimer: Task<Void, Never>?
@@ -54,6 +56,8 @@ final class ChatSession: ObservableObject, ChatHost {
         await syncService?.start()
         await resolveRooms()
         try await ChatScreens.provider.start(host: self)
+        mentions.attach(to: self)
+        notificationPrefs.attach(to: self)
         displayName = try? await client.displayName()
         log.info("sync started")
     }
@@ -62,17 +66,19 @@ final class ChatSession: ObservableObject, ChatHost {
     /// whose presence among the joined rooms makes someone a member. A lapsed membership drops
     /// the room and locks #one-Chat on the next sync.
     private func resolveRooms() async {
-        if let blog = try? await client.resolveRoomAlias(roomAlias: Self.alias("IPHONEBLOG_BLOG_ALIAS", Brand.blogRoomAlias)) {
+        if let blog = await resolve(Self.alias("IPHONEBLOG_BLOG_ALIAS", Brand.blogRoomAlias)) {
             blogRoomID = blog.roomId
             router.blogRoomID = blog.roomId
             rooms.hidden = [blog.roomId]
-            var room = try? client.getRoom(roomId: blog.roomId)
-            if room == nil { room = try? await client.joinRoomById(roomId: blog.roomId) }
-            if let room, blogFeed == nil { blogFeed = MatrixBlogFeed(room: room, client: client) }
+            // Everyone signed in reads the Blog room; it is public, so join it once.
+            if (try? client.getRoom(roomId: blog.roomId)) == nil {
+                _ = try? await client.joinRoomById(roomId: blog.roomId)
+            }
         } else {
             log.error("blog room alias does not resolve")
         }
-        oneRoomID = try? await client.resolveRoomAlias(roomAlias: Self.alias("IPHONEBLOG_ONE_ALIAS", Brand.oneRoomAlias))?.roomId
+        oneRoomID = await resolve(Self.alias("IPHONEBLOG_ONE_ALIAS", Brand.oneRoomAlias))?.roomId
+        oneChannelID = await resolve(Self.alias("IPHONEBLOG_CHANNEL_ALIAS", Brand.oneChannelAlias))?.roomId
         await refreshMembership()
         // The bot invites and removes; every change in the room list is a moment to look again,
         // and a slow timer catches an invite that arrives while nothing else moves.
@@ -118,8 +124,22 @@ final class ChatSession: ObservableObject, ChatHost {
     }
 
     private func setMembership(_ member: Bool, channels: Set<String>) {
+        // The channel alias may not resolve (an older server); then the space's first child.
+        if oneChannelID == nil || !(channels.isEmpty || channels.contains(oneChannelID!)) { // swiftlint:disable:this force_unwrapping
+            if let first = channels.sorted().first { oneChannelID = first }
+        }
         if member != isOneMember { isOneMember = member }
         if rooms.channelIDs != channels { rooms.channelIDs = channels }
+    }
+
+    /// Resolves an alias of this account's own server. Another server's alias would send the
+    /// homeserver over federation, which can take minutes to give up; the app has none.
+    private func resolve(_ alias: String) async -> ResolvedRoomAlias? {
+        guard alias.split(separator: ":").last == userID.split(separator: ":").last else {
+            log.error("alias \(alias, privacy: .public) is not on this server")
+            return nil
+        }
+        return try? await client.resolveRoomAlias(roomAlias: alias)
     }
 
     /// Room aliases from brand.env; debug runs against a test server may name others.
@@ -190,6 +210,24 @@ final class ChatSession: ObservableObject, ChatHost {
         guard let pushToken else { return }
         let identifiers = PusherIdentifiers(pushkey: pushToken.base64EncodedString(), appId: Brand.pusherAppID)
         try? await client.deletePusher(identifiers: identifiers)
+    }
+
+    /// A client-server API call the SDK has no method for, with this session's token.
+    func api(_ method: String, _ path: String, body: Data? = nil) async throws -> Data {
+        let base = client.homeserver().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard let url = URL(string: base + path) else { throw URLError(.badURL) }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("Bearer \(try client.session().accessToken)", forHTTPHeaderField: "Authorization")
+        if let body {
+            request.httpBody = body
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        return data
     }
 
     /// The account page on the sign-in service (name, password, devices).

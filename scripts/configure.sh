@@ -43,6 +43,10 @@ enum Brand {
 
     static let blogRoomAlias = "$BLOG_ROOM_ALIAS"
     static let oneRoomAlias = "$ONE_ROOM_ALIAS"
+    static let oneChannelAlias = "$ONE_CHANNEL_ALIAS"
+    static let blogWebURL = "$BLOG_WEB_URL"
+    static let registerURL = "$REGISTER_URL"
+    static let imprintURL = "$IMPRINT_URL"
     static let blogAPIURL = "$BLOG_API_URL"
     static let oneOfferURL = "$ONE_OFFER_URL"
 
@@ -51,6 +55,6 @@ enum Brand {
 }
 EOF
 
-export APP_DISPLAY_NAME TEAM_ID BUNDLE_ID APP_GROUP_ID OAUTH_REDIRECT_SCHEME="$scheme"
+export APP_DISPLAY_NAME TEAM_ID BUNDLE_ID APP_GROUP_ID OAUTH_REDIRECT_SCHEME="$scheme" OAUTH_LEGACY_REDIRECT_SCHEME
 xcodegen --quiet --spec project.yml
 echo "configure.sh: done"

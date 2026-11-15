@@ -11,11 +11,11 @@ import SwiftUI
 extension Theme {
     enum Chat {
         /// Sender name and the time beside it.
-        static let senderName = SwiftUI.Font.system(size: 16, weight: .bold)
-        static let time = SwiftUI.Font.system(size: 13)
+        static let senderName = SwiftUI.Font.system(size: 15, weight: .bold)
+        static let time = SwiftUI.Font.system(size: 12)
         /// "5 Antworten" and the last reply after it.
-        static let threadSummary = SwiftUI.Font.system(size: 15, weight: .semibold)
-        static let threadPreview = SwiftUI.Font.system(size: 15)
+        static let threadSummary = SwiftUI.Font.system(size: 14, weight: .bold)
+        static let threadPreview = SwiftUI.Font.system(size: 13)
         /// "# allgemein" and "148 Mitglieder" in the navigation bar.
         static let roomTitle = SwiftUI.Font.system(size: 17, weight: .bold)
         static let roomSubtitle = SwiftUI.Font.system(size: 13)
@@ -23,7 +23,7 @@ extension Theme {
         static let divider = SwiftUI.Font.system(size: 13, weight: .semibold)
 
         /// The sender's avatar, the small one in a thread summary.
-        static let avatar: CGFloat = 40
+        static let avatar: CGFloat = 36
         static let summaryAvatar: CGFloat = 20
         /// Gap between avatar and message; space above a new sender, between one sender's messages.
         static let avatarGap: CGFloat = 12

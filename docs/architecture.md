@@ -10,7 +10,7 @@ iPad and Apple-silicon Macs.
 ```
  iPhone / iPad / Mac                                   alex (behind edge)
  ┌───────────────────────────────┐                     ┌───────────────────────────┐
- │ SwiftUI screens               │                     │ matrix.iphoneblog.de      │
+ │ SwiftUI screens               │                     │ chat.iphoneblog.de        │
  │   AppModel (signed out / in)  │  sliding sync, REST │   Synapse, server name    │
  │   ChatSession → RoomListModel │ ──────────────────► │   iphoneblog.de           │
  │                 → Timeline    │                     │   /_matrix/push → Sygnal  │
@@ -37,16 +37,18 @@ the room list, timelines, threads, media, sending queues and token refresh; the 
 screens. We keep our own code thin around it: `MatrixClientFactory` builds every client the
 same way, `ChatSession` owns sync, `RoomListModel` turns the SDK's list diffs into rows.
 
-**Preset server, no discovery.** The client talks to `https://matrix.iphoneblog.de`
+**Preset server, no discovery.** The client talks to `https://chat.iphoneblog.de`
 directly; people are `@name:iphoneblog.de`. No `.well-known/matrix` on the blog is needed.
 Members never see a server field.
 
 **Sign-in through the blog.** The app registers itself with the Matrix Authentication
 Service at `auth.iphoneblog.de` (dynamic client registration), opens the sign-in page in
 `ASWebAuthenticationSession`, and MAS sends the member on to WordPress. The callback uses the
-custom scheme `de.iphoneblog.matrix:/oauth/callback`; MAS accepts a custom scheme when it is
-the reverse of the client URI's host (`matrix.iphoneblog.de`), so no apple-app-site-association
-file is needed for sign-in. The web sheet shares Safari's cookies: someone signed in to the
+custom scheme `de.iphoneblog.chat:/oauth/callback` with the client URI
+`https://chat.iphoneblog.de/app`; MAS accepts a custom scheme when it is the reverse of the
+client URI's host, so no apple-app-site-association file is needed for sign-in. The app also
+answers the old scheme `de.iphoneblog.matrix`, so a client registered while `matrix.iphoneblog.de`
+was the host keeps signing in for as long as that alias lives. The web sheet shares Safari's cookies: someone signed in to the
 blog taps once. Tokens live in the keychain; the SDK refreshes them and hands new ones to
 `KeychainSessionDelegate`.
 
@@ -60,12 +62,31 @@ encrypted room. A second or third device signs in and sees all history at once; 
 room list loads in one round trip whatever the number of rooms.
 
 **Push through our own Sygnal.** The app registers a pusher with app id
-`<BUNDLE_ID>.ios.prod` (today `de.iphoneblog.matrix.preview.ios.prod`, Thorsten's team; see apple-setup.md) and the gateway `https://matrix.iphoneblog.de/_matrix/push/v1/notify`.
+`<BUNDLE_ID>.ios.prod` (today `de.iphoneblog.matrix.preview.ios.prod`, Thorsten's team; see apple-setup.md) and the gateway `https://chat.iphoneblog.de/_matrix/push/v1/notify`.
 A notification service extension (second target, shared app group) receives each push,
 fetches the event with the SDK's notification client and writes "Name in #channel: text".
 A tap opens the channel or the thread. Unencrypted rooms make this simple: no keys to share
 with the extension. Apple's notification-filtering entitlement is requested for Alex's
 account so the extension may drop pushes it cannot show.
+
+**Four tabs, the blog as the front page.** Blog, #one-Chat, @Mentions (signed in only), Ich,
+as in the approved previews; every visual value lives in `App/Sources/Theme.swift`, light and
+dark by the system. The Blog tab is a `WKWebView` on WordPress's app view (`?app=1`, which
+drops banner, header, menu and footer), not native article cards: the blog renders articles,
+paywall included, exactly as the site does, and the app adds only the discussion. The web
+view routes taps only: a "Diskussion" link opens the native discussion, a link to the blog
+keeps `app=1`, any other site opens in Safari. Redirects and the page's own loads go where the
+server sends them. Reading a discussion needs no account: the app reads the static files the
+article bot writes (`links.json` maps an article URL to its thread, matched by path so `www`
+and `beta` find the same one; `threads/<root>.json` holds the replies). #one members get the
+conversation views and write in the thread.
+
+**@Mentions from the server.** The tab lists `GET /notifications?only=highlight`: the server
+already decides what mentions me and keeps the read state across devices. The push switches
+on Ich are server push rules for the same reason: "Neue Artikel" is an override rule
+(`de.iphoneblog.new_articles`) on events in the Blog room that carry the bot's
+`de.iphoneblog.article` field, while the Blog room itself stays on mentions only, so replies
+under articles do not ring.
 
 **Reuse before writing: the SDK's UI layer plus Element X's chat views.** The Matrix engine's
 UI layer (`matrix-sdk-ui`, Apache-2.0, inside the Swift bindings) does the chat logic. For the
@@ -78,7 +99,7 @@ That code is AGPL-3.0, so this app is AGPL-3.0 too; the repository is public, as
 | Sync | `SyncService` | | start and stop with the app's life cycle |
 | Room list | `RoomListService`, filters, diffs, unread and mention counts | | `RoomListModel`, the channel list view (our design) |
 | Timeline | `Timeline`: pagination, local echo, send queue, edits, reactions, receipts | `Screens/Timeline` (cells, list, reactions, replies, thread summaries), `Services/Timeline` (SDK wrapper, view items) | adapters, our colours and type, cells we do not want removed |
-| Threads | thread focus, `ThreadListService`, thread subscriptions | `Screens/ThreadTimelineScreen`, `Screens/RoomThreadListScreen` | the Threads tab across rooms |
+| Threads | thread focus, `ThreadListService`, thread subscriptions | `Screens/ThreadTimelineScreen`, `Screens/RoomThreadListScreen` | the article discussions and the threads in #one-Chat |
 | Composer | send queue, replies, edits, `Mentions`, media upload | the composer toolbar and mention suggestions from `Screens/RoomScreen`, `Other/Pills` | plain-text mode only (no rich-text editor) |
 | Media | thumbnails, files, upload with progress | `Screens/FilePreviewScreen`, `Screens/MediaPickerScreen` | |
 | Design system | | `compound-ios` (needed by the views), recoloured through its override API | our tokens: teal, coral, greys |

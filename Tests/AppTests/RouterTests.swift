@@ -34,7 +34,7 @@ final class RouterTests: XCTestCase {
         router.tab = .mentions
         router.openThread(roomID: "!blog", rootEventID: "$article")
         XCTAssertEqual(router.tab, .blog)
-        XCTAssertEqual(router.blogPath, ["$article"])
+        XCTAssertEqual(router.blogPath, [.thread(rootEventID: "$article")])
         XCTAssertNil(router.selectedRoomID)
     }
 
