@@ -101,8 +101,9 @@ gh workflow run apple-setup.yml --repo Philipp-solutions-de/iphoneblog-matrix-io
 gh workflow run apple-setup.yml --repo Philipp-solutions-de/iphoneblog-zulip-ios
 ```
 
-Each registers its app and extension ids and turns on Push Notifications (app) and App Groups
-(both) through the API ([bundle ids](https://developer.apple.com/documentation/appstoreconnectapi/bundle-ids),
+Each registers its app and extension ids and turns on Push Notifications (app), App Groups
+(both) and, in the Matrix app, Associated Domains (app: passkeys at `auth.phso.de` in the Blog
+tab's web view) through the API ([bundle ids](https://developer.apple.com/documentation/appstoreconnectapi/bundle-ids),
 [capabilities](https://developer.apple.com/documentation/appstoreconnectapi/bundle-id-capabilities)).
 Running them again changes nothing. Check both went green on the repositories' Actions pages.
 

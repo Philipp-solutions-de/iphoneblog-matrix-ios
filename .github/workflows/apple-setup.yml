@@ -1,7 +1,8 @@
 name: Apple setup
 
 # Run by hand once the App Store Connect key is in the secrets (docs/apple-setup.md):
-# registers the bundle ids and switches on Push Notifications and App Groups.
+# registers the bundle ids and switches on Push Notifications, App Groups and Associated
+# Domains. The TestFlight build runs the same lane first, so this is for a first setup only.
 # Safe to run again; it only adds what is missing.
 
 on:
