@@ -11,8 +11,8 @@ needs no account: the blog itself in a web view, as WordPress's app view (`BLOG_
 its discussion natively: the Matrix thread the article bot started. The app finds it by the
 article's path in `links.json` and reads it from the bot's static files (`BLOG_API_URL`);
 #one members write in it with the conversation views. **#one-Chat** is one channel,
-`#allgemein` in the space `#one:iphoneblog.de`; membership is being joined or invited to that
-space (the app accepts invites). Everyone else sees it locked, with the way to #one.
+`#one-chat:iphoneblog.de` (older alias `#allgemein`) in the space `#one:iphoneblog.de`;
+membership is being joined to that space (the server accepts the bot's invites at once). Everyone else sees it locked, with the way to #one.
 **@Mentions** (signed in only) lists the server's highlight notifications. **Ich** holds the
 profile, the push switches (each one a server push rule) and the account. Sign-in through the
 blog (MAS at `auth.iphoneblog.de`) is offered where writing starts. Push through our Sygnal
