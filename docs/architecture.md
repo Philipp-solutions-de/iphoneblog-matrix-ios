@@ -76,9 +76,13 @@ drops banner, header, menu and footer), not native article cards: the blog rende
 paywall included, exactly as the site does, and the app adds only the discussion. The web
 view routes taps only: a "Diskussion" link opens the native discussion, a link to the blog
 keeps `app=1`, any other site opens in Safari. Redirects and the page's own loads go where the
-server sends them. Reading a discussion needs no account: the app reads the static files the
+server sends them, so beta's staff gate (Authelia at `auth.phso.de`) signs in inside the view.
+One web view lives as long as the app (`BlogWebModel`): a tab switch, a sign-in or a
+discussion never reloads the page the reader is on, and "Artikel lesen" opens the article there
+rather than in a Safari sheet that has none of the view's cookies. Reading a discussion needs no account: the app reads the static files the
 article bot writes (`links.json` maps an article URL to its thread, matched by path so `www`
-and `beta` find the same one; `threads/<root>.json` holds the replies). #one members get the
+and `beta` find the same one; `threads/<root>.json` holds the replies; a key is the decoded, lower-case path with one trailing
+slash, and a miss in a copy older than a minute reads the file again). #one members get the
 conversation views and write in the thread.
 
 **@Mentions from the server.** The tab lists `GET /notifications?only=highlight`: the server

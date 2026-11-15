@@ -9,18 +9,25 @@ struct BlogTab: View {
     @ObservedObject var router: Router
     /// Nil while signed out.
     let session: ChatSession?
+    /// One web view for the app's life: switching tabs, signing in or opening a discussion
+    /// never reloads the page the reader is on.
+    @StateObject private var web = BlogWebModel(start: BlogTab.startURL)
 
     var body: some View {
         NavigationStack(path: $router.blogPath) {
-            BlogWebView(start: Self.startURL) { article in
-                router.blogPath.append(.article(article))
-            }
-            .ignoresSafeArea(edges: .bottom)
-            .background(Theme.background)
-            .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(for: Router.DiscussionRoute.self) { route in
-                DiscussionView(route: route, session: session, router: router)
-            }
+            BlogHome(web: web)
+                .toolbar(.hidden, for: .navigationBar)
+                .navigationDestination(for: Router.DiscussionRoute.self) { route in
+                    DiscussionView(route: route, session: session, router: router) { article in
+                        // "Artikel lesen": the article in the blog view, not in a Safari sheet,
+                        // which would meet beta's staff gate without the web view's session.
+                        web.open(article)
+                        router.blogPath = []
+                    }
+                }
+        }
+        .onAppear {
+            web.openDiscussion = { [weak router] article in router?.blogPath.append(.article(article)) }
         }
     }
 
@@ -35,92 +42,204 @@ struct BlogTab: View {
     }
 }
 
-/// A WKWebView on the blog that keeps the app view, hands discussions to the app and sends
-/// everything else to Safari.
-struct BlogWebView: UIViewRepresentable {
+/// The logo bar on top (preview "Blog tab"), the blog below, and what shows while it loads
+/// or when it cannot.
+private struct BlogHome: View {
+    @ObservedObject var web: BlogWebModel
+
+    var body: some View {
+        BlogWebView(model: web)
+            .ignoresSafeArea(edges: .bottom)
+            .background(Theme.background)
+            .overlay {
+                switch web.phase {
+                case .loading:
+                    ProgressView()
+                case .failed:
+                    ContentUnavailableView {
+                        Label("Blog nicht erreichbar", systemImage: "wifi.slash")
+                    } description: {
+                        Text("Die Seite lässt sich gerade nicht laden.")
+                    } actions: {
+                        Button("Nochmal versuchen") { web.retry() }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Theme.teal)
+                    }
+                    .background(Theme.background)
+                case .ready:
+                    EmptyView()
+                }
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                Button { web.goHome() } label: {
+                    Image("Logo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: Theme.BlogBar.logo, height: Theme.BlogBar.logo)
+                        .frame(maxWidth: .infinity, minHeight: Theme.BlogBar.height)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("iPhoneBlog.de, zum Anfang")
+                .background(Theme.background)
+                .overlay(alignment: .bottom) { Theme.line.frame(height: 1) }
+            }
+    }
+}
+
+/// The values of the logo bar. Theme.swift belongs to the navigation shell; these move there
+/// when it next changes.
+extension Theme {
+    enum BlogBar {
+        static let logo: CGFloat = 38
+        static let height: CGFloat = 52
+    }
+}
+
+/// The Blog tab's web view and its state: the page keeps the app view, hands discussions to
+/// the app and sends everything else to Safari.
+@MainActor
+final class BlogWebModel: NSObject, ObservableObject, WKNavigationDelegate, WKUIDelegate {
+    enum Phase: Equatable { case loading, ready, failed }
+
+    /// `loading` and `failed` cover the page only until the first page showed; after that a
+    /// failed load keeps what the reader sees.
+    @Published private(set) var phase: Phase = .loading
     let start: URL
-    let openDiscussion: (URL) -> Void
+    let webView: WKWebView
+    /// A tap on "Diskussion": the article's permalink.
+    var openDiscussion: ((URL) -> Void)?
 
-    func makeCoordinator() -> Coordinator { Coordinator(start: start, openDiscussion: openDiscussion) }
-
-    func makeUIView(context: Context) -> WKWebView {
+    init(start: URL) {
+        self.start = start
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
-        let view = WKWebView(frame: .zero, configuration: configuration)
-        view.navigationDelegate = context.coordinator
-        view.uiDelegate = context.coordinator
-        view.allowsBackForwardNavigationGestures = true
-        view.isOpaque = false
-        view.backgroundColor = UIColor(Theme.background)
-        view.scrollView.backgroundColor = UIColor(Theme.background)
-        view.customUserAgent = nil
+        configuration.allowsInlineMediaPlayback = true
+        webView = WKWebView(frame: .zero, configuration: configuration)
+        super.init()
+        let background = UIColor(Theme.background)
+        webView.isOpaque = false
+        webView.backgroundColor = background
+        webView.scrollView.backgroundColor = background
+        webView.underPageBackgroundColor = background
+        webView.allowsBackForwardNavigationGestures = true
+        webView.navigationDelegate = self
+        webView.uiDelegate = self
+        #if DEBUG
+        webView.isInspectable = true
+        #endif
         let refresh = UIRefreshControl()
-        refresh.addTarget(context.coordinator, action: #selector(Coordinator.reload(_:)), for: .valueChanged)
-        view.scrollView.refreshControl = refresh
-        context.coordinator.webView = view
-        view.load(URLRequest(url: start))
-        return view
+        refresh.addTarget(self, action: #selector(pulled(_:)), for: .valueChanged)
+        webView.scrollView.refreshControl = refresh
+        webView.load(URLRequest(url: start))
     }
 
-    func updateUIView(_ view: WKWebView, context: Context) { }
+    func retry() {
+        phase = .loading
+        if webView.url == nil { webView.load(URLRequest(url: start)) } else { webView.reload() }
+    }
 
-    @MainActor
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
-        let start: URL
-        let openDiscussion: (URL) -> Void
-        weak var webView: WKWebView?
-
-        init(start: URL, openDiscussion: @escaping (URL) -> Void) {
-            self.start = start
-            self.openDiscussion = openDiscussion
+    /// A tap on the logo: the start page, or its top when already there.
+    func goHome() {
+        if let url = webView.url, BlogLinks.withAppView(url) == BlogLinks.withAppView(start) {
+            webView.scrollView.setContentOffset(CGPoint(x: 0, y: -webView.scrollView.adjustedContentInset.top), animated: true)
+        } else {
+            webView.load(URLRequest(url: start))
         }
+    }
 
-        @objc func reload(_ sender: UIRefreshControl) {
-            webView?.reload()
-            sender.endRefreshing()
+    /// An article, from "Artikel lesen".
+    func open(_ article: URL) {
+        let target = BlogLinks.withAppView(article)
+        if let url = webView.url, DiscussionStore.key(for: url) == DiscussionStore.key(for: target) { return }
+        webView.load(URLRequest(url: target))
+    }
+
+    @objc private func pulled(_ control: UIRefreshControl) {
+        // Ends when the page has loaded (didFinish/didFail), not at once.
+        if webView.url == nil { webView.load(URLRequest(url: start)) } else { webView.reload() }
+    }
+
+    private func finished(failed: Bool) {
+        webView.scrollView.refreshControl?.endRefreshing()
+        if !failed { phase = .ready } else if phase != .ready { phase = .failed }
+    }
+
+    // MARK: WKNavigationDelegate
+
+    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
+                 decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
+        guard let url = action.request.url else { return decisionHandler(.cancel) }
+        // Only taps are routed. Redirects, reloads and the page's own loads (a sign-in gate,
+        // an embedded player) go where the server sends them.
+        guard action.navigationType == .linkActivated || url.scheme == "iphoneblog-chat" else {
+            return decisionHandler(url.scheme == "http" || url.scheme == "https" || url.scheme == "about" ? .allow : .cancel)
         }
-
-        func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
-                     decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
-            guard let url = action.request.url else { return decisionHandler(.cancel) }
-            // Only taps are routed. Redirects, reloads and the page's own loads (a sign-in gate,
-            // an embedded player) go where the server sends them.
-            guard action.navigationType == .linkActivated || url.scheme == "iphoneblog-chat" else {
-                return decisionHandler(url.scheme == "http" || url.scheme == "https" || url.scheme == "about" ? .allow : .cancel)
-            }
-            switch BlogLinks.classify(url, blogHost: start.host()) {
-            case .discussion(let article):
+        switch BlogLinks.classify(url, blogHost: start.host()) {
+        case .discussion(let article):
+            decisionHandler(.cancel)
+            openDiscussion?(article)
+        case .blog(let keepingAppView):
+            if let keepingAppView, action.targetFrame?.isMainFrame ?? true {
                 decisionHandler(.cancel)
-                openDiscussion(article)
-            case .blog(let keepingAppView):
-                if let keepingAppView, action.targetFrame?.isMainFrame ?? true {
-                    decisionHandler(.cancel)
-                    webView.load(URLRequest(url: keepingAppView))
-                } else {
-                    decisionHandler(.allow)
-                }
-            case .external:
-                decisionHandler(.cancel)
-                UIApplication.shared.open(url)
-            case .ignore:
+                webView.load(URLRequest(url: keepingAppView))
+            } else {
                 decisionHandler(.allow)
             }
-        }
-
-        /// `target="_blank"` links: same rules, never a second web view.
-        func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
-                     for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-            if let url = action.request.url {
-                switch BlogLinks.classify(url, blogHost: start.host()) {
-                case .discussion(let article): openDiscussion(article)
-                case .blog(let keeping): webView.load(URLRequest(url: keeping ?? url))
-                case .external: UIApplication.shared.open(url)
-                case .ignore: break
-                }
-            }
-            return nil
+        case .external:
+            decisionHandler(.cancel)
+            UIApplication.shared.open(url)
+        case .ignore:
+            decisionHandler(url.scheme == "iphoneblog-chat" ? .cancel : .allow)
         }
     }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        finished(failed: false)
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        finished(failed: !Self.isCancel(error))
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        finished(failed: !Self.isCancel(error))
+    }
+
+    /// iOS ends a web view's content process under memory pressure; the page would stay blank.
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        webView.reload()
+    }
+
+    /// A load the app replaced itself (app=1, Diskussion) is not a failure.
+    private static func isCancel(_ error: Error) -> Bool {
+        let error = error as NSError
+        return (error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled)
+            || (error.domain == "WebKitErrorDomain" && error.code == 102) // frame load interrupted
+    }
+
+    // MARK: WKUIDelegate
+
+    /// `target="_blank"` links: same rules, never a second web view.
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        if let url = action.request.url {
+            switch BlogLinks.classify(url, blogHost: start.host()) {
+            case .discussion(let article): openDiscussion?(article)
+            case .blog(let keeping): webView.load(URLRequest(url: keeping ?? url))
+            case .external: UIApplication.shared.open(url)
+            case .ignore: break
+            }
+        }
+        return nil
+    }
+}
+
+/// The web view in SwiftUI; the model owns it.
+struct BlogWebView: UIViewRepresentable {
+    let model: BlogWebModel
+
+    func makeUIView(context: Context) -> WKWebView { model.webView }
+    func updateUIView(_ view: WKWebView, context: Context) { }
 }
 
 /// Where a link in the blog leads. Pure, so it is tested without a web view.
@@ -138,13 +257,21 @@ enum BlogLinks {
 
     static let blogHosts: Set<String> = ["www.iphoneblog.de", "iphoneblog.de", "beta.iphoneblog.de"]
 
+    /// The same address with `app=1`, once.
+    static func withAppView(_ url: URL) -> URL {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+        components.queryItems = (components.queryItems ?? []).filter { $0.name != "app" } + [URLQueryItem(name: "app", value: "1")]
+        return components.url ?? url
+    }
+
     static func classify(_ url: URL, blogHost: String?) -> Target {
         switch url.scheme?.lowercased() {
         case "iphoneblog-chat":
             guard url.host() == "diskussion",
                   let raw = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                     .queryItems?.first(where: { $0.name == "url" })?.value,
-                  let article = URL(string: raw) else { return .ignore }
+                  let article = URL(string: raw), ["http", "https"].contains(article.scheme?.lowercased() ?? ""),
+                  article.host() != nil else { return .ignore }
             return .discussion(article)
         case "http", "https":
             guard let host = url.host()?.lowercased(),

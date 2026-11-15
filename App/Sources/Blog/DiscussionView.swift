@@ -8,6 +8,8 @@ struct DiscussionView: View {
     /// Nil while signed out.
     let session: ChatSession?
     @ObservedObject var router: Router
+    /// "Artikel lesen": the Blog tab shows the article in its web view.
+    let readArticle: (URL) -> Void
     @Environment(\.dismiss) private var dismiss
 
     @State private var rootEventID: String?
@@ -60,11 +62,7 @@ struct DiscussionView: View {
                     Text("·").accessibilityHidden(true)
                 }
                 if let link = articleURL {
-                    Button("Artikel lesen") {
-                        // From the blog: back to the article there. From a push or a mention: the
-                        // article in Safari's sheet.
-                        if case .article = route { dismiss() } else { router.presentedURL = link }
-                    }
+                    Button("Artikel lesen") { readArticle(link) }
                         .fontWeight(.medium)
                         .foregroundStyle(Theme.teal)
                 }
@@ -93,8 +91,14 @@ struct DiscussionView: View {
             ContentUnavailableView("Noch keine Diskussion", systemImage: "bubble.left.and.bubble.right",
                                    description: Text("Zu diesem Artikel gibt es noch keinen Thread."))
         case .unavailable:
-            ContentUnavailableView("Nicht erreichbar", systemImage: "wifi.slash",
-                                   description: Text("Die Diskussion lässt sich gerade nicht laden."))
+            ContentUnavailableView {
+                Label("Nicht erreichbar", systemImage: "wifi.slash")
+            } description: {
+                Text("Die Diskussion lässt sich gerade nicht laden.")
+            } actions: {
+                Button("Nochmal versuchen") { Task { await load() } }
+                    .tint(Theme.teal)
+            }
         case .ready:
             if isMember, let session, let roomID = session.blogRoomID, let rootEventID {
                 // Members: the conversation views, with the composer that answers in the thread.
@@ -130,7 +134,13 @@ struct DiscussionView: View {
         let store = DiscussionStore.shared
         switch route {
         case .article(let url):
-            rootEventID = await store.rootEventID(for: url)
+            do {
+                rootEventID = try await store.rootEventID(for: url)
+            } catch {
+                // links.json unreadable: not "no discussion", which would be wrong and final.
+                state = .unavailable
+                return
+            }
         case .thread(let id):
             rootEventID = id
         }

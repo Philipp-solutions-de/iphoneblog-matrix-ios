@@ -95,33 +95,43 @@ final class DiscussionStore {
         return URL(string: Brand.blogAPIURL)! // swiftlint:disable:this force_unwrapping
     }
 
-    /// The path an article is matched by: the permalink's path with a trailing slash. Host,
-    /// query (app=1) and fragment do not count; beta and www lead to the same thread.
+    /// The path an article is matched by: the permalink's decoded path, lower case, with one
+    /// trailing slash. Host, query (app=1) and fragment do not count; beta and www lead to the
+    /// same thread.
     nonisolated static func key(for url: URL) -> String {
-        var path = url.path(percentEncoded: false)
+        var path = url.path(percentEncoded: false).lowercased()
         if path.isEmpty { path = "/" }
+        while path.hasSuffix("//") { path.removeLast() }
         if !path.hasSuffix("/") { path += "/" }
         return path
     }
 
-    /// The thread's root event for an article, or nil when it has no discussion.
-    func rootEventID(for articleURL: URL) async -> String? {
-        if loadedAt == nil || Date().timeIntervalSince(loadedAt!) > 60 { // swiftlint:disable:this force_unwrapping
-            await loadLinks()
-        }
-        return byPath[Self.key(for: articleURL)]
+    /// The thread's root event for an article, or nil when it has no discussion. Throws when
+    /// links.json cannot be read and no copy is at hand. A miss in a copy older than a minute
+    /// reads the file again: the article may be newer than the copy.
+    func rootEventID(for articleURL: URL) async throws -> String? {
+        let key = Self.key(for: articleURL)
+        if let root = byPath[key] { return root }
+        if let loadedAt, Date().timeIntervalSince(loadedAt) < 60 { return nil }
+        try await loadLinks()
+        return byPath[key]
     }
 
-    private func loadLinks() async {
-        guard let (data, response) = try? await session.data(from: base.appending(path: "links.json")),
-              (response as? HTTPURLResponse)?.statusCode == 200,
-              let links = try? GuestAPI.decoder.decode(GuestAPI.Links.self, from: data) else { return }
+    private func loadLinks() async throws {
+        let (data, response) = try await session.data(from: base.appending(path: "links.json"))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        let links = try GuestAPI.decoder.decode(GuestAPI.Links.self, from: data)
+        byPath = Self.index(links)
+        loadedAt = Date()
+    }
+
+    /// links.json → path key → root event.
+    nonisolated static func index(_ links: GuestAPI.Links) -> [String: String] {
         var map: [String: String] = [:]
         for (article, root) in links.links {
-            if let url = URL(string: article) { map[Self.key(for: url)] = root }
+            if let url = URL(string: article) { map[key(for: url)] = root }
         }
-        byPath = map
-        loadedAt = Date()
+        return map
     }
 
     /// The thread file: title, link, count and the newest replies, oldest first.
