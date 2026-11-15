@@ -66,6 +66,13 @@ struct ChatsView: View {
                 .navigationDestination(for: Router.ThreadRoute.self) { route in
                     ChatScreens.provider.threadScreen(roomID: route.roomID, rootEventID: route.rootEventID, host: session)
                 }
+                .task(id: router.pendingThread) {
+                    guard let route = router.pendingThread, route.roomID == router.selectedRoomID else { return }
+                    // One frame for the stack to settle after the tab or channel change.
+                    try? await Task.sleep(for: .milliseconds(150))
+                    router.threadPath = [route]
+                    router.pendingThread = nil
+                }
             }
         }
         .tint(Theme.teal)

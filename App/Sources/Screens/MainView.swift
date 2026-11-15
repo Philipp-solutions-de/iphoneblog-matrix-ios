@@ -14,7 +14,7 @@ struct MainView: View {
                 .tag(Router.Tab.chats)
                 .badge(rooms.badgeCount)
 
-            ThreadsView()
+            ThreadsView(session: session)
                 .tabItem { Label("Threads", systemImage: "bubble.left") }
                 .tag(Router.Tab.threads)
 
