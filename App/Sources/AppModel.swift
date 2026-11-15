@@ -133,7 +133,16 @@ final class AppModel: ObservableObject {
                            logoUri: Brand.oauthLogoURI,
                            tosUri: Brand.oauthTermsURI,
                            policyUri: Brand.oauthPolicyURI,
-                           staticRegistrations: [:])
+                           staticRegistrations: staticRegistrations(clientID: Brand.oauthClientID))
+    }
+
+    /// The static MAS client, keyed by homeserver and issuer as the SDK looks them up. WordPress's
+    /// web-login accepts only tokens of this client. Empty client id: dynamic registration.
+    static func staticRegistrations(clientID: String) -> [String: String] {
+        guard !clientID.isEmpty else { return [:] }
+        var keys = [Brand.homeserverURL, Brand.oauthIssuerURL]
+        keys += keys.map { $0.hasSuffix("/") ? String($0.dropLast()) : $0 + "/" }
+        return Dictionary(keys.map { ($0, clientID) }, uniquingKeysWith: { first, _ in first })
     }
 
     /// A client without a session, kept until sign-in finishes.
