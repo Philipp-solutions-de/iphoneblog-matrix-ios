@@ -306,6 +306,7 @@ private struct ChatRoomScreen: View {
                 }
             }
             .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(style.colors.background, for: .navigationBar)
             .timelineMediaPreview(viewModel: $context.mediaPreviewViewModel)
             .overlay(alignment: .top) {
                 FloatingDateBadge(dateText: timelineContext.floatingDate?.formattedDateSeparator()) {
