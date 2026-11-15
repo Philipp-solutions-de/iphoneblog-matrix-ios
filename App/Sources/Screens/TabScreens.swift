@@ -27,19 +27,6 @@ struct MentionsView: View {
     }
 }
 
-/// The threads you take part in, across all channels, from the conversation views.
-/// A tap opens the thread in Chats, beside its channel on iPad.
-struct ThreadsView: View {
-    let session: ChatSession
-
-    var body: some View {
-        NavigationStack {
-            ChatScreens.provider.threadsScreen(host: session)
-                .navigationTitle("Threads")
-        }
-    }
-}
-
 /// Ich: name and address, push, the blog account, privacy, sign out.
 struct MeView: View {
     @EnvironmentObject private var model: AppModel

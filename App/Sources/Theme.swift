@@ -75,6 +75,22 @@ enum Theme {
         static let groupCorner: CGFloat = 14
     }
 
+    // MARK: Blog tab
+
+    enum Blog {
+        static let title = SwiftUI.Font.system(size: 20, weight: .bold, design: .serif)
+        static let meta = SwiftUI.Font.system(size: 13.5)
+        static let imageHeight: CGFloat = 190
+        static let cardGap: CGFloat = 22
+    }
+
+    // MARK: Locked and signed-out screens
+
+    enum Gate {
+        static let title = SwiftUI.Font.system(size: 22, weight: .bold, design: .serif)
+        static let iconSize: CGFloat = 44
+    }
+
     // MARK: Helpers
 
     private static func dynamic(light: UInt32, dark: UInt32) -> Color {

@@ -13,6 +13,8 @@ final class AppModel: ObservableObject {
     }
 
     @Published private(set) var state: State = .starting
+    /// Navigation lives here, not in the session: the Blog tab exists signed out too.
+    let router = Router()
     @Published var errorMessage: String?
     /// True when the server offers only username and password (a test server).
     /// Our own server signs in through the blog only.
@@ -118,6 +120,7 @@ final class AppModel: ObservableObject {
         if let stored = store.load() { MatrixClientFactory.deleteStore(storeID: stored.storeID) }
         store.delete()
         pendingClient = nil
+        router.reset()
         state = .signedOut
     }
 
@@ -154,11 +157,12 @@ final class AppModel: ObservableObject {
     }
 
     private func begin(_ client: Client) async throws {
-        let session = try ChatSession(client: client)
+        let session = try ChatSession(client: client, router: router)
         pendingClient = nil
         // Sync first: the screens and the conversation views read its room list service.
         try await session.start()
         state = .signedIn(session)
+        router.showSignIn = false
         if !ProcessInfo.processInfo.isRunningTests {
             await PushCenter.shared.attach(session)
         }
