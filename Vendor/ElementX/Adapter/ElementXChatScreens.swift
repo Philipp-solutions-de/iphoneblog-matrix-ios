@@ -36,6 +36,11 @@ final class ElementXChatScreens: ChatScreenProviding {
         return session.threadView(roomID: roomID, rootEventID: rootEventID, host: adapter(for: host))
     }
 
+    func threadsScreen(host: ChatHost) -> AnyView {
+        guard let session else { return AnyView(ProgressView()) }
+        return session.threadsView(host: adapter(for: host))
+    }
+
     /// ChatKit holds its host weakly; the adapter lives here for as long as the account does.
     private func adapter(for host: ChatHost) -> HostAdapter {
         let key = ObjectIdentifier(host)

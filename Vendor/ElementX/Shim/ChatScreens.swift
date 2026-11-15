@@ -342,12 +342,16 @@ private struct ChatRoomScreen: View {
 final class ChatThreadCoordinator: ChatScreenCoordinator {
     private let coordinator: ThreadTimelineScreenCoordinator
     private let sheets: ChatSheets
+    private let roomID: String
+    private let rootEventID: String
     private weak var host: ChatKitHost?
     private var cancellables = Set<AnyCancellable>()
 
     init(session: ChatKitSession, roomProxy: JoinedRoomProxyProtocol, rootEventID: String,
          presenter: ChatScreenPresenter, host: ChatKitHost) async throws {
         self.host = host
+        roomID = roomProxy.id
+        self.rootEventID = rootEventID
         let itemFactory = session.timelineItemFactory()
         let result = await session.timelineControllerFactory.buildThreadTimelineController(threadRootEventID: rootEventID,
                                                                                             initialFocussedEventID: nil,
@@ -377,6 +381,7 @@ final class ChatThreadCoordinator: ChatScreenCoordinator {
     }
 
     func start() {
+        ChatThreadSeen.markSeen(roomID: roomID, rootEventID: rootEventID)
         coordinator.actions
             .sink { [weak self] action in self?.handle(action) }
             .store(in: &cancellables)
@@ -384,6 +389,8 @@ final class ChatThreadCoordinator: ChatScreenCoordinator {
     }
 
     func stop() {
+        // Replies read while the thread was open count as seen.
+        ChatThreadSeen.markSeen(roomID: roomID, rootEventID: rootEventID)
         coordinator.stop()
     }
 
@@ -450,6 +457,10 @@ enum ChatKitStrings {
     /// Composer placeholder in a channel and in a thread.
     static func messageTo(_ roomName: String) -> String { "Nachricht an \(roomName)" }
     static let replyPlaceholder = "Antworten"
+
+    /// The Threads tab when it is empty.
+    static let noThreadsTitle = "Noch keine Threads"
+    static let noThreadsText = "Wenn du in einem Thread schreibst oder einen beginnst, steht er hier."
 
     /// Under the room's name: "148 Mitglieder".
     static func members(_ count: Int) -> String { count == 1 ? "1 Mitglied" : "\(count) Mitglieder" }
