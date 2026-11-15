@@ -199,6 +199,22 @@ platform :ios do
     Spaceship::ConnectAPI::Build.all(app_id: app.id, sort: "-uploadedDate", limit: 8).each do |b|
       UI.message("#{b.app_version} (#{b.version}) #{b.processing_state} uploaded #{b.uploaded_date}")
     end
+
+    # Uploads Apple refused never become builds; the build upload records keep the reason.
+    require "net/http"
+    require "json"
+    token = Spaceship::ConnectAPI.token.text
+    uri = URI("https://api.appstoreconnect.apple.com/v1/apps/#{app.id}/buildUploads?limit=6&sort=-uploadedDate")
+    response = Net::HTTP.get_response(uri, "Authorization" => "Bearer #{token}")
+    UI.message("buildUploads: HTTP #{response.code}")
+    (JSON.parse(response.body)["data"] || []).each do |upload|
+      a = upload["attributes"] || {}
+      UI.message("upload #{a['cfBundleShortVersionString']} (#{a['cfBundleVersion']}) #{a.dig('state', 'state') || a['state']} #{a['uploadedDate']}")
+      %w[errors warnings infos].each do |kind|
+        (a.dig("state", kind) || []).each { |e| UI.message("  #{kind}: #{e['code']} #{e['description']}") }
+      end
+    end
+    UI.message(response.body[0, 600]) unless response.code == "200"
   end
 
   desc "Build and sign for the App Store without uploading (proves signing works)"
