@@ -57,6 +57,11 @@ def profile_has_group?(path, group)
   plist.include?("<string>#{group}</string>")
 end
 
+def profile_has_associated_domains?(path)
+  plist = `security cms -D -i #{Shellwords.escape(path)}`
+  plist.include?("<key>com.apple.developer.associated-domains</key>")
+end
+
 platform :ios do
   # Builds, signs and exports the App Store .ipa; returns the API key.
   # Signing is manual: the team's one Apple Distribution certificate comes from the
@@ -85,8 +90,17 @@ platform :ios do
     profiles = {}
     bundle_id = brand("BUNDLE_ID")
     group = brand("APP_GROUP_ID")
+    # Capabilities first: a profile carries only what the App ID has switched on. Adds only
+    # what is missing (Associated Domains came after the first builds).
+    register
     { "App" => bundle_id, "NotificationExtension" => "#{bundle_id}.nse" }.each do |target, identifier|
       name, path = app_store_profile(key, identifier)
+      # A profile made before Associated Domains was on lacks it; make it once more.
+      if target == "App" && !profile_has_associated_domains?(path)
+        UI.important("#{identifier}: profile lacks associated domains, regenerating")
+        name, path = app_store_profile(key, identifier, force: true)
+        UI.user_error!("#{identifier}: Associated Domains is not on for the id") unless profile_has_associated_domains?(path)
+      end
       # A profile made before the app group was tied to the id lacks it; make it once more.
       unless profile_has_group?(path, group)
         UI.important("#{identifier}: profile lacks #{group}, regenerating")
@@ -158,8 +172,9 @@ platform :ios do
         bundle = Spaceship::ConnectAPI::BundleId.create(name: name, platform: "IOS", identifier: identifier)
         UI.success("#{identifier}: registered")
       end
-      # The app receives pushes; app and extension share the app group.
-      wanted = identifier == bundle_id ? [caps::PUSH_NOTIFICATIONS, caps::APP_GROUPS] : [caps::APP_GROUPS]
+      # The app receives pushes and uses passkeys in its web view (Associated Domains);
+      # app and extension share the app group.
+      wanted = identifier == bundle_id ? [caps::PUSH_NOTIFICATIONS, caps::APP_GROUPS, caps::ASSOCIATED_DOMAINS] : [caps::APP_GROUPS]
       present = bundle.get_capabilities.map(&:capability_type)
       wanted.each do |cap|
         if present.include?(cap)

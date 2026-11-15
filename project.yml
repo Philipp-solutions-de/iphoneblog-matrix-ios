@@ -147,6 +147,12 @@ targets:
           - $(AppIdentifierPrefix)${BUNDLE_ID}
         com.apple.security.application-groups:
           - ${APP_GROUP_ID}
+        # Passkeys inside the Blog tab's web view: beta's staff gate signs in at Authelia on
+        # auth.phso.de, and WebKit offers a passkey there only to an app that domain names in
+        # its apple-app-site-association (infra, moon). Fastfile `register` turns the
+        # capability on for the App ID.
+        com.apple.developer.associated-domains:
+          - webcredentials:auth.phso.de
     settings:
       base:
         PRODUCT_NAME: iphoneblog
