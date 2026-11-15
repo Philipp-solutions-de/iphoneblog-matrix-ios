@@ -17,16 +17,32 @@ struct IphoneblogApp: App {
 
 struct RootView: View {
     @EnvironmentObject private var model: AppModel
-    @StateObject private var guestFeed = GuestBlogFeed()
 
     var body: some View {
         switch model.state {
         case .starting:
             ProgressView()
         case .signedOut, .signingIn:
-            MainView(router: model.router, guestFeed: guestFeed, session: nil)
+            MainView(router: model.router, session: nil)
         case .signedIn(let session):
-            MainView(router: model.router, guestFeed: guestFeed, session: session)
+            SignedInMain(router: model.router, session: session)
         }
     }
+}
+
+/// Watches the session and its lists so the tab badges follow them.
+private struct SignedInMain: View {
+    @ObservedObject var router: Router
+    @ObservedObject var session: ChatSession
+    @ObservedObject var rooms: RoomListModel
+    @ObservedObject var mentions: MentionsModel
+
+    init(router: Router, session: ChatSession) {
+        self.router = router
+        self.session = session
+        rooms = session.rooms
+        mentions = session.mentions
+    }
+
+    var body: some View { MainView(router: router, session: session) }
 }

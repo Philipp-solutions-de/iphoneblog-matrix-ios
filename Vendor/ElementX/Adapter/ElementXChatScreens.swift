@@ -36,6 +36,11 @@ final class ElementXChatScreens: ChatScreenProviding {
         return session.threadView(roomID: roomID, rootEventID: rootEventID, host: adapter(for: host))
     }
 
+    func discussionScreen(roomID: String, rootEventID: String, host: ChatHost) -> AnyView {
+        AnyView(threadScreen(roomID: roomID, rootEventID: rootEventID, host: host)
+            .environment(\.chatThreadHeaderHidden, true))
+    }
+
     func threadsScreen(host: ChatHost) -> AnyView {
         guard let session else { return AnyView(ProgressView()) }
         return session.threadsView(host: adapter(for: host))

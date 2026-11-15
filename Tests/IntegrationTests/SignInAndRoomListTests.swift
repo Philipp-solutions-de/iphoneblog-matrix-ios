@@ -53,18 +53,35 @@ final class SignInAndRoomListTests: XCTestCase {
             while Date() < until, !session.isOneMember { try await Task.sleep(for: .milliseconds(250)) }
             XCTAssertTrue(session.isOneMember, "not a #one member")
             XCTAssertEqual(session.rooms.channels.map(\.name), ["Allgemein"])
+            let channel = try XCTUnwrap(session.oneChannelID, "no #one-Chat channel")
+            XCTAssertEqual(session.rooms.rooms.first { $0.id == channel }?.name, "Allgemein")
         }
 
-        // Blog, signed in: the article's title and teaser come from the bot's field.
-        if let title = env["IPHONEBLOG_TEST_ARTICLE_TITLE"], !title.isEmpty {
-            let feed = try XCTUnwrap(session.blogFeed, "no Blog room")
-            await feed.load()
+        // The mention also reaches @Mentions, from the server's notification list.
+        if let mentionRoom = env["IPHONEBLOG_TEST_MENTION_ROOM"], !mentionRoom.isEmpty {
             let until = Date().addingTimeInterval(30)
-            while Date() < until, feed.articles.first?.teaser == nil { try await Task.sleep(for: .milliseconds(250)) }
-            let article = try XCTUnwrap(feed.articles.first)
-            XCTAssertEqual(article.title, title)
-            XCTAssertEqual(article.teaser, "Zwei Zeilen Vorschau auf den Artikel.")
-            XCTAssertEqual(article.replyCount, 1)
+            while Date() < until, session.mentions.items.isEmpty {
+                session.mentions.reload()
+                try await Task.sleep(for: .seconds(1))
+            }
+            let mention = try XCTUnwrap(session.mentions.items.first, "no mention in @Mentions")
+            XCTAssertTrue(mention.unread)
+            XCTAssertGreaterThanOrEqual(session.mentions.unreadCount, 1)
+        }
+
+        // The Blog room is joined, and the new-articles push rule exists on the server.
+        if env["IPHONEBLOG_BLOG_ALIAS"] != nil {
+            XCTAssertNotNil(session.blogRoomID, "Blog room not resolved")
+            let until = Date().addingTimeInterval(30)
+            while Date() < until, !session.notificationPrefs.hasLoaded { try await Task.sleep(for: .milliseconds(250)) }
+            await session.notificationPrefs.load()
+            XCTAssertTrue(session.notificationPrefs.newArticles, "article push rule missing")
+            session.notificationPrefs.setNewArticles(false)
+            try await Task.sleep(for: .seconds(2))
+            await session.notificationPrefs.load()
+            XCTAssertFalse(session.notificationPrefs.newArticles, "article push rule not removed")
+            session.notificationPrefs.setNewArticles(true)
+            try await Task.sleep(for: .seconds(2))
         }
 
         await model.signOut()

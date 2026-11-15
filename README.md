@@ -2,18 +2,21 @@
 
 The iphoneblog community chat: our own SwiftUI app on the Matrix engine
 ([matrix-rust-sdk](https://github.com/matrix-org/matrix-rust-sdk)), talking to
-`matrix.iphoneblog.de`. Members sign in with their iphoneblog.de account. Channels, threads,
+`chat.iphoneblog.de`. Members sign in with their iphoneblog.de account. Channels, threads,
 direct messages, mentions, images and reactions; nothing else.
 
-**State:** four tabs (decisions 2026-11-15). **Blog** opens first and needs no account: one
-card per article thread (the bot's post), a tap opens the thread; members reply there. Signed
-out it reads the static files the article bot writes on the Matrix host (`BLOG_API_URL`:
-`threads.json`, `threads/<root>.json`), signed in the Blog room through the SDK plus the bot's
-`de.iphoneblog.article` field on each root. **#one-Chat** holds the children of the space `#one:iphoneblog.de` and the direct messages;
-membership is being joined or invited to that space (invites are accepted by the app).
-Non-members see it locked with a link to the #one offer. **@Erwähnungen** and **Ich** as before. Sign-in
-through the blog (MAS at `auth.iphoneblog.de`) is offered where writing starts. Push through
-our Sygnal with a notification extension. The conversation views come from Element X under
+**State:** four tabs, as in the approved design previews (2026-11-15). **Blog** opens first and
+needs no account: the blog itself in a web view, as WordPress's app view (`BLOG_WEB_URL`,
+`?app=1`). The "Diskussion" link under an article (`iphoneblog-chat://diskussion?url=…`) opens
+its discussion natively: the Matrix thread the article bot started. The app finds it by the
+article's path in `links.json` and reads it from the bot's static files (`BLOG_API_URL`);
+#one members write in it with the conversation views. **#one-Chat** is one channel,
+`#allgemein` in the space `#one:iphoneblog.de`; membership is being joined or invited to that
+space (the app accepts invites). Everyone else sees it locked, with the way to #one.
+**@Mentions** (signed in only) lists the server's highlight notifications. **Ich** holds the
+profile, the push switches (each one a server push rule) and the account. Sign-in through the
+blog (MAS at `auth.iphoneblog.de`) is offered where writing starts. Push through our Sygnal
+with a notification extension. The conversation views come from Element X under
 `Vendor/ElementX/`, behind `App/Sources/Bridge/` (docs/architecture.md).
 
 How it is built and why: [docs/architecture.md](docs/architecture.md).

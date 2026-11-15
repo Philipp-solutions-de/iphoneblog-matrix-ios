@@ -28,10 +28,7 @@ final class RoomListModel: ObservableObject {
     /// The #one space's children: the channels #one-Chat shows.
     @Published var channelIDs: Set<String> = []
     var channels: [RoomSummary] { rooms.filter { !$0.isDirect && !hidden.contains($0.id) && channelIDs.contains($0.id) } }
-    var directMessages: [RoomSummary] { rooms.filter(\.isDirect) }
     var withMentions: [RoomSummary] { rooms.filter { $0.unreadMentions > 0 && !hidden.contains($0.id) } }
-    /// Direct messages count as mentions: they are meant for you.
-    var badgeCount: Int { rooms.reduce(0) { $0 + ($1.isDirect ? $1.unreadMessages : $1.unreadMentions) } }
 
     private var sdkRooms: [Room] = []
     private var entries: RoomListEntriesWithDynamicAdaptersResult?

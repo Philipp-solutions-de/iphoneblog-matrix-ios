@@ -134,3 +134,9 @@ public struct ChatKitStyle {
                          mediaWidth: 280, corner: 12)
     )
 }
+
+public extension EnvironmentValues {
+    /// True where the app draws its own header above a thread (the article discussion): the
+    /// thread screen then shows no "Thread" title of its own.
+    @Entry var chatThreadHeaderHidden = false
+}

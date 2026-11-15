@@ -71,6 +71,8 @@ run register_new_matrix_user -c homeserver.yaml -u writer -p "$writer_password" 
 
 token="$(login "$user" "$password")"
 writer="$(login writer "$writer_password")"
+curl -fs -X PUT "$url/_matrix/client/v3/profile/@writer:localhost/displayname" -H "Authorization: Bearer $writer" \
+    -d '{"displayname":"Stefan L."}' >/dev/null
 rooms=(Allgemein Artikel)
 allgemein=""
 create() { # token, json → room id
@@ -78,7 +80,8 @@ create() { # token, json → room id
         | python3 -c 'import json,sys; print(json.load(sys.stdin)["room_id"])'
 }
 for name in "${rooms[@]}"; do
-    id="$(create "$token" "{\"name\":\"$name\",\"preset\":\"public_chat\"}")"
+    alias=""; [[ "$name" == Allgemein ]] && alias=',"room_alias_name":"allgemein"'
+    id="$(create "$token" "{\"name\":\"$name\",\"preset\":\"public_chat\"$alias}")"
     [[ "$name" == Allgemein ]] && allgemein="$id"
 done
 
@@ -94,6 +97,8 @@ send() { # room, txn, json
         | python3 -c 'import json,sys; print(json.load(sys.stdin)["event_id"])'
 }
 send "$allgemein" t1 '{"msgtype":"m.text","body":"Hallo zusammen"}' >/dev/null
+hello="$(send "$allgemein" t1b '{"msgtype":"m.text","body":"Hat jemand schon das neue iPad mini im Alltag?"}')"
+send "$allgemein" t1c "{\"msgtype\":\"m.text\",\"body\":\"Ja, seit einer Woche. Der Dock-Adapter passt.\",\"m.relates_to\":{\"rel_type\":\"m.thread\",\"event_id\":\"$hello\"}}" >/dev/null
 send "$allgemein" t2 "{\"msgtype\":\"m.text\",\"body\":\"tester: schau mal\",\"m.mentions\":{\"user_ids\":[\"@$user:localhost\"]}}" >/dev/null
 
 # The Blog room: the writer plays the article bot, one article root with the bot's field and a
@@ -111,6 +116,9 @@ IPHONEBLOG_TEST_ROOMS=$(IFS=,; echo "${rooms[*]}")
 IPHONEBLOG_TEST_MENTION_ROOM=Allgemein
 IPHONEBLOG_ONE_ALIAS=#one:localhost
 IPHONEBLOG_BLOG_ALIAS=#blog:localhost
-IPHONEBLOG_TEST_ARTICLE_TITLE="Ein Testartikel"
+IPHONEBLOG_CHANNEL_ALIAS=#allgemein:localhost
+IPHONEBLOG_TEST_CHANNEL_ROOM=$allgemein
+IPHONEBLOG_TEST_CHANNEL_THREAD='$hello'
+IPHONEBLOG_TEST_ARTICLE_ROOT='$root'
 EOF
 echo "test-homeserver: running at $url with user $user and rooms ${rooms[*]}"

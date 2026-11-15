@@ -103,7 +103,7 @@ targets:
            UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         CFBundleURLTypes:
           - CFBundleURLName: OAuth callback
-            CFBundleURLSchemes: ["${OAUTH_REDIRECT_SCHEME}"]
+            CFBundleURLSchemes: ["${OAUTH_REDIRECT_SCHEME}", "${OAUTH_LEGACY_REDIRECT_SCHEME}"]
         ITSAppUsesNonExemptEncryption: false
         NSPhotoLibraryUsageDescription: Damit du Bilder im Chat teilen kannst.
         # Apple refuses an upload whose code reaches the microphone or saves to the photo
