@@ -103,7 +103,10 @@ gh workflow run apple-setup.yml --repo Philipp-solutions-de/iphoneblog-zulip-ios
 
 Each registers its app and extension ids and turns on Push Notifications (app), App Groups
 (both) and, in the Matrix app, Associated Domains (app: passkeys at `auth.phso.de` in the Blog
-tab's web view) through the API ([bundle ids](https://developer.apple.com/documentation/appstoreconnectapi/bundle-ids),
+tab's web view) through the API (the passkeys also need
+`https://auth.phso.de/.well-known/apple-app-site-association` to name `<team>.<bundle id>`:
+when the bundle id or team changes for the release, change `well_known` for auth.phso.de in
+the infra repository's `inventory/host_vars/moon.yml` and run `playbooks/door.yml --limit moon`) ([bundle ids](https://developer.apple.com/documentation/appstoreconnectapi/bundle-ids),
 [capabilities](https://developer.apple.com/documentation/appstoreconnectapi/bundle-id-capabilities)).
 Running them again changes nothing. Check both went green on the repositories' Actions pages.
 
