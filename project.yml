@@ -76,7 +76,10 @@ targets:
       # The adapter between the app's Bridge and ChatKit (Vendor/ElementX/Adapter).
       - path: Vendor/ElementX/Adapter
     dependencies:
+      # Dynamic: the app, ChatKit and the extension all load it from the app's Frameworks
+      # folder. Xcode does not embed it by itself once more than one target links it.
       - package: MatrixRustSDK
+        embed: true
       - target: NotificationExtension
         embed: true
       - target: ChatKit
