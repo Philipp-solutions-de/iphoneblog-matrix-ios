@@ -191,6 +191,16 @@ platform :ios do
     puts "CERTIFICATE_BASE64_END"
   end
 
+  desc "The newest builds in App Store Connect with Apple's processing state"
+  lane :build_status do
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.from(hash: api_key)
+    app = Spaceship::ConnectAPI::App.find(brand("BUNDLE_ID"))
+    UI.user_error!("no app record for #{brand('BUNDLE_ID')}") unless app
+    Spaceship::ConnectAPI::Build.all(app_id: app.id, sort: "-uploadedDate", limit: 8).each do |b|
+      UI.message("#{b.app_version} (#{b.version}) #{b.processing_state} uploaded #{b.uploaded_date}")
+    end
+  end
+
   desc "Build and sign for the App Store without uploading (proves signing works)"
   lane :signed_build do
     archive
@@ -199,10 +209,11 @@ platform :ios do
   desc "Build the app and upload it to TestFlight"
   lane :beta do
     key = archive
+    # No changelog: with one, fastlane waits for Apple to list the build before setting it,
+    # and a build Apple rejects never appears, so the job ran into its time limit.
     upload_to_testflight(
       api_key: key,
-      skip_waiting_for_build_processing: true,
-      changelog: "Build #{ENV.fetch('BUILD_NUMBER')} from #{ENV.fetch('GITHUB_SHA', 'local')[0, 7]}."
+      skip_waiting_for_build_processing: true
     )
   end
 end

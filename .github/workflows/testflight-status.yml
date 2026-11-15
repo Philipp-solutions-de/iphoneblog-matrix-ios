@@ -1,0 +1,34 @@
+name: TestFlight status
+
+# Run by hand on main: lists the newest builds in App Store Connect with Apple's
+# processing state (PROCESSING, VALID, INVALID, FAILED). Reads only.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  status:
+    if: github.ref == 'refs/heads/main'
+    environment: apple
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BUNDLE_FROZEN: "true"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+      - name: Builds and their state
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: bundle exec fastlane ios build_status
