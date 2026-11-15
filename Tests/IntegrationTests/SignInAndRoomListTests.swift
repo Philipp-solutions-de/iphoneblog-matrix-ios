@@ -80,6 +80,8 @@ final class SignInAndRoomListTests: XCTestCase {
             try await Task.sleep(for: .seconds(2))
             await session.notificationPrefs.load()
             XCTAssertFalse(session.notificationPrefs.newArticles, "article push rule not removed")
+            session.notificationPrefs.setNewArticles(true)
+            try await Task.sleep(for: .seconds(2))
         }
 
         await model.signOut()

@@ -9,6 +9,8 @@ dev="$1"; api="$2"; web="$3"; out="${4:-$here/build/shots/screens}"
 app="$here/build/DerivedData/Build/Products/Debug-iphonesimulator/iphoneblog.app"
 id="de.iphoneblog.matrix.preview"
 mkdir -p "$out"
+# A fresh install: no settings left from a test run on the same simulator.
+xcrun simctl uninstall "$dev" "$id" 2>/dev/null || true
 xcrun simctl install "$dev" "$app"
 set -a; . "$here/build/test-homeserver.env"; set +a
 shoot() { # mode who tab name [VAR=value ...]
@@ -29,7 +31,7 @@ shoot() { # mode who tab name [VAR=value ...]
     for pair in "$@"; do extra+=("SIMCTL_CHILD_$pair"); done
     env ${extra[@]+"${extra[@]}"} SIMCTL_CHILD_IPHONEBLOG_BLOG_API="$api" SIMCTL_CHILD_IPHONEBLOG_BLOG_WEB="$web" \
         SIMCTL_CHILD_IPHONEBLOG_START_TAB="$tab" SIMCTL_CHILD_IPHONEBLOG_NO_PUSH_PROMPT=1 xcrun simctl launch "$dev" "$id" >/dev/null
-    sleep 14
+    sleep 16
     xcrun simctl io "$dev" screenshot "$out/$name-$mode.png" >/dev/null 2>&1
 }
 # The mock's first article; its thread file is threads/<root>.json under <blog-api-url>.
