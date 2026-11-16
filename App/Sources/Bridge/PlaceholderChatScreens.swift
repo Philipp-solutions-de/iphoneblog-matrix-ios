@@ -18,6 +18,10 @@ final class PlaceholderChatScreens: ChatScreenProviding {
 }
 
 extension ChatScreenProviding {
+    func threadsEntry(host: ChatHost, open: @escaping () -> Void) -> AnyView {
+        AnyView(Button("Threads", action: open).padding())
+    }
+
     /// Until the conversation views bring their thread list, the Threads tab says what comes.
     func threadsScreen(host: ChatHost) -> AnyView {
         AnyView(ContentUnavailableView("Deine Threads", systemImage: "bubble.left",

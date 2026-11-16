@@ -151,7 +151,7 @@ class JoinedRoomProxy: JoinedRoomProxyProtocol {
             let sdkTimeline = try await room.timelineWithConfiguration(configuration: .init(focus: .event(eventId: eventID,
                                                                                                           numContextEvents: numberOfEvents,
                                                                                                           threadMode: .automatic(hideThreadedEvents: userSettings.app.threadsEnabled)),
-                                                                                            filter: .all,
+                                                                                            filter: .eventFilter(filter: Self.excludedEventsFilter), // iphoneblog: as the live timeline
                                                                                             internalIdPrefix: UUID().uuidString,
                                                                                             dateDividerMode: .daily,
                                                                                             trackReadReceipts: .disabled,
@@ -180,7 +180,7 @@ class JoinedRoomProxy: JoinedRoomProxyProtocol {
     func threadTimeline(eventID: String) async -> Result<TimelineProxyProtocol, RoomProxyError> {
         do {
             let sdkTimeline = try await room.timelineWithConfiguration(configuration: .init(focus: .thread(rootEventId: eventID),
-                                                                                            filter: .all,
+                                                                                            filter: .eventFilter(filter: Self.excludedEventsFilter), // iphoneblog: as the live timeline
                                                                                             internalIdPrefix: UUID().uuidString,
                                                                                             dateDividerMode: .daily,
                                                                                             trackReadReceipts: .messageLikeEvents,
@@ -807,7 +807,22 @@ class JoinedRoomProxy: JoinedRoomProxyProtocol {
                                                       .spaceParent,
                                                       .policyRuleRoom,
                                                       .policyRuleServer,
-                                                      .policyRuleUser]
+                                                      .policyRuleUser,
+                                                      // iphoneblog: the bot runs the rooms, so who joined, left or was
+                                                      // invited, and name, topic or avatar changes are noise.
+                                                      .roomMember,
+                                                      .roomName,
+                                                      .roomTopic,
+                                                      .roomAvatar,
+                                                      .roomCreate,
+                                                      .roomEncryption,
+                                                      .roomThirdPartyInvite,
+                                                      .roomImagePack,
+                                                      .roomLanguage,
+                                                      .roomPolicy,
+                                                      .roomRetention,
+                                                      .memberHints,
+                                                      .callMember]
         return .exclude(stateEventFilters.map { TimelineEventCondition.eventType($0) })
     }()
 }

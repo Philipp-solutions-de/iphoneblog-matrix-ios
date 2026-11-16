@@ -248,7 +248,7 @@ final class ChatRoomCoordinator: ChatScreenCoordinator {
 
     func toPresentable() -> AnyView {
         let info = roomProxy.infoPublisher.value
-        let title = info.isDirect ? info.displayNameOrID : "# \(info.displayNameOrID)"
+        let title = info.isDirect ? info.displayNameOrID : ChatKitStrings.channel(info.displayNameOrID)
         return AnyView(ChatRoomScreen(context: screenViewModel.context,
                                       timelineContext: timelineViewModel.context,
                                       composerToolbar: ComposerToolbar(context: composerViewModel.context),
@@ -397,7 +397,7 @@ final class ChatThreadCoordinator: ChatScreenCoordinator {
     }
 
     func start() {
-        ChatThreadSeen.markSeen(roomID: roomID, rootEventID: rootEventID)
+        ChatThreadActivity.shared.markSeen(roomID: roomID, rootEventID: rootEventID)
         coordinator.actions
             .sink { [weak self] action in self?.handle(action) }
             .store(in: &cancellables)
@@ -406,7 +406,7 @@ final class ChatThreadCoordinator: ChatScreenCoordinator {
 
     func stop() {
         // Replies read while the thread was open count as seen.
-        ChatThreadSeen.markSeen(roomID: roomID, rootEventID: rootEventID)
+        ChatThreadActivity.shared.markSeen(roomID: roomID, rootEventID: rootEventID)
         coordinator.stop()
     }
 
@@ -473,7 +473,23 @@ enum ChatKitStrings {
 
     /// Composer placeholder in a channel and in a thread.
     static func messageTo(_ roomName: String) -> String { "Nachricht an \(roomName)" }
-    static let replyPlaceholder = "Antworten"
+
+    /// A channel's name with one "#": "# Allgemein", and "#one-Chat" as it is (it carries its own).
+    static func channel(_ name: String) -> String { name.hasPrefix("#") ? name : "# \(name)" }
+    static let replyPlaceholder = "Antworten…"
+    static let unread = "ungelesen"
+
+    /// "Letzte Antwort vor 5 Min.", "Letzte Antwort gerade eben".
+    static func lastReply(_ date: Date, now: Date = .now) -> String {
+        if now.timeIntervalSince(date) < 60 { return "Letzte Antwort gerade eben" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = Locale(identifier: "de_DE")
+        formatter.unitsStyle = .short
+        return "Letzte Antwort " + formatter.localizedString(for: date, relativeTo: now)
+    }
+
+    /// The Threads row at the top of #one-Chat.
+    static let threadsTitle = "Threads"
 
     /// Under a photo, video or file while it uploads.
     static let uploading = "Wird hochgeladen"

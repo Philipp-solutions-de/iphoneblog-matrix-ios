@@ -24,11 +24,20 @@ private struct MemberGate: View {
     var body: some View {
         if session.isOneMember, let channel = session.oneChannelID {
             NavigationStack(path: $router.threadPath) {
-                ChatScreens.provider.roomScreen(roomID: channel, host: session)
-                    .id(channel)
-                    .navigationDestination(for: Router.ThreadRoute.self) { route in
-                        ChatScreens.provider.threadScreen(roomID: route.roomID, rootEventID: route.rootEventID, host: session)
-                    }
+                VStack(spacing: 0) {
+                    // Slack's place for threads: above the channel, with a count of the ones with news.
+                    ChatScreens.provider.threadsEntry(host: session) { router.showThreads = true }
+                    ChatScreens.provider.roomScreen(roomID: channel, host: session)
+                        .id(channel)
+                }
+                .navigationDestination(for: Router.ThreadRoute.self) { route in
+                    ChatScreens.provider.threadScreen(roomID: route.roomID, rootEventID: route.rootEventID, host: session)
+                }
+                .navigationDestination(isPresented: $router.showThreads) {
+                    ChatScreens.provider.threadsScreen(host: session)
+                        .navigationTitle("Threads")
+                        .navigationBarTitleDisplayMode(.inline)
+                }
             }
             .onAppear { router.selectedRoomID = channel }
             .task(id: router.pendingThread) {

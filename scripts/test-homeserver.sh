@@ -99,6 +99,22 @@ send() { # room, txn, json
 send "$allgemein" t1 '{"msgtype":"m.text","body":"Hallo zusammen"}' >/dev/null
 hello="$(send "$allgemein" t1b '{"msgtype":"m.text","body":"Hat jemand schon das neue iPad mini im Alltag?"}')"
 send "$allgemein" t1c "{\"msgtype\":\"m.text\",\"body\":\"Ja, seit einer Woche. Der Dock-Adapter passt.\",\"m.relates_to\":{\"rel_type\":\"m.thread\",\"event_id\":\"$hello\"}}" >/dev/null
+# A busy thread for the thread row: five more replies from three people (Tests/UITests/ThreadsUITests).
+reader_password="$(openssl rand -hex 16)"
+run register_new_matrix_user -c homeserver.yaml -u anna -p "$reader_password" --no-admin "$url" >/dev/null
+anna="$(login anna "$reader_password")"
+curl -fs -X PUT "$url/_matrix/client/v3/profile/@anna:localhost/displayname" -H "Authorization: Bearer $anna" \
+    -d '{"displayname":"Anna K."}' >/dev/null
+curl -fs -X POST "$url/_matrix/client/v3/join/$allgemein" -H "Authorization: Bearer $anna" -d '{}' >/dev/null
+reply() { # token, txn, text
+    curl -fs -X PUT "$url/_matrix/client/v3/rooms/$allgemein/send/m.room.message/$2" -H "Authorization: Bearer $1" \
+        -d "{\"msgtype\":\"m.text\",\"body\":\"$3\",\"m.relates_to\":{\"rel_type\":\"m.thread\",\"event_id\":\"$hello\"}}" >/dev/null
+}
+reply "$anna" r1 "Ich warte noch auf das Cellular-Modell."
+reply "$writer" r2 "Das kommt laut Gerüchten im Frühjahr."
+reply "$token" r3 "Ich nutze meins vor allem zum Lesen."
+reply "$anna" r4 "Mit welcher App liest du?"
+reply "$writer" r5 "Bei mir sind es Comics in Panels."
 send "$allgemein" t2 "{\"msgtype\":\"m.text\",\"body\":\"tester: schau mal\",\"m.mentions\":{\"user_ids\":[\"@$user:localhost\"]}}" >/dev/null
 # A busy channel: ten messages and the rich set (six) after the mention. The SDK alone loses a mention behind six;
 # the sign-in test and BadgesUITests check that it still counts (RoomListModel, ChatSession).

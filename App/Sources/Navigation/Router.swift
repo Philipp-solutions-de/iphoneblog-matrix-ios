@@ -33,6 +33,8 @@ final class Router: ObservableObject {
     @Published var notice: String?
     /// The sign-in sheet, offered where reading ends and writing would start.
     @Published var showSignIn = false
+    /// The Threads list in #one-Chat.
+    @Published var showThreads = false
     /// The tab badges: #one-Chat's unread messages and unread @Mentions. ChatSession keeps them
     /// current; MainView observes only the router, so they live here.
     @Published var chatBadge = 0
@@ -84,6 +86,7 @@ final class Router: ObservableObject {
             return
         }
         let route = ThreadRoute(roomID: roomID, rootEventID: rootEventID)
+        showThreads = false // from the Threads list: the thread replaces it
         if tab == .chat, selectedRoomID == roomID {
             threadPath = [route]
         } else {

@@ -70,12 +70,12 @@ controller, media provider) do the rest.
 | `Other/Pills/PillAttachmentViewProvider.swift` | a preview-only mock in a non-preview code path |
 | `Other/Pills/PillView.swift` | others' mentions in soft teal (`MentionPillColors`), not a dark badge |
 | `Screens/Timeline/View/Style/TimelineStyler.swift` | messages as rows in the design's Slack style (`Shim/TimelineRowStyler.swift`), not bubbles |
-| `Screens/Timeline/View/ItemMenu/TimelineItemMenuActionProvider.swift` | no Forward and no Pin in the message menu |
+| `Screens/Timeline/View/ItemMenu/TimelineItemMenuActionProvider.swift` | no Forward and no Pin in the message menu; "Im Thread antworten" first |
 | `Screens/RoomScreen/ComposerToolbar/View/RoomAttachmentPicker.swift` | the + menu offers text formatting, photos, camera and files: no polls |
 | `Screens/RoomScreen/ComposerToolbar/View/ComposerToolbar.swift` | no voice-message record button (the send button stays, greyed while empty); the placeholder and the "not encrypted" note come from the screen (environment values in `Shim/ChatScreens.swift`) |
 | `Screens/Timeline/View/Supplementary/TimelineReactionsView.swift` | a preview container built on mocks |
 | `Services/Client/ClientProxyProtocol.swift` | the protocol cut to the members the views use; `Shim/ChatClientProxy` implements it |
-| `Services/Room/JoinedRoomProxy.swift` | `reportUtds: false`: no encryption, so no undecryptable events and no hook to report them |
+| `Services/Room/JoinedRoomProxy.swift` | `reportUtds: false`: no encryption, so no undecryptable events and no hook to report them; membership, name, topic, avatar and other room-setting events hidden in every timeline (the bot runs the rooms) |
 | `Services/Session/UserSessionProtocol.swift` | without calls, notifications and app hooks |
 | `Services/Timeline/TimelineItemProxy.swift` | without the SDK mocks import and a mock send handle; hands each local echo's upload progress to `Shim/ChatUploadProgress.swift` |
 

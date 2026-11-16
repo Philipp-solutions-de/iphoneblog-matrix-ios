@@ -53,6 +53,13 @@ run() {
     return "$status"
 }
 
+# The app's own settings live in its data container (no simctl command reaches them).
+clear_app_settings() {
+    local data
+    data="$(xcrun simctl get_app_container "$device" de.iphoneblog.matrix.preview data 2>/dev/null)" || return 0
+    rm -f "${data:?}/Library/Preferences/de.iphoneblog.matrix.preview.plist"
+}
+
 case "$action" in
     build)
         run build "${common[@]}" -scheme iphoneblog -destination 'generic/platform=iOS Simulator' build
@@ -66,6 +73,9 @@ case "$action" in
         # A session from an earlier test server survives in the simulator's keychain, even an
         # uninstall, and its token is dead on a fresh server.
         xcrun simctl keychain "$device" reset 2>/dev/null || true
+        # And the app's settings: every fresh test server has the same @tester, whose "Neue
+        # Artikel" rule the app would remember as seeded.
+        clear_app_settings
         # xcodebuild hands TEST_RUNNER_<NAME> to the test process as <NAME>.
         export TEST_RUNNER_IPHONEBLOG_TEST_HOMESERVER="${IPHONEBLOG_TEST_HOMESERVER:?}"
         export TEST_RUNNER_IPHONEBLOG_TEST_USER="${IPHONEBLOG_TEST_USER:?}"
@@ -82,6 +92,7 @@ case "$action" in
         # the member test also runs when IPHONEBLOG_TEST_* name a test homeserver.
         [[ -n "$device" ]] || { echo "build.sh: no iPhone simulator" >&2; exit 1; }
         xcrun simctl keychain "$device" reset 2>/dev/null || true # as for integration
+        clear_app_settings
         if curl -s -o /dev/null http://127.0.0.1:8793/calls; then
             echo "build.sh: port 8793 is taken; stop the old fixture server first" >&2; exit 1
         fi

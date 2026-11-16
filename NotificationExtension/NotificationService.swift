@@ -65,7 +65,8 @@ final class NotificationService: UNNotificationServiceExtension {
         if item.roomInfo.isDirect {
             content.title = sender
         } else {
-            content.title = "#\(room)"
+            // One "#": "#one-Chat" carries its own (ChatKitStrings.channel in the app).
+            content.title = room.hasPrefix("#") ? room : "#\(room)"
             content.subtitle = sender
         }
         if let threadID = item.threadId {
