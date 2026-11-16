@@ -195,8 +195,11 @@ final class PerformanceTests: XCTestCase {
         // session and the space are there.
         // Two minutes: a CI runner's simulator signs in and syncs slowly.
         let deadline = Date().addingTimeInterval(120)
+        // #one-Chat lists #one's rooms; Allgemein, the first, holds the seeded history.
+        let room = app.buttons.matching(identifier: "one-room").firstMatch
         repeat {
             tab.tap()
+            if room.waitForExistence(timeout: 5) { room.tap() }
             if app.staticTexts["Felix H."].firstMatch.waitForExistence(timeout: 5) { break }
         } while Date() < deadline
         if !app.staticTexts["Felix H."].firstMatch.exists {
