@@ -9,7 +9,7 @@ are. Apple's texts quoted here were read on 2026-11-16.
 | Apple asks | Answer | Where |
 |---|---|---|
 | In-app purchase (3.1.1) | None. #one is sold on the website; the app shows no price, buy button or link to buy (`SHOW_PURCHASE` off). A free app beside a paid web service, 3.1.3(f) | `brand.env`, review notes |
-| User content (1.2) | Report a message or a person (mailed to the moderation contact ao@iphoneblog.de), block a person; a word filter on the server waits on Thorsten | `App/Sources/Moderation/`, server module (infra) |
+| User content (1.2) | Report a message or a person (mailed to the moderation contact ao@iphoneblog.de), block a person; no word filter (Thorsten, 2026-11-16: added only if review refuses for its lack) | `App/Sources/Moderation/`, server module (infra) |
 | Account deletion (5.1.1(v)) | Ich → Konto löschen → the website's `/konto/loeschen/` | `AccountDeletionView.swift`, iphoneblog-wordpress |
 | Privacy manifest | `PrivacyInfo.xcprivacy` in the app, the notification extension and ChatKit | below |
 | Push permission | Asked on the first visit to #one-Chat, after one sentence; not at sign-in | `PushPrimer.swift` |

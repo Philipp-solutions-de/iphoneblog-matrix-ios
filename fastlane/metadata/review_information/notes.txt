@@ -11,10 +11,11 @@ NATIVE FUNCTIONALITY (4.2)
 Only the Blog tab's article pages are a web view, restricted to iphoneblog.de; links elsewhere open in Safari. The discussions, the chat, threads, mentions, notifications, report and block are native SwiftUI on the Matrix SDK.
 
 USER-GENERATED CONTENT (1.2)
-- Report: long-press a message → "Melden", or tap a person → "Melden"; reports go to our moderators by mail.
+- Report: long-press a message → "Melden", or tap a person → "Melden". Each report reaches our moderator by mail within minutes, with the reported content, the reason and both accounts.
+- The moderator removes content and blocks users on the server.
 - Block: tap a person → "Blockieren"; their messages disappear for this account on all devices. Ich → "Blockiert" undoes it.
-- Only #one members may write in the chat, and every member has a paid, named account; we remove abusive people.
-- Moderation contact: ao@iphoneblog.de (reports reach this address by mail)
+- Only #one members may write in the chat. Every member is a known account tied to iphoneblog.de with a paid membership; there are no anonymous accounts.
+- Moderation contact, also in the app under Ich: ao@iphoneblog.de (reports reach this address by mail).
 
 ACCOUNT DELETION (5.1.1(v))
 Ich → "Konto löschen" explains what is deleted and opens the website's deletion page, signed in. Confirming deletes the account at once, ends a running #one subscription at the end of its paid period without further charges, and deletes the chat account the next night.
