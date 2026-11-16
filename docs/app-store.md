@@ -61,7 +61,7 @@ The app uses HTTPS, which is exempt, and ships the Matrix SDK's own cryptography
 Curve25519, Ed25519, AES-256, HMAC-SHA-256, HKDF), standard algorithms not provided by iOS.
 Thorsten's answer (2026-11-16): standard encryption, with the French declaration.
 
-- **France**: the publisher, as supplier, files a "déclaration de fourniture" with ANSSI
+- **France**: Thorsten (Philipp Solutions, the publisher), as supplier, files a "déclaration de fourniture" with ANSSI
   (online at demarche.numerique.gouv.fr) and uploads ANSSI's attestation in App Store Connect →
   App Information → App Encryption Documentation. Until it arrives, France stays unticked under
   Pricing and Availability.
@@ -83,7 +83,7 @@ grants it the app shows no link and no buy prompt (3.1.3(f)). Apple's terms, rea
   audio, music, video); "a social network that streams video" is named as not eligible, and the
   terms exclude apps that facilitate real-time person-to-person services;
 - the app offers no In-App Purchase;
-- one request per bundle id, filed by the **Account Holder** (Alex), who answers questions about
+- one request per bundle id, filed by the **Account Holder** (Thorsten), who answers questions about
   the app and accepts the entitlement's terms. A developer reports that Admins cannot file it.
 
 **Our case for it:** the app opens on the blog's articles, readable without an account; every
@@ -95,10 +95,10 @@ signed out, #one-Chat is a neutral sign-in screen, and signed in without #one it
 #one-Mitglieder" with "Abmelden" and "Konto löschen", nothing about buying (Thorsten,
 2026-11-16). Members get all four tabs.
 
-**Steps for Alex** (Account Holder, once the publisher's app record and bundle id exist):
+**Steps for Thorsten** (Account Holder):
 
 1. developer.apple.com → the reader-app page above → **request form** for the External Link
-   Account Entitlement; bundle id `de.iphoneblog.matrix`.
+   Account Entitlement; the app's bundle id.
 2. Answer from the text below; agree to the terms.
 3. Apple's answer comes by mail. If granted: Thorsten adds the entitlement to the app id and
    profile, and the app gets one link built with StoreKit's `ExternalLinkAccount` (Apple's
@@ -131,5 +131,4 @@ step, Thorsten's yes).
 
 `fastlane ios beta` uploads to TestFlight only. The App Store needs a lane that runs `deliver`
 with `fastlane/metadata`, the store screenshots (6.9" iPhone at least) and `submit_for_review`
-off by default, from the publisher's account and bundle id (`de.iphoneblog.matrix`). It waits on
-the publisher's account.
+off by default, on Thorsten's team, which publishes (Philipp Solutions, 2026-11-16).
