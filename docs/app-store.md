@@ -106,7 +106,7 @@ room: Apple may count it as real-time person-to-person. Until Apple answers, the
 **Unverified:** the form's exact questions. The texts to paste:
 
 > **App description.** iPhoneBlog is the app of iPhoneBlog.de, a German publication about Apple,
-> the iPhone and the App Store, published since 2007. The app's main content is the publication
+> the iPhone and the App Store, published since [YEAR, Alex fills in]. The app's main content is the publication
 > itself: every article, readable without an account. Each article has a discussion section
 > where readers comment on it. iPhoneBlog's membership, #one, adds weekly videos, a private video
 > feed and a members' community; it is sold only on our website, and the app offers no In-App
