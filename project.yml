@@ -22,7 +22,7 @@ packages:
   # The Matrix engine. Pinned to one release; .github/workflows/sdk-bump.yml proposes the next.
   MatrixRustSDK:
     url: https://github.com/element-hq/matrix-rust-components-swift
-    exactVersion: 26.11.12
+    exactVersion: 26.11.16
 
   # ChatKit: Element X's chat views (Vendor/ElementX, AGPL-3.0) and the packages they need.
   # Versions follow Element X's project.yml at the tag in Vendor/ElementX/UPSTREAM.tag.
