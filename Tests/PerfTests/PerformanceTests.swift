@@ -233,9 +233,14 @@ final class PerformanceTests: XCTestCase {
     private func threadSummary(_ app: XCUIApplication, in list: XCUIElement) throws -> XCUIElement {
         // The only thread in allgemein with replies: its row under the root ("90 Antworten, …").
         let summary = app.buttons.matching(identifier: "thread-row").firstMatch
-        // A CI runner pages older messages in slowly: more swipes, each given a moment.
+        // A CI runner pages older messages in slowly: more swipes, each given a moment. A swipe
+        // can carry past the row while the list still moves, so the search also comes back up.
         for _ in 0..<25 where !summary.isHittable {
             list.swipeDown(velocity: .slow)
+            _ = summary.waitForExistence(timeout: 1)
+        }
+        for _ in 0..<25 where !summary.isHittable {
+            list.swipeUp(velocity: .slow)
             _ = summary.waitForExistence(timeout: 1)
         }
         guard summary.isHittable else {
