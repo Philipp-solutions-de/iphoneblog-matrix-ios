@@ -61,7 +61,8 @@ final class GifUITests: XCTestCase {
         let added = app.images.matching(NSPredicate(format: "label CONTAINS %@ OR label CONTAINS %@",
                                                     today("de_DE", "dd. MMMM,"), today("en_US", "MMMM d,")))
         XCTAssertTrue(added.firstMatch.waitForExistence(timeout: 45), "the GIF is not in the photo picker")
-        let gif = added.element(boundBy: added.count - 1) // the newest, if earlier runs added it too
+        // Earlier local runs added the GIF too; any of them will do, as long as it is on screen.
+        let gif = added.allElementsBoundByIndex.first { $0.isHittable } ?? added.firstMatch
         sleep(1)
         gif.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         app.buttons["Add"].tap()

@@ -18,7 +18,7 @@ final class SessionUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchEnvironment = [
             "IPHONEBLOG_NO_PUSH_PROMPT": "1",
-            "IPHONEBLOG_START_TAB": "me",
+            "IPHONEBLOG_START_TAB": "chat",
             "IPHONEBLOG_HOMESERVER": server,
             "IPHONEBLOG_DEV_USER": user,
             "IPHONEBLOG_DEV_PASSWORD": password,
@@ -28,21 +28,20 @@ final class SessionUITests: XCTestCase {
         ]
         app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE"]
         app.launch()
-        XCTAssertTrue(app.buttons["me.signOut"].waitForExistence(timeout: 120), "not signed in")
-        XCTAssertTrue(app.tabBars.buttons["@Mentions"].waitForExistence(timeout: 10))
+        // Anna has no #one: #one-Chat shows "Nur für #one-Mitglieder" with Abmelden.
+        XCTAssertTrue(app.buttons["one.signOut"].waitForExistence(timeout: 120), "not signed in")
 
         // Every device of the account loses its token, as when the sign-in service revokes them.
         try revokeAllSessions(server: server, user: user, password: password)
 
-        // Signing out returns to the Blog tab (with a short notice) and @Mentions, a tab for the
-        // signed-in only, goes; Ich then offers the sign-in.
-        XCTAssertTrue(app.tabBars.buttons["@Mentions"].waitForNonExistence(timeout: 90), "the app stayed signed in")
+        // Signing out returns to the Blog tab (with a short notice); #one-Chat then offers the sign-in.
+        XCTAssertTrue(app.buttons["one.signOut"].waitForNonExistence(timeout: 90), "the app stayed signed in")
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = "session-lost"
         shot.lifetime = .keepAlways
         add(shot)
-        app.tabBars.buttons["Ich"].tap()
-        XCTAssertTrue(app.buttons["me.signIn"].waitForExistence(timeout: 10), "Ich does not offer the sign-in")
+        app.tabBars.buttons["#one-Chat"].tap()
+        XCTAssertTrue(app.buttons["one.signIn"].waitForExistence(timeout: 10), "#one-Chat does not offer the sign-in")
         // The next test signs in again with the same password; nothing else to undo.
     }
 

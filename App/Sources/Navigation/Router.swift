@@ -49,6 +49,13 @@ final class Router: ObservableObject {
     /// current; MainView observes only the router, so they live here.
     @Published var chatBadge = 0
     @Published var mentionsBadge = 0
+    /// A #one member: only members see #one-Chat and @Mentions (Thorsten, 2026-11-16). Set by
+    /// ChatSession whenever membership changes, so the tabs follow without a restart.
+    @Published var isMember = false {
+        didSet {
+            if !isMember, tab == .mentions || tab == .me { tab = .chat }
+        }
+    }
 
     /// Debug screenshot runs open a discussion (IPHONEBLOG_START_DISCUSSION=<root event>), a room
     /// (IPHONEBLOG_START_ROOM=<room>) or a thread (IPHONEBLOG_START_THREAD=<room>|<root event>).
@@ -120,5 +127,6 @@ final class Router: ObservableObject {
         blogRoomID = nil
         chatBadge = 0
         mentionsBadge = 0
+        isMember = false
     }
 }

@@ -204,6 +204,7 @@ final class ChatSession: ObservableObject, ChatHost {
             if let first = channels.sorted().first { oneChannelID = first }
         }
         if member != isOneMember { isOneMember = member }
+        if router.isMember != member { router.isMember = member }
         if rooms.channelIDs != channels { rooms.channelIDs = channels }
     }
 

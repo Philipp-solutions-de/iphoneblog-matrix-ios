@@ -71,8 +71,14 @@ A tap opens the channel or the thread. Unencrypted rooms make this simple: no ke
 with the extension. Apple's notification-filtering entitlement is requested for Alex's
 account so the extension may drop pushes it cannot show.
 
-**Four tabs, the blog as the front page.** Blog, #one-Chat, @Mentions (signed in only), Ich,
-as in the approved previews; every visual value lives in `App/Sources/Theme.swift`, light and
+**Four tabs for members, two for everyone else; the blog as the front page.** #one members see
+Blog, #one-Chat, @Mentions and Ich. Everyone else sees Blog and #one-Chat: signed out, a neutral
+sign-in ("Der Chat für #one-Mitglieder", Anmelden); signed in without #one, "Nur für
+#one-Mitglieder" with Abmelden and Konto löschen (App Store 5.1.1(v), since they have no Ich).
+No price, no way to buy, no hint where to get #one; they read discussions without writing
+(Thorsten, 2026-11-16). The tabs follow membership as it changes (`Router.isMember`). For
+members, #one-Chat lists the #one rooms (`GET /_iphoneblog/v1/rooms`, else the space #one's
+children) with Threads on top. every visual value lives in `App/Sources/Theme.swift`, light and
 dark by the system. The Blog tab is a `WKWebView` on WordPress's app view (`?app=1`, which
 drops banner, header, menu and footer), not native article cards: the blog renders articles,
 paywall included, exactly as the site does, and the app adds only the discussion. The web
