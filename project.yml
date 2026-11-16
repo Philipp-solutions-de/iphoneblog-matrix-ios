@@ -172,6 +172,7 @@ targets:
       - path: App/Generated
       - path: App/Sources/Matrix/MatrixClientFactory.swift
       - path: App/Sources/Matrix/SessionStore.swift
+      - path: App/Sources/Matrix/PushText.swift
       - path: App/Sources/Matrix/SharedStorage.swift
     dependencies:
       - package: MatrixRustSDK
