@@ -241,7 +241,7 @@ platform :ios do
     UI.user_error!("no app record for #{brand('BUNDLE_ID')}") unless app
     asc = lambda do |method, path, body = nil|
       uri = URI("https://api.appstoreconnect.apple.com#{path}")
-      request = (method == :post ? Net::HTTP::Post : Net::HTTP::Get).new(uri)
+      request = { post: Net::HTTP::Post, patch: Net::HTTP::Patch }.fetch(method, Net::HTTP::Get).new(uri)
       request["Authorization"] = "Bearer #{Spaceship::ConnectAPI.token.text}"
       if body
         request["Content-Type"] = "application/json"
@@ -271,6 +271,45 @@ platform :ios do
     _, users = asc.call(:get, "/v1/users?limit=200")
     _, pending = asc.call(:get, "/v1/userInvitations?limit=200")
     UI.message("team: #{(users['data'] || []).size} users, #{(pending['data'] || []).size} open invitations")
+
+    # Why a tester sees nothing: the group's builds and "all builds" setting, each tester's
+    # state, and the newest builds' states. With TESTERS_FIX=true: all builds on for internal
+    # groups, the newest valid builds added, and a TestFlight invitation to each tester.
+    if ENV["TESTERS_CHECK"] == "true" || ENV["TESTERS_FIX"] == "true"
+      fix = ENV["TESTERS_FIX"] == "true"
+      _, builds = asc.call(:get, "/v1/builds?filter[app]=#{app.id}&sort=-uploadedDate&limit=4&include=buildBetaDetail")
+      valid = (builds["data"] || []).select { |b| b.dig("attributes", "processingState") == "VALID" && !b.dig("attributes", "expired") }
+      (builds["data"] || []).each do |b|
+        a = b["attributes"]
+        UI.message("build #{a['version']}: #{a['processingState']} expired=#{a['expired']} encryption=#{a['usesNonExemptEncryption'].inspect} expires=#{a['expirationDate']}")
+      end
+      (groups["data"] || []).each do |g|
+        a = g["attributes"]
+        UI.message("group \"#{a['name']}\" internal=#{a['isInternalGroup']} allBuilds=#{a['hasAccessToAllBuilds'].inspect}")
+        if fix && a["isInternalGroup"] && a["hasAccessToAllBuilds"] != true
+          code, = asc.call(:patch, "/v1/betaGroups/#{g['id']}", { data: { type: "betaGroups", id: g["id"], attributes: { hasAccessToAllBuilds: true } } })
+          UI.message("  all builds on: HTTP #{code}")
+        end
+        if fix && !valid.empty?
+          code, body = asc.call(:post, "/v1/betaGroups/#{g['id']}/relationships/builds", { data: valid.map { |b| { type: "builds", id: b["id"] } } })
+          UI.message("  builds #{valid.map { |b| b.dig('attributes', 'version') }.join(',')} added: HTTP #{code}")
+          (body["errors"] || []).each { |e| UI.message("    #{e['code']}: #{e['detail']}") }
+        end
+        _, gb = asc.call(:get, "/v1/betaGroups/#{g['id']}/builds?limit=10")
+        UI.message("  builds now: #{(gb['data'] || []).map { |b| b.dig('attributes', 'version') }.join(',')}")
+        _, testers = asc.call(:get, "/v1/betaGroups/#{g['id']}/betaTesters?limit=50")
+        (testers["data"] || []).each_with_index do |t, i|
+          ta = t["attributes"]
+          UI.message("  tester #{i + 1}: state=#{ta['state']} inviteType=#{ta['inviteType']}")
+          next unless fix && ta["state"] != "ACCEPTED" && ta["state"] != "INSTALLED"
+          code, body = asc.call(:post, "/v1/betaTesterInvitations", { data: { type: "betaTesterInvitations",
+            relationships: { app: { data: { type: "apps", id: app.id } }, betaTester: { data: { type: "betaTesters", id: t["id"] } } } } })
+          UI.message("    TestFlight invitation sent: HTTP #{code}")
+          (body["errors"] || []).each { |e| UI.message("      #{e['code']}: #{e['detail']}") }
+        end
+      end
+      next
+    end
 
     email = ENV["INVITE_EMAIL"].to_s.strip
     next if email.empty?
