@@ -21,6 +21,15 @@ with a notification extension. The conversation views come from Element X under
 
 How it is built and why: [docs/architecture.md](docs/architecture.md).
 
+## Decisions and open work
+
+The chat project's decisions, the interfaces between its five pieces (server, WordPress, this
+app, the website and the bot) and its open work live in one place, the WordPress repository:
+`docs/chat.md`, ADR-0008 and `docs/TODO.md`, "Chat"
+([docs/chat.md](https://github.com/iPhoneblog-web/iPhoneblog-Wordpress/blob/main/docs/chat.md)).
+This README says how this repository is built; a decision about what the chat does goes there,
+not here.
+
 ## Build it
 
 You need Xcode 27, `xcodegen` and, for the sign-in test, `uv` (`brew install xcodegen uv`).
