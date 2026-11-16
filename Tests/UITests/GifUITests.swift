@@ -19,6 +19,7 @@ final class GifUITests: XCTestCase {
         app.launchEnvironment = [
             "IPHONEBLOG_NO_PUSH_PROMPT": "1",
             "IPHONEBLOG_START_TAB": "chat",
+            "IPHONEBLOG_START_ROOM": env["IPHONEBLOG_TEST_CHANNEL_ROOM"] ?? "",
             "IPHONEBLOG_HOMESERVER": server,
             "IPHONEBLOG_DEV_USER": user,
             "IPHONEBLOG_DEV_PASSWORD": password,
