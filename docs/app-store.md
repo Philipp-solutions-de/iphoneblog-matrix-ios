@@ -73,6 +73,51 @@ Thorsten's answer (2026-11-16): standard encryption, with the French declaration
   BIS's rule of March 2021 it needs no annual self-classification report. **Unverified** for
   this app until Apple's form has been answered.
 
+## The External Link Account Entitlement (one link to #one on the website)
+
+Thorsten (2026-11-16): request it, describing the app as iPhoneBlog's reader app. Until Apple
+grants it the app shows no link and no buy prompt (3.1.3(f)). Apple's terms, read 2026-11-16
+([reader apps](https://developer.apple.com/support/reader-apps/)):
+
+- the app's main feature must be digital content (Apple names magazines, newspapers, books,
+  audio, music, video); "a social network that streams video" is named as not eligible, and the
+  terms exclude apps that facilitate real-time person-to-person services;
+- the app offers no In-App Purchase;
+- one request per bundle id, filed by the **Account Holder** (Alex), who answers questions about
+  the app and accepts the entitlement's terms. A developer reports that Admins cannot file it.
+
+**Our case for it:** the app opens on the blog's articles, readable without an account; every
+article has its discussion, which is the article's comment section; #one is iPhoneBlog's paid
+membership (videos, a video feed, the members' community), sold on the website. Direct messages
+are switched off everywhere (Thorsten, 2026-11-16). **The risk** is #one-Chat, a live members'
+room: Apple may count it as real-time person-to-person. Until Apple answers, the app hides
+#one-Chat from non-members (no lock, no hint), so a reviewer without #one sees a reader app.
+
+**Steps for Alex** (Account Holder, once the publisher's app record and bundle id exist):
+
+1. developer.apple.com → the reader-app page above → **request form** for the External Link
+   Account Entitlement; bundle id `de.iphoneblog.matrix`.
+2. Answer from the text below; agree to the terms.
+3. Apple's answer comes by mail. If granted: Thorsten adds the entitlement to the app id and
+   profile, and the app gets one link built with StoreKit's `ExternalLinkAccount` (Apple's
+   notice sheet first); in the EU the terms of the EU addendum apply (commission on sales within
+   the window Apple sets, monthly reporting).
+
+**Unverified:** the form's exact questions. The texts to paste:
+
+> **App description.** iPhoneBlog is the app of iPhoneBlog.de, a German publication about Apple,
+> the iPhone and the App Store, published since 2007. The app's main content is the publication
+> itself: every article, readable without an account. Each article has a discussion section
+> where readers comment on it. iPhoneBlog's membership, #one, adds weekly videos, a private video
+> feed and a members' community; it is sold only on our website, and the app offers no In-App
+> Purchase.
+>
+> **Content type.** Newspapers and magazines (a news publication).
+>
+> **The link.** One link, "#one auf iphoneblog.de", to https://www.iphoneblog.de/one/, where people
+> create and manage their #one membership. Shown to people without #one, where the app explains
+> that #one content is for members.
+
 ## Review notes and demo account
 
 `fastlane/metadata/review_information/notes.txt` (English). Before submitting, replace

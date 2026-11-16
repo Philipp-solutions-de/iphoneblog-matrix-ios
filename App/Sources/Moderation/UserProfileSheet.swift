@@ -52,7 +52,7 @@ struct UserProfileSheet: View {
         .confirmationDialog("\(name) blockieren?", isPresented: $confirmBlock, titleVisibility: .visible) {
             Button("Blockieren", role: .destructive) { Task { await setBlocked(true) } }
         } message: {
-            Text("Du siehst keine Nachrichten und Direktnachrichten von \(name) mehr, auf allen deinen Geräten. \(name) erfährt davon nichts. Aufheben kannst du das unter Ich → Blockiert.")
+            Text("Du siehst keine Nachrichten von \(name) mehr, auf allen deinen Geräten. \(name) erfährt davon nichts. Aufheben kannst du das unter Ich → Blockiert.")
         }
         .sheet(isPresented: $reporting) {
             ReportSheet(subject: .user(userID: userID, name: name), backend: backend, done: notice)
