@@ -1,0 +1,16 @@
+--- a/ElementX/Sources/Services/Timeline/TimelineProxy.swift
++++ b/ElementX/Sources/Services/Timeline/TimelineProxy.swift
+@@ -636,8 +636,12 @@
+             }
+             content = buildEmoteMessageContentFor(emoteMessage, html: emoteHtml)
+         } else {
++            // iphoneblog: a mention goes as plain text in `body`, its link only in formatted_body
++            // (Shim/ComposerText.swift).
+             if let html {
+-                content = messageEventContentFromHtml(body: message, htmlBody: html)
++                content = messageEventContentFromHtml(body: ComposerText.plainBody(message), htmlBody: html)
++            } else if ComposerText.hasMention(message) {
++                content = messageEventContentFromHtml(body: ComposerText.plainBody(message), htmlBody: ComposerText.html(message))
+             } else {
+                 content = messageEventContentFromMarkdown(md: message)
+             }

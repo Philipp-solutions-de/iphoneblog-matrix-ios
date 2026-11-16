@@ -122,6 +122,14 @@ both a thread reply and a channel message; it would take two events), push for r
 threads you are in without a mention (Synapse sends none), and thread rows in the Blog tab,
 which shows the website.
 
+**Pushes for mentions, not for every message.** At an account's first sign-in the app turns the
+default underride `.m.rule.message` off, once, marked in account data
+(`de.iphoneblog.push_defaults`) so a later choice stays: every message then only counts towards
+the badge, while @mentions (a reply to one's own message carries one) and new articles push.
+Under Ich each #one room has "Alle / Nur Erwähnungen / Aus" as a room rule on top. Later: pushes
+for replies in threads one takes part in need thread subscriptions (MSC4306), experimental and
+off on the server.
+
 **No direct messages.** The app offers no way to start one (a tap on a person opens nothing),
 and direct rooms stay out of #one-Chat, Threads and @Mentions; the server refuses to create
 them (Thorsten, 2026-11-16).

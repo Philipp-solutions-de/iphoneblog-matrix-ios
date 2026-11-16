@@ -30,19 +30,25 @@ struct MeView: View {
                     SettingsRow(label: "@Mentions") {
                         Toggle("", isOn: Binding(get: { prefs.mentions }, set: prefs.setMentions)).labelsHidden()
                     }
+                    // One row per #one room (testers: too many pushes). "Nur Erwähnungen" is the
+                    // default; "Alle" pushes every message there, "Aus" not even mentions.
                     if session.isOneMember {
-                        SettingsRow(label: "#one-Chat") {
-                            Menu {
-                                Picker("#one-Chat", selection: Binding(get: { prefs.channel }, set: prefs.setChannel)) {
-                                    ForEach(NotificationPrefs.ChannelMode.allCases) { Text($0.rawValue).tag($0) }
+                        ForEach(session.oneRooms) { room in
+                            SettingsRow(label: "#one-Chat · \(room.name)") {
+                                Menu {
+                                    Picker(room.name, selection: Binding(get: { prefs.roomModes[room.id] ?? .mentions },
+                                                                         set: { prefs.setMode($0, roomID: room.id) })) {
+                                        ForEach(NotificationPrefs.ChannelMode.allCases) { Text($0.rawValue).tag($0) }
+                                    }
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Text((prefs.roomModes[room.id] ?? .mentions).rawValue)
+                                        Image(systemName: "chevron.up.chevron.down").font(.system(size: 12))
+                                    }
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(Theme.ink3)
                                 }
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Text(prefs.channel.rawValue)
-                                    Image(systemName: "chevron.up.chevron.down").font(.system(size: 12))
-                                }
-                                .font(.system(size: 16))
-                                .foregroundStyle(Theme.ink3)
+                                .accessibilityIdentifier("me.roomMode.\(room.name)")
                             }
                         }
                     }
@@ -88,7 +94,7 @@ struct MeView: View {
         }
         .background(Theme.group)
         .task { await push.refreshAuthorization() }
-        .task(id: session.oneChannelID) { await prefs.load() }
+        .task(id: session.oneRooms.map(\.id)) { await prefs.load() }
         .confirmationDialog("Auf diesem Gerät abmelden?", isPresented: $confirmSignOut, titleVisibility: .visible) {
             Button("Abmelden", role: .destructive) { Task { await model.signOut() } }
         } message: {

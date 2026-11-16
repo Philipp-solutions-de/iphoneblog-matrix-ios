@@ -174,15 +174,16 @@ final class MentionsModel: ObservableObject {
 @MainActor
 final class NotificationPrefs: ObservableObject {
     enum ChannelMode: String, CaseIterable, Identifiable {
-        case all = "Alle Nachrichten"
-        case mentions = "Nur @Mentions"
-        case mute = "Stumm"
+        case all = "Alle"
+        case mentions = "Nur Erwähnungen"
+        case mute = "Aus"
         var id: String { rawValue }
     }
 
     @Published private(set) var newArticles = true
     @Published private(set) var mentions = true
-    @Published private(set) var channel: ChannelMode = .all
+    /// Each #one room's push mode; "Nur Erwähnungen" unless someone chose otherwise.
+    @Published private(set) var roomModes: [String: ChannelMode] = [:]
     @Published private(set) var hasLoaded = false
 
     /// An override rule: in the Blog room, an event that carries an article (only the bot posts
@@ -222,16 +223,32 @@ final class NotificationPrefs: ObservableObject {
                 }
             }
         }
+        // Push only for @mentions of me (replies to me carry one) and new articles; every other
+        // message is silent and counts towards the badge (testers: "Pusht die ganze Zeit").
+        // One account rule, as the server session advised: the default underride for messages
+        // goes off, so rooms added later need nothing; a room set to "Alle" gets its own rule.
+        // Once per account, marked in its account data (de.iphoneblog.push_defaults), so a choice
+        // made later, here or in the web app, is never overwritten.
+        if let user = session.userID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "@:"))) {
+            let marker = "/_matrix/client/v3/user/\(user)/account_data/de.iphoneblog.push_defaults"
+            if (try? await session.api("GET", marker)) == nil,
+               (try? await session.api("PUT", "/_matrix/client/v3/pushrules/global/underride/.m.rule.message/enabled",
+                                       body: Data(#"{"enabled":false}"#.utf8))) != nil {
+                _ = try? await session.api("PUT", marker, body: Data(#"{"messages_quiet":true}"#.utf8))
+            }
+        }
         newArticles = (try? await session.api("GET", "/_matrix/client/v3/pushrules/global/override/\(Self.articleRuleID)")) != nil
         mentions = (try? await settings.isUserMentionEnabled()) ?? true
-        if let channelID = session.oneChannelID,
-           let current = try? await settings.getRoomNotificationSettings(roomId: channelID, isEncrypted: false, isOneToOne: false) {
-            channel = switch current.mode {
+        var modes: [String: ChannelMode] = [:]
+        for roomID in session.rooms.channelIDs {
+            guard let current = try? await settings.getRoomNotificationSettings(roomId: roomID, isEncrypted: false, isOneToOne: false) else { continue }
+            modes[roomID] = switch current.mode {
             case .allMessages: .all
             case .mentionsAndKeywordsOnly: .mentions
             case .mute: .mute
             }
         }
+        roomModes = modes
         hasLoaded = true
     }
 
@@ -267,11 +284,10 @@ final class NotificationPrefs: ObservableObject {
         }
     }
 
-    func setChannel(_ mode: ChannelMode) {
-        // One switch for the whole #one-Chat area: every #one room gets the mode.
-        guard let session, !session.rooms.channelIDs.isEmpty else { return }
-        let channelIDs = session.rooms.channelIDs
-        channel = mode
+    /// One room's push mode: Alle (its own rule), Nur Erwähnungen, Aus.
+    func setMode(_ mode: ChannelMode, roomID: String) {
+        guard let session else { return }
+        roomModes[roomID] = mode
         Task {
             let settings = await session.client.getNotificationSettings()
             let sdkMode: RoomNotificationMode = switch mode {
@@ -280,15 +296,14 @@ final class NotificationPrefs: ObservableObject {
             case .mute: .mute
             }
             do {
-                for channelID in channelIDs {
-                    try await settings.setRoomNotificationMode(roomId: channelID, mode: sdkMode)
-                }
+                try await settings.setRoomNotificationMode(roomId: roomID, mode: sdkMode)
             } catch {
-                log.error("channel mode failed: \(error.localizedDescription, privacy: .public)")
+                log.error("room mode failed: \(error.localizedDescription, privacy: .public)")
                 await load()
             }
         }
     }
+
 
     private func putArticleRule(blogRoomID: String, session: ChatSession) async throws {
         let rule: [String: Any] = [
