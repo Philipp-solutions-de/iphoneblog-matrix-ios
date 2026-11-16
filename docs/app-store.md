@@ -90,8 +90,10 @@ grants it the app shows no link and no buy prompt (3.1.3(f)). Apple's terms, rea
 article has its discussion, which is the article's comment section; #one is iPhoneBlog's paid
 membership (videos, a video feed, the members' community), sold on the website. Direct messages
 are switched off everywhere (Thorsten, 2026-11-16). **The risk** is #one-Chat, a live members'
-room: Apple may count it as real-time person-to-person. Non-members see only the Blog and Ich
-tabs (Thorsten, 2026-11-16), so a reviewer without #one sees a reader app.
+room: Apple may count it as real-time person-to-person. Non-members see Blog and #one-Chat;
+signed out, #one-Chat is a neutral sign-in screen, and signed in without #one it says "Nur für
+#one-Mitglieder" with "Abmelden" and "Konto löschen", nothing about buying (Thorsten,
+2026-11-16). Members get all four tabs.
 
 **Steps for Alex** (Account Holder, once the publisher's app record and bundle id exist):
 
@@ -115,7 +117,7 @@ tabs (Thorsten, 2026-11-16), so a reviewer without #one sees a reader app.
 > **Content type.** Newspapers and magazines (a news publication).
 >
 > **The link.** One link, "#one auf iphoneblog.de", to https://www.iphoneblog.de/one/, where people
-> create and manage their #one membership. Shown in Ich to people without #one.
+> create and manage their #one membership. Shown on #one-Chat's "Nur für #one-Mitglieder" screen.
 
 ## Review notes and demo account
 
