@@ -133,6 +133,11 @@ public final class ChatKitSession {
         })
     }
 
+    /// The "Threads" row for the top of a channel: your threads with news, counted.
+    public func threadsEntryView(open: @escaping () -> Void) -> AnyView {
+        AnyView(ChatThreadsEntryRow(model: self.threadsModel, open: open))
+    }
+
     private lazy var threadsModel = ChatThreadsListModel(client: self.clientProxy.client, ownUserID: self.clientProxy.userID)
 
     func joinedRoomProxy(_ roomID: String) async throws -> JoinedRoomProxyProtocol {

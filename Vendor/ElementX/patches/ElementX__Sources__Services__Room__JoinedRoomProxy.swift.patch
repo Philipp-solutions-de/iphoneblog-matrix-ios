@@ -9,7 +9,12 @@
                                             kind: .live)
          openRoomSpan?.finish()
          
-@@ -155,7 +155,7 @@
+@@ -151,11 +151,11 @@
+             let sdkTimeline = try await room.timelineWithConfiguration(configuration: .init(focus: .event(eventId: eventID,
+                                                                                                           numContextEvents: numberOfEvents,
+                                                                                                           threadMode: .automatic(hideThreadedEvents: userSettings.app.threadsEnabled)),
+-                                                                                            filter: .all,
++                                                                                            filter: .eventFilter(filter: Self.excludedEventsFilter), // iphoneblog: as the live timeline
                                                                                              internalIdPrefix: UUID().uuidString,
                                                                                              dateDividerMode: .daily,
                                                                                              trackReadReceipts: .disabled,
@@ -18,7 +23,12 @@
              openRoomSpan?.finish()
              
              return .success(TimelineProxy(timeline: sdkTimeline, kind: .detached))
-@@ -184,7 +184,7 @@
+@@ -180,11 +180,11 @@
+     func threadTimeline(eventID: String) async -> Result<TimelineProxyProtocol, RoomProxyError> {
+         do {
+             let sdkTimeline = try await room.timelineWithConfiguration(configuration: .init(focus: .thread(rootEventId: eventID),
+-                                                                                            filter: .all,
++                                                                                            filter: .eventFilter(filter: Self.excludedEventsFilter), // iphoneblog: as the live timeline
                                                                                              internalIdPrefix: UUID().uuidString,
                                                                                              dateDividerMode: .daily,
                                                                                              trackReadReceipts: .messageLikeEvents,
@@ -45,3 +55,27 @@
                      
                      let timeline = TimelineProxy(timeline: sdkTimeline, kind: .pinned)
                      
+@@ -807,7 +807,22 @@
+                                                       .spaceParent,
+                                                       .policyRuleRoom,
+                                                       .policyRuleServer,
+-                                                      .policyRuleUser]
++                                                      .policyRuleUser,
++                                                      // iphoneblog: the bot runs the rooms, so who joined, left or was
++                                                      // invited, and name, topic or avatar changes are noise.
++                                                      .roomMember,
++                                                      .roomName,
++                                                      .roomTopic,
++                                                      .roomAvatar,
++                                                      .roomCreate,
++                                                      .roomEncryption,
++                                                      .roomThirdPartyInvite,
++                                                      .roomImagePack,
++                                                      .roomLanguage,
++                                                      .roomPolicy,
++                                                      .roomRetention,
++                                                      .memberHints,
++                                                      .callMember]
+         return .exclude(stateEventFilters.map { TimelineEventCondition.eventType($0) })
+     }()
+ }

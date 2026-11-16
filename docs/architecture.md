@@ -103,6 +103,19 @@ their body text ("in der App zu sehen"); reply quotes and link previews are not 
 against `scripts/blog-fixture-server.py`, and `RichMessagesUITests` checks formatting, links,
 replies, pictures, video, files and the composer against the test homeserver.
 
+**Threads work as in Slack.** Under a message with replies, a row shows up to three repliers,
+"n Antworten" in teal and when the last reply came; unread replies make it bold with a dot. A
+tap on a message opens its thread, also to start one (links, mentions and pictures keep their
+own tap), and the long-press menu offers "Im Thread antworten" first. "Threads" at the top of
+#one-Chat lists the threads you started or wrote in, newest first, with a count of those with
+news; it sits there, beside the channel as in Slack, so @Mentions stays the list of people who
+named you. Counts come from the server's thread relations (`ChatThreadActivity`): the SDK's
+timeline summary and thread list counted 3 and 9 for a thread with 6 replies. Unread is per
+device (`ChatThreadSeen`). Not built: "Auch an #one-Chat senden" (Matrix has no event that is
+both a thread reply and a channel message; it would take two events), push for replies in
+threads you are in without a mention (Synapse sends none), and thread rows in the Blog tab,
+which shows the website.
+
 **Tab badges come from the server's counts.** The SDK counts a room's unread mentions in the
 last few events it holds, so a mention with six or more messages after it dropped out. A room's
 mention count is the larger of the SDK's and the server's notification list (the one @Mentions
