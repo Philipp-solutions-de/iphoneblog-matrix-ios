@@ -66,15 +66,13 @@ final class ChatSession: ObservableObject, ChatHost {
         if syncService == nil {
             // The send queue reports how far an upload is; the message row shows it as a bar.
             client.enableSendQueueUploadProgress(enable: true)
-            let service = try await client.syncService().finish()
+            // Offline mode: on a network error or a server that is down, the SDK waits and
+            // reconnects by itself, with backoff, instead of stopping for good (testers: "die App
+            // aktualisiert sich nicht, ich muss sie abschiessen").
+            let service = try await client.syncService().withOfflineMode().finish()
             syncService = service
             stateHandle = service.state(listener: SyncStateObserver { [weak self] state in
-                Task { @MainActor in
-                    self?.syncState = state
-                    // A sync that fails may have lost its token: ask the server who we are; a
-                    // 401 M_UNKNOWN_TOKEN there ends the session (api(), onAuthLost).
-                    if case .error = state { _ = try? await self?.api("GET", "/_matrix/client/v3/account/whoami") }
-                }
+                Task { @MainActor in self?.syncStateChanged(state) }
             })
             try await rooms.attach(to: service.roomListService())
         }
@@ -86,6 +84,55 @@ final class ChatSession: ObservableObject, ChatHost {
         displayName = try? await client.displayName()
         await loadAvatar()
         log.info("sync started")
+    }
+
+    // MARK: Keeping sync alive
+
+    private var restartTask: Task<Void, Never>?
+    private var restartAttempt = 0
+    private var inForeground = true
+
+    /// Sync ended in an error: if the token was lost, the session ends (whoami → api(),
+    /// onAuthLost); otherwise it starts again after 1, 2, 4 … 60 s with jitter, while the app is
+    /// in front. A running sync resets the count.
+    private func syncStateChanged(_ state: SyncServiceState) {
+        syncState = state
+        switch state {
+        case .running:
+            restartAttempt = 0
+            restartTask?.cancel()
+        case .error, .terminated:
+            guard inForeground, restartTask == nil || restartTask?.isCancelled == true else { return }
+            let delay = min(60, pow(2, Double(restartAttempt))) * Double.random(in: 0.8...1.2)
+            restartAttempt += 1
+            log.info("sync stopped; restart in \(delay, format: .fixed(precision: 1)) s")
+            restartTask = Task { [weak self] in
+                if case .error = state { _ = try? await self?.api("GET", "/_matrix/client/v3/account/whoami") }
+                try? await Task.sleep(for: .seconds(delay))
+                guard let self, !Task.isCancelled, self.inForeground else { return }
+                self.restartTask = nil
+                await self.syncService?.start()
+            }
+        default:
+            break
+        }
+    }
+
+    /// The app went to the background: stop syncing, as Element X does (iOS cuts the connection
+    /// anyway, and a dead long-poll is what left the app without updates).
+    func enterBackground() async {
+        inForeground = false
+        restartTask?.cancel()
+        restartTask = nil
+        await syncService?.stop()
+    }
+
+    /// The app is in front again: sync at once, and look at what changed meanwhile.
+    func enterForeground() async {
+        inForeground = true
+        restartAttempt = 0
+        await syncService?.start()
+        mentions.reload()
     }
 
     /// Finds the Blog room (joining it if needed, it is open to everyone) and the #one room,
@@ -295,7 +342,28 @@ final class ChatSession: ObservableObject, ChatHost {
     }
 
     /// A client-server API call the SDK has no method for, with this session's token.
+    /// After a 5xx answer or a network error the app's own calls hold back, 1 s doubling to 60 s
+    /// with jitter, so a restarting server is not hit by every model at once (68 calls in one
+    /// minute during a Synapse restart).
+    private var apiPausedUntil = Date.distantPast
+    private var apiFailures = 0
+
     func api(_ method: String, _ path: String, body: Data? = nil) async throws -> Data {
+        if Date() < apiPausedUntil { throw URLError(.cannotConnectToHost) }
+        do {
+            let data = try await apiCall(method, path, body: body)
+            apiFailures = 0
+            return data
+        } catch let error as URLError where error.code != .badServerResponse || lastStatus >= 500 {
+            apiFailures += 1
+            apiPausedUntil = Date().addingTimeInterval(min(60, pow(2, Double(apiFailures - 1))) * Double.random(in: 0.8...1.2))
+            throw error
+        }
+    }
+
+    private var lastStatus = 0
+
+    private func apiCall(_ method: String, _ path: String, body: Data? = nil) async throws -> Data {
         let base = client.homeserver().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard let url = URL(string: base + path) else { throw URLError(.badURL) }
         var request = URLRequest(url: url)
@@ -306,6 +374,7 @@ final class ChatSession: ObservableObject, ChatHost {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
         let (data, response) = try await URLSession.shared.data(for: request)
+        lastStatus = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             if (response as? HTTPURLResponse)?.statusCode == 401,
                String(data: data.prefix(300), encoding: .utf8)?.contains("M_UNKNOWN_TOKEN") == true {

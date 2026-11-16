@@ -20,6 +20,7 @@ struct MainView: View {
     }
 
     @EnvironmentObject private var model: AppModel
+    @Environment(\.scenePhase) private var scenePhase
     @ObservedObject var router: Router
     /// Nil while signed out.
     let session: ChatSession?
@@ -46,6 +47,15 @@ struct MainView: View {
                 MeView(session: session, prefs: session.notificationPrefs, router: router)
                     .tabItem { Label("Ich", systemImage: "person") }
                     .tag(Router.Tab.me)
+            }
+        }
+        // Sync stops in the background and starts again in front (ChatSession).
+        .onChange(of: scenePhase) { _, phase in
+            guard let session else { return }
+            switch phase {
+            case .background: Task { await session.enterBackground() }
+            case .active: Task { await session.enterForeground() }
+            default: break
             }
         }
         .onChange(of: session == nil) { _, signedOut in
