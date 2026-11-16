@@ -48,11 +48,17 @@ final class GifUITests: XCTestCase {
         let before = Date()
         app.buttons["composer_toolbar-open_compose_options"].tap()
         app.buttons["room-attachment_picker_photo_library"].tap()
-        // build.sh added the GIF today; the picker labels each picture with its date.
-        let today = DateFormatter()
-        today.locale = Locale(identifier: "de_DE")
-        today.dateFormat = "dd. MMMM," // "Foto, 16. November, 16:34": no year for this year's pictures
-        let added = app.images.matching(NSPredicate(format: "label CONTAINS %@", today.string(from: .now)))
+        // build.sh added the GIF today; the picker labels each picture with its date, in the
+        // system's language (it runs outside the app): "Foto, 16. November, 16:34" here,
+        // "Photo, November 16, 4:34 PM" on CI's English simulator. No year for this year's.
+        func today(_ locale: String, _ format: String) -> String {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: locale)
+            formatter.dateFormat = format
+            return formatter.string(from: .now)
+        }
+        let added = app.images.matching(NSPredicate(format: "label CONTAINS %@ OR label CONTAINS %@",
+                                                    today("de_DE", "dd. MMMM,"), today("en_US", "MMMM d,")))
         XCTAssertTrue(added.firstMatch.waitForExistence(timeout: 45), "the GIF is not in the photo picker")
         let gif = added.element(boundBy: added.count - 1) // the newest, if earlier runs added it too
         sleep(1)
