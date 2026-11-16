@@ -99,12 +99,15 @@ send() { # room, txn, json
 send "$allgemein" t1 '{"msgtype":"m.text","body":"Hallo zusammen"}' >/dev/null
 hello="$(send "$allgemein" t1b '{"msgtype":"m.text","body":"Hat jemand schon das neue iPad mini im Alltag?"}')"
 send "$allgemein" t1c "{\"msgtype\":\"m.text\",\"body\":\"Ja, seit einer Woche. Der Dock-Adapter passt.\",\"m.relates_to\":{\"rel_type\":\"m.thread\",\"event_id\":\"$hello\"}}" >/dev/null
-# One message of every rich kind (formatting, link, reply, image, video, file) in Allgemein,
-# before the mention: the SDK counts a room's unread mentions from its last few events only,
-# and six messages after the mention made the sign-in test count 0 (an open bug: a busy
-# channel can hide a mention's badge).
-python3 "$here/scripts/test-rich-messages.py" "$url" "$writer" "$allgemein"
 send "$allgemein" t2 "{\"msgtype\":\"m.text\",\"body\":\"tester: schau mal\",\"m.mentions\":{\"user_ids\":[\"@$user:localhost\"]}}" >/dev/null
+# A busy channel: ten messages and the rich set (six) after the mention. The SDK alone loses a mention behind six;
+# the sign-in test and BadgesUITests check that it still counts (RoomListModel, ChatSession).
+for n in $(seq 1 10); do
+    send "$allgemein" "busy$n" "{\"msgtype\":\"m.text\",\"body\":\"Nachricht $n im vollen Kanal\"}" >/dev/null
+done
+# Then one message of every rich kind (formatting, link, reply, image, video, file), last in
+# Allgemein where Tests/UITests/RichMessagesUITests.swift looks for them.
+python3 "$here/scripts/test-rich-messages.py" "$url" "$writer" "$allgemein"
 
 # The Blog room: the writer plays the article bot, one article root with the bot's field and a
 # reply in its thread. The app joins it by itself (public).

@@ -67,6 +67,13 @@ final class SignInAndRoomListTests: XCTestCase {
             let mention = try XCTUnwrap(session.mentions.items.first, "no mention in @Mentions")
             XCTAssertTrue(mention.unread)
             XCTAssertGreaterThanOrEqual(session.mentions.unreadCount, 1)
+            // The tab badges, with ten messages and more after the mention (a busy channel).
+            let badgeUntil = Date().addingTimeInterval(10)
+            while Date() < badgeUntil, session.router.mentionsBadge == 0 || session.router.chatBadge == 0 {
+                try await Task.sleep(for: .milliseconds(250))
+            }
+            XCTAssertGreaterThanOrEqual(session.router.mentionsBadge, 1, "@Mentions tab has no badge")
+            XCTAssertGreaterThanOrEqual(session.router.chatBadge, 1, "#one-Chat tab has no badge")
         }
 
         // The Blog room is joined, and the new-articles push rule exists on the server.

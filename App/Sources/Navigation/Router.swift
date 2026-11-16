@@ -33,6 +33,10 @@ final class Router: ObservableObject {
     @Published var notice: String?
     /// The sign-in sheet, offered where reading ends and writing would start.
     @Published var showSignIn = false
+    /// The tab badges: #one-Chat's unread messages and unread @Mentions. ChatSession keeps them
+    /// current; MainView observes only the router, so they live here.
+    @Published var chatBadge = 0
+    @Published var mentionsBadge = 0
 
     /// Debug screenshot runs open a discussion (IPHONEBLOG_START_DISCUSSION=<root event>) or a
     /// channel thread (IPHONEBLOG_START_THREAD=<room>|<root event>) on top of the start tab.
@@ -98,5 +102,7 @@ final class Router: ObservableObject {
         pendingThread = nil
         blogPath = []
         blogRoomID = nil
+        chatBadge = 0
+        mentionsBadge = 0
     }
 }

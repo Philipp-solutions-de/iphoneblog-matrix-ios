@@ -26,6 +26,7 @@ final class ChatSession: ObservableObject, ChatHost {
     private var oneRoomID: String?
     private var membershipWatch: AnyCancellable?
     private var membershipTimer: Task<Void, Never>?
+    private var badgeWatch: AnyCancellable?
 
     private var syncService: SyncService?
     private var stateHandle: TaskHandle?
@@ -87,6 +88,18 @@ final class ChatSession: ObservableObject, ChatHost {
         membershipWatch = rooms.$rooms
             .debounce(for: .seconds(2), scheduler: RunLoop.main)
             .sink { [weak self] _ in Task { await self?.refreshMembership() } }
+        // The tab badges and each room's mention count follow the room list and @Mentions.
+        badgeWatch = rooms.$rooms.combineLatest(mentions.$items, $oneChannelID, $isOneMember)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] rooms, items, channel, member in
+                guard let self else { return }
+                let byRoom = items.filter(\.unread).reduce(into: [String: Int]()) { $0[$1.roomID, default: 0] += 1 }
+                self.rooms.serverMentions = byRoom
+                let chat = member ? rooms.first { $0.id == channel }?.unreadMessages ?? 0 : 0
+                let unread = items.filter(\.unread).count
+                if router.chatBadge != chat { router.chatBadge = chat }
+                if router.mentionsBadge != unread { router.mentionsBadge = unread }
+            }
         membershipTimer = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(300))

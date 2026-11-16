@@ -33,13 +33,13 @@ struct MainView: View {
             OneChatTab(router: router, session: session)
                 .tabItem { Label("#one-Chat", systemImage: "number") }
                 .tag(Router.Tab.chat)
-                .badge(chatBadge)
+                .badge(router.chatBadge)
 
             if let session {
                 MentionsView(session: session, mentions: session.mentions, router: router)
                     .tabItem { Label("@Mentions", systemImage: "at") }
                     .tag(Router.Tab.mentions)
-                    .badge(session.mentions.unreadCount)
+                    .badge(router.mentionsBadge)
             }
 
             Group {
@@ -81,8 +81,4 @@ struct MainView: View {
     }
 
     /// #one-Chat counts unread messages in the channel, for members.
-    private var chatBadge: Int {
-        guard let session, session.isOneMember, let channel = session.oneChannelID else { return 0 }
-        return session.rooms.rooms.first { $0.id == channel }?.unreadMessages ?? 0
-    }
 }

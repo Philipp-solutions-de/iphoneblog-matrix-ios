@@ -8,8 +8,12 @@ struct RoomSummary: Identifiable, Equatable {
     var isDirect: Bool
     /// Messages since the last read marker.
     var unreadMessages: Int = 0
-    /// Mentions of me and keyword hits since the last read marker.
-    var unreadMentions: Int = 0
+    /// Mentions of me since the last read marker. The SDK counts them in the few last events it
+    /// holds for a room, so a mention with six or more messages after it drops out; the server's
+    /// notification list (as @Mentions reads it) sees them all, and the larger count wins.
+    var unreadMentions: Int { max(sdkMentions, serverMentions) }
+    var sdkMentions = 0
+    var serverMentions = 0
     var isMarkedUnread = false
 
     var hasUnread: Bool { unreadMessages > 0 || isMarkedUnread }
@@ -27,6 +31,18 @@ final class RoomListModel: ObservableObject {
     var hidden: Set<String> = []
     /// The #one space's children: the channels #one-Chat shows.
     @Published var channelIDs: Set<String> = []
+    /// Unread mentions per room from the server (MentionsModel), merged into each row.
+    var serverMentions: [String: Int] = [:] {
+        didSet {
+            guard serverMentions != oldValue else { return }
+            let merged = rooms.map { room in
+                var room = room
+                room.serverMentions = serverMentions[room.id] ?? 0
+                return room
+            }
+            if merged != rooms { rooms = merged }
+        }
+    }
     var channels: [RoomSummary] { rooms.filter { !$0.isDirect && !hidden.contains($0.id) && channelIDs.contains($0.id) } }
     var withMentions: [RoomSummary] { rooms.filter { $0.unreadMentions > 0 && !hidden.contains($0.id) } }
 
@@ -78,9 +94,10 @@ final class RoomListModel: ObservableObject {
             if let info = try? await room.roomInfo() {
                 summary.isDirect = info.isDirect
                 summary.unreadMessages = Int(info.numUnreadMessages)
-                summary.unreadMentions = Int(info.numUnreadMentions)
+                summary.sdkMentions = Int(info.numUnreadMentions)
                 summary.isMarkedUnread = info.isMarkedUnread
             }
+            summary.serverMentions = serverMentions[summary.id] ?? 0
             summaries.append(summary)
         }
         rooms = summaries

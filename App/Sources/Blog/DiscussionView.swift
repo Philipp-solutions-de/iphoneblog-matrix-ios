@@ -103,7 +103,8 @@ struct DiscussionView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(page?.replies ?? [], id: \.eventId) { reply in
-                    ReplyRow(name: reply.senderName, date: Date(milliseconds: reply.ts), text: reply.body)
+                    ReplyRow(name: reply.senderName, date: Date(milliseconds: reply.ts), text: reply.body, html: reply.formattedBody,
+                             media: reply.media) { router.presentedURL = $0 }
                 }
                 if page?.replies.isEmpty ?? true {
                     Text("Noch keine Antworten.")
@@ -156,11 +157,46 @@ struct DiscussionView: View {
     }
 }
 
-/// One reply: round initials, name, time, text (preview 2b).
+/// A reply's picture for readers: the server's thumbnail at its own proportions, at most the
+/// chat's media width; a tap opens the full picture.
+struct ReplyPicture: View {
+    let media: GuestAPI.Media
+    let label: String
+    let action: () -> Void
+
+    private var ratio: CGFloat {
+        let w = media.thumbnailW ?? media.w ?? 4, h = media.thumbnailH ?? media.h ?? 3
+        return CGFloat(max(w, 1)) / CGFloat(max(h, 1))
+    }
+
+    var body: some View {
+        Button(action: action) {
+            AsyncImage(url: media.thumbnailUrl ?? media.url) { phase in
+                if let image = phase.image {
+                    image.resizable().scaledToFill()
+                } else {
+                    Theme.surface
+                }
+            }
+            .aspectRatio(ratio, contentMode: .fit)
+            .frame(maxWidth: Theme.Chat.mediaWidth, alignment: .leading)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Size.corner, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 4)
+        .accessibilityLabel(label)
+    }
+}
+
+/// One reply: round initials, name, time, text or picture (preview 2b).
 struct ReplyRow: View {
     let name: String
     let date: Date
     let text: String
+    var html: String?
+    var media: GuestAPI.Media?
+    /// Opens the full picture.
+    var open: (URL) -> Void = { _ in }
 
     var body: some View {
         HStack(alignment: .top, spacing: Theme.Space.rowGap) {
@@ -170,8 +206,12 @@ struct ReplyRow: View {
                     Text(name).font(Theme.Font.name).foregroundStyle(Theme.ink)
                     Text(ReplyRow.format(date)).font(Theme.Font.time).foregroundStyle(Theme.ink3)
                 }
-                Text(ReplyText.attributed(text)).font(Theme.Font.body).foregroundStyle(Theme.ink2)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let media {
+                    ReplyPicture(media: media, label: text) { open(media.url) }
+                } else {
+                    Text(ReplyText.attributed(body: text, formattedBody: html)).font(Theme.Font.body).foregroundStyle(Theme.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
         .padding(.horizontal, Theme.Space.page)
