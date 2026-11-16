@@ -155,11 +155,11 @@ final class BlogWebModel: NSObject, ObservableObject, WKNavigationDelegate, WKUI
         refresh.addTarget(self, action: #selector(pulled(_:)), for: .valueChanged)
         webView.scrollView.refreshControl = refresh
         #if DEBUG && targetEnvironment(simulator)
-        if let cookie = Self.testGateCookie() {
-            // Set before the first request, or the first page meets the gate.
-            configuration.websiteDataStore.httpCookieStore.setCookie(cookie) { [weak self] in
+        if TestGate.cookie() != nil {
+            // Set before the first request, or the first page meets the gate (TestGate.swift).
+            Task { @MainActor [weak self] in
                 guard let self else { return }
-                log.info("beta test gate cookie set")
+                if await TestGate.install(in: configuration.websiteDataStore) { log.info("beta test gate cookie set") }
                 webView.load(URLRequest(url: start))
             }
             return
@@ -168,29 +168,6 @@ final class BlogWebModel: NSObject, ObservableObject, WKNavigationDelegate, WKUI
         webView.load(URLRequest(url: start))
     }
 
-    #if DEBUG && targetEnvironment(simulator)
-    /// Beta's staff gate lets a request past with the machine token (infra docs/staff-gate.md,
-    /// "A token for machines"); edge also takes it as the cookie `test_gate`, on beta only. A
-    /// cookie, not the X-Test-Gate header: WKWebView adds headers to the pages it is told to
-    /// load, not to their styles, scripts and fetches, and the gate covers every path. Only a
-    /// Debug build in the simulator compiles this, and it reads the token from the Mac
-    /// ($SIMULATOR_HOST_HOME/.config/iphoneblog/test-gate-beta, written by Thorsten from sops,
-    /// README "Beta in the simulator"), so nothing ships in the app. The cookie is host-only:
-    /// beta.iphoneblog.de and no other host. scripts/check-release-clean.sh fails an App Store
-    /// build that carries this path.
-    private static func testGateCookie() -> HTTPCookie? {
-        guard let home = ProcessInfo.processInfo.environment["SIMULATOR_HOST_HOME"],
-              let raw = try? String(contentsOfFile: home + "/.config/iphoneblog/test-gate-beta", encoding: .utf8) else {
-            return nil
-        }
-        let token = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard token.count >= 32 else { return nil }
-        return HTTPCookie(properties: [
-            .name: "test_gate", .value: token, .domain: "beta.iphoneblog.de", .path: "/",
-            .secure: "TRUE", .expires: Date().addingTimeInterval(7 * 86_400),
-        ])
-    }
-    #endif
 
     func retry() {
         phase = .loading
