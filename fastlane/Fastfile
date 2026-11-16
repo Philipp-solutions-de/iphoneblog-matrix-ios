@@ -350,6 +350,8 @@ platform :ios do
   desc "Build the app and upload it to TestFlight"
   lane :beta do
     key = archive
+    # The simulator-only test-gate path (BlogTab.swift) must not ship.
+    sh(File.join(ROOT, "scripts/check-release-clean.sh"), Dir[File.join(ROOT, "build/ipa/*.ipa")].first.to_s)
     # No changelog: with one, fastlane waits for Apple to list the build before setting it,
     # and a build Apple rejects never appears, so the job ran into its time limit.
     upload_to_testflight(
