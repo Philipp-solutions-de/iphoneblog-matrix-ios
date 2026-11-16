@@ -1,9 +1,10 @@
 name: TestFlight testers
 
-# Run by hand on main. Without inputs it only reads: the groups, their builds and testers, and
-# the newest builds' internal, external and Beta App Review states. With an email and a group
-# it adds that person to the group, and Apple mails the invitation (external groups once a
-# build there has passed Beta App Review).
+# Run by hand on main. Without inputs it only reads: the groups, their builds and testers, the
+# newest builds' internal, external and Beta App Review states, and the team as counts. With an
+# email and `team`, it invites that person to the App Store Connect team (Marketing, this app
+# only); with an email and a group, it adds them to that TestFlight group (an internal group
+# takes only team members who have accepted). Apple mails each invitation.
 
 on:
   workflow_dispatch:
@@ -13,7 +14,19 @@ on:
         required: false
         default: ""
       group:
-        description: "Exact group name"
+        description: "Exact group name (empty: no group)"
+        required: false
+        default: ""
+      team:
+        description: "Invite to the App Store Connect team first (Marketing, this app only)"
+        type: boolean
+        default: false
+      first:
+        description: "First name, for a team invitation"
+        required: false
+        default: ""
+      last:
+        description: "Last name, for a team invitation"
         required: false
         default: ""
 
@@ -44,6 +57,9 @@ jobs:
           APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
           INVITE_EMAIL: ${{ inputs.email }}
           INVITE_GROUP: ${{ inputs.group }}
+          TEAM_INVITE: ${{ inputs.team }}
+          INVITE_FIRST: ${{ inputs.first }}
+          INVITE_LAST: ${{ inputs.last }}
         run: |
           # The address stays out of the log.
           if [ -n "$INVITE_EMAIL" ]; then echo "::add-mask::$INVITE_EMAIL"; fi

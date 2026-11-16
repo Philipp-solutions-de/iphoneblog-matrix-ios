@@ -267,8 +267,31 @@ platform :ios do
                  "external=#{detail&.dig('attributes', 'externalBuildState')} review=#{review&.dig('attributes', 'betaReviewState') || 'none'}")
     end
 
+    # Team members and open invitations, as counts (names and addresses stay out of the log).
+    _, users = asc.call(:get, "/v1/users?limit=200")
+    _, pending = asc.call(:get, "/v1/userInvitations?limit=200")
+    UI.message("team: #{(users['data'] || []).size} users, #{(pending['data'] || []).size} open invitations")
+
     email = ENV["INVITE_EMAIL"].to_s.strip
     next if email.empty?
+    known = ->(list) { (list["data"] || []).any? { |u| u.dig("attributes", "username").to_s.casecmp?(email) || u.dig("attributes", "email").to_s.casecmp?(email) } }
+    UI.message("this person: #{known.call(users) ? 'team member' : known.call(pending) ? 'invited, not yet accepted' : 'not on the team'}")
+
+    # A team invitation (role Marketing, this app only, no certificates): an internal tester
+    # must be on the team first.
+    if ENV["TEAM_INVITE"] == "true" && !known.call(users) && !known.call(pending)
+      code, body = asc.call(:post, "/v1/userInvitations", {
+        data: { type: "userInvitations",
+                attributes: { email: email, firstName: ENV.fetch("INVITE_FIRST"), lastName: ENV.fetch("INVITE_LAST"),
+                              roles: ["MARKETING"], allAppsVisible: false, provisioningAllowed: false },
+                relationships: { visibleApps: { data: [{ type: "apps", id: app.id }] } } }
+      })
+      UI.message("team invitation: HTTP #{code}")
+      (body["errors"] || []).each { |e| UI.message("  #{e['code']}: #{e['detail']}") }
+      UI.user_error!("team invitation failed") unless code.start_with?("2")
+      next
+    end
+    next if ENV["INVITE_GROUP"].to_s.empty?
     group = (groups["data"] || []).find { |g| g.dig("attributes", "name") == ENV["INVITE_GROUP"].to_s }
     UI.user_error!("no group named \"#{ENV['INVITE_GROUP']}\"") unless group
     code, body = asc.call(:post, "/v1/betaTesters", {
