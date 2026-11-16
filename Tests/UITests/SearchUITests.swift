@@ -61,7 +61,7 @@ final class SearchUITests: XCTestCase {
         let result = hit(app, containing: "Nachricht 3 im vollen Kanal")
         XCTAssertTrue(result.waitForExistence(timeout: 30), "channel message not found")
         result.tap()
-        XCTAssertTrue(app.textViews["Nachricht an # Allgemein"].waitForExistence(timeout: 30), "not back in the channel")
+        XCTAssertTrue(app.textViews["Nachricht an #one-Chat"].waitForExistence(timeout: 30), "not back in the channel")
         sleep(2)
         attach(app, "search-jumped")
     }

@@ -494,7 +494,7 @@ enum ChatKitStrings {
     /// Composer placeholder in a channel and in a thread.
     static func messageTo(_ roomName: String) -> String { "Nachricht an \(roomName)" }
 
-    /// A channel's name with one "#": "# Allgemein", and "#one-Chat" as it is (it carries its own).
+    /// A channel's name with one "#": "# Fotos", and "#one-Chat" as it is (it carries its own).
     static func channel(_ name: String) -> String { name.hasPrefix("#") ? name : "# \(name)" }
     static let replyPlaceholder = "Antworten…"
     static let unread = "ungelesen"

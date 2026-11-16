@@ -121,7 +121,7 @@ struct MentionRow: View {
     /// The place as words, for the filter.
     static func placeName(_ place: MentionsModel.Mention.Place) -> String {
         switch place {
-        case .channel(_, let root): "#one-Chat " + (root == nil ? "Allgemein" : "Thread")
+        case .channel(_, let root): "#one-Chat" + (root == nil ? "" : " Thread")
         case .discussion(_, let title): "Diskussion " + (title ?? "")
         case .room(_, let name): name ?? ""
         }
@@ -130,7 +130,7 @@ struct MentionRow: View {
     private var context: (text: String, color: Color) {
         switch mention.place {
         case .channel(_, let root):
-            ("#one-Chat · " + (root == nil ? "Allgemein" : "Thread"), Theme.coralText)
+            ("#one-Chat" + (root == nil ? "" : " · Thread"), Theme.coralText)
         case .discussion(_, let title):
             ("Diskussion" + (title.map { " · " + $0 } ?? ""), Theme.teal)
         case .room(_, let name):

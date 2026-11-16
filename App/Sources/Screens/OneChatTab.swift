@@ -70,14 +70,9 @@ struct LockedOneChat: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("#one-Chat")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.coral)
-                Text("Allgemein")
-                    .font(.system(size: 24, weight: .medium))
-                    .foregroundStyle(Theme.ink)
-            }
+            // The channel's one name, as everywhere: "#one-Chat" ("#one" in the #one colour).
+            (Text("#one").foregroundStyle(Theme.coral) + Text("-Chat").foregroundStyle(Theme.ink))
+                .font(.system(size: 24, weight: .medium))
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Theme.Space.page)
             .padding(.top, 6)
