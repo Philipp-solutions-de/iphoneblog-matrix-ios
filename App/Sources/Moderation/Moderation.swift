@@ -52,10 +52,10 @@ enum Moderation {
         userID != ownUserID && userID.hasPrefix("@")
     }
 
-    /// The address shown in Ich and as the App Store's support address for moderation. nil until
-    /// the publisher names one (iphoneblog-wordpress docs/TODO.md, "Moderation contact"); the row
-    /// is hidden while it is nil.
-    static let contactAddress: String? = nil
+    /// The address shown in Ich and as the App Store's support address for moderation: Alex,
+    /// who also receives every report by mail (decided 2026-11-16). The row is hidden while it
+    /// is nil.
+    static let contactAddress: String? = "ao@iphoneblog.de"
 }
 
 /// The real backend, on the signed-in session.

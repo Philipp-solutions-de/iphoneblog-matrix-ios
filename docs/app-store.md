@@ -9,7 +9,7 @@ are. Apple's texts quoted here were read on 2026-11-16.
 | Apple asks | Answer | Where |
 |---|---|---|
 | In-app purchase (3.1.1) | None. #one is sold on the website; the app shows no price, buy button or link to buy (`SHOW_PURCHASE` off). A free app beside a paid web service, 3.1.3(f) | `brand.env`, review notes |
-| User content (1.2) | Report a message or a person, block a person, a word filter on the server, a moderation contact | `App/Sources/Moderation/`, server module (infra) |
+| User content (1.2) | Report a message or a person (mailed to the moderation contact ao@iphoneblog.de), block a person; a word filter on the server waits on Thorsten | `App/Sources/Moderation/`, server module (infra) |
 | Account deletion (5.1.1(v)) | Ich → Konto löschen → the website's `/konto/loeschen/` | `AccountDeletionView.swift`, iphoneblog-wordpress |
 | Privacy manifest | `PrivacyInfo.xcprivacy` in the app, the notification extension and ChatKit | below |
 | Push permission | Asked on the first visit to #one-Chat, after one sentence; not at sign-in | `PushPrimer.swift` |
@@ -70,8 +70,7 @@ this case.
 ## Review notes and demo account
 
 `fastlane/metadata/review_information/notes.txt` (English). Before submitting, replace
-`MODERATION_ADDRESS`, `CONTACT_NAME` and `CONTACT_PHONE`, and delete the word-filter line if the
-filter is not on. The demo account (`demo_user.txt`, `demo_password.txt`, never in git: CI writes
+`CONTACT_NAME` and `CONTACT_PHONE`; add a line on the word filter if it is on by then. The demo account (`demo_user.txt`, `demo_password.txt`, never in git: CI writes
 them from the `apple` environment's secrets) must be a #one member **on live**: Apple reviews
 against the App Store build, which signs in through live. That needs the chat on live (launch
 step, Thorsten's yes).

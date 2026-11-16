@@ -13,9 +13,8 @@ Only the Blog tab's article pages are a web view, restricted to iphoneblog.de; l
 USER-GENERATED CONTENT (1.2)
 - Report: long-press a message → "Melden", or tap a person → "Melden"; reports go to our moderators by mail.
 - Block: tap a person → "Blockieren"; their messages disappear for this account on all devices. Ich → "Blockiert" undoes it.
-- Our server refuses messages with words from a blocklist.
 - Only #one members may write in the chat, and every member has a paid, named account; we remove abusive people.
-- Moderation contact: MODERATION_ADDRESS
+- Moderation contact: ao@iphoneblog.de (reports reach this address by mail)
 
 ACCOUNT DELETION (5.1.1(v))
 Ich → "Konto löschen" explains what is deleted and opens the website's deletion page, signed in. Confirming deletes the account at once, ends a running #one subscription at the end of its paid period without further charges, and deletes the chat account the next night.
