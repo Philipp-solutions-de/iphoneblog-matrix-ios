@@ -276,6 +276,8 @@ final class TimelineProxy: TimelineProxyProtocol {
                    audioInfo: AudioInfo,
                    caption: String?,
                    requestHandle: @MainActor (SendAttachmentJoinHandleProtocol) -> Void) async -> Result<Void, TimelineProxyError> {
+        // iphoneblog: the posting notice before someone's first post (Shim/ChatPostingNotice).
+        guard await ChatPostingNotice.shared.ensureAcknowledged() else { return .failure(.sdkError(CancellationError())) }
         MXLog.info("Sending audio")
         
         do {
@@ -302,6 +304,8 @@ final class TimelineProxy: TimelineProxyProtocol {
                   fileInfo: FileInfo,
                   caption: String?,
                   requestHandle: @MainActor (SendAttachmentJoinHandleProtocol) -> Void) async -> Result<Void, TimelineProxyError> {
+        // iphoneblog: the posting notice before someone's first post (Shim/ChatPostingNotice).
+        guard await ChatPostingNotice.shared.ensureAcknowledged() else { return .failure(.sdkError(CancellationError())) }
         MXLog.info("Sending file")
         
         do {
@@ -329,6 +333,8 @@ final class TimelineProxy: TimelineProxyProtocol {
                    imageInfo: ImageInfo,
                    caption: String?,
                    requestHandle: @MainActor (SendAttachmentJoinHandleProtocol) -> Void) async -> Result<Void, TimelineProxyError> {
+        // iphoneblog: the posting notice before someone's first post (Shim/ChatPostingNotice).
+        guard await ChatPostingNotice.shared.ensureAcknowledged() else { return .failure(.sdkError(CancellationError())) }
         MXLog.info("Sending image")
         
         do {
@@ -381,6 +387,8 @@ final class TimelineProxy: TimelineProxyProtocol {
                    videoInfo: VideoInfo,
                    caption: String?,
                    requestHandle: @MainActor (SendAttachmentJoinHandleProtocol) -> Void) async -> Result<Void, TimelineProxyError> {
+        // iphoneblog: the posting notice before someone's first post (Shim/ChatPostingNotice).
+        guard await ChatPostingNotice.shared.ensureAcknowledged() else { return .failure(.sdkError(CancellationError())) }
         MXLog.info("Sending video")
         
         do {
@@ -407,6 +415,8 @@ final class TimelineProxy: TimelineProxyProtocol {
     func sendGallery(itemInfos: [GalleryItemInfo],
                      caption: String?,
                      inReplyToEventID: String?) async -> Result<Void, TimelineProxyError> {
+        // iphoneblog: the posting notice before someone's first post (Shim/ChatPostingNotice).
+        guard await ChatPostingNotice.shared.ensureAcknowledged() else { return .failure(.sdkError(CancellationError())) }
         MXLog.info("Sending gallery with \(itemInfos.count) items")
         
         do {
@@ -430,6 +440,8 @@ final class TimelineProxy: TimelineProxyProtocol {
                           waveform: [Float],
                           inReplyToEventID: String?,
                           requestHandle: @MainActor (SendAttachmentJoinHandleProtocol) -> Void) async -> Result<Void, TimelineProxyError> {
+        // iphoneblog: the posting notice before someone's first post (Shim/ChatPostingNotice).
+        guard await ChatPostingNotice.shared.ensureAcknowledged() else { return .failure(.sdkError(CancellationError())) }
         MXLog.info("Sending voice message")
         
         do {
@@ -460,6 +472,8 @@ final class TimelineProxy: TimelineProxyProtocol {
                      html: String?,
                      inReplyToEventID: String? = nil,
                      intentionalMentions: IntentionalMentions) async -> Result<Void, TimelineProxyError> {
+        // iphoneblog: the posting notice before someone's first post (Shim/ChatPostingNotice).
+        guard await ChatPostingNotice.shared.ensureAcknowledged() else { return .failure(.sdkError(CancellationError())) }
         if let inReplyToEventID {
             MXLog.info("Sending reply to eventID: \(inReplyToEventID)")
         } else {

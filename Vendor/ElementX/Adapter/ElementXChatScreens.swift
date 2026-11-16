@@ -21,6 +21,7 @@ final class ElementXChatScreens: ChatScreenProviding {
 
     func start(host: ChatHost) async throws {
         guard sessionUserID != host.userID || session == nil else { return }
+        ChatPostingNotice.shared.privacyURL = URL(string: Brand.oauthPolicyURI)
         session = try ChatKitSession(client: host.client, roomListService: host.roomListService)
         sessionUserID = host.userID
         hosts = [:]

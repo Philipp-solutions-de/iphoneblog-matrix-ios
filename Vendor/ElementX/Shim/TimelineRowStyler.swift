@@ -169,15 +169,22 @@ struct TimelineItemRowStylerView<Content: View>: View {
         .longPressWithFeedback(isEnabled: !isMessageSelectionActive) {
             context.send(viewAction: .displayTimelineItemMenu(itemID: timelineItem.id))
         }
-        .swipeRightAction {
-            CompoundIcon(\.reply)
+        // Right: answer in the thread; left: the message's menu with its reaction bar (Alex's
+        // request). Not inside a thread, where right would only reopen it. MessageSwipe keeps
+        // the screen's left edge free for swipe-back.
+        .messageSwipe(isEnabled: { !isMessageSelectionActive && timelineItem.canBeRepliedTo }) {
+            CompoundIcon(\.threads)
+                .foregroundColor(style.colors.accent)
+                .accessibilityHidden(true)
+        } trailing: {
+            CompoundIcon(\.reactionAdd)
                 .foregroundColor(style.colors.ink2)
                 .accessibilityHidden(true)
-        } shouldStartAction: {
-            !isMessageSelectionActive && timelineItem.canBeRepliedTo
-        } action: {
-            context.send(viewAction: .handleTimelineItemMenuAction(itemID: timelineItem.id,
-                                                                   action: .reply(isThread: timelineItem.properties.isThreaded)))
+        } swipedRight: {
+            guard !context.viewState.timelineKind.isThread else { return }
+            context.send(viewAction: .displayThread(itemID: timelineItem.id))
+        } swipedLeft: {
+            context.send(viewAction: .displayTimelineItemMenu(itemID: timelineItem.id))
         }
     }
 
