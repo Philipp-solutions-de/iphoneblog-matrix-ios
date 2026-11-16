@@ -11,7 +11,8 @@ and fails when:
   simulator, whose hitches are its own and not a phone's: the budget is checked on a device), or
 - a gated metric is worse than its **baseline** by more than the relative tolerance *and* the
   absolute slack, both in the same file. Two conditions, because a simulator on a shared runner
-  is noisy: 0.4 ms/s against a baseline of 0.2 is +100 % and means nothing.
+  is noisy: 0.4 ms/s against a baseline of 0.2 is +100 % and means nothing. "per_test" gives
+  one test its own slack (a cold launch on a busy runner varies by seconds).
 
 A test that did not run, a metric it did not report, a log without numbers and a file without
 baselines fail too: a gate that silently
@@ -86,7 +87,7 @@ def main():
                 continue
             value = m["median"]
             tol = conf["tolerance"]
-            slack = tol["absolute"].get(metric, 0)
+            slack = tol.get("per_test", {}).get(test, {}).get(metric, tol["absolute"].get(metric, 0))
             verdict = "ok"
             if budget is not None and value > budget:
                 verdict = "over budget"

@@ -172,6 +172,5 @@ case "$action" in
     build)    build ;;
     run)      run; python3 scripts/perf-gate.py "$result" ;;
     gate)     python3 scripts/perf-gate.py "$result" ;;
-    baseline) run; python3 scripts/perf-gate.py "$result" --write-baseline ;;
-    *) echo "usage: scripts/perf.sh [all|build|run|gate|baseline]" >&2; exit 2 ;;
+    *) echo "usage: scripts/perf.sh [all|build|run|gate|device]" >&2; exit 2 ;;
 esac

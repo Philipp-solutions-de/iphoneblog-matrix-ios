@@ -65,14 +65,28 @@ snapshot the whole app on its main thread, the very thing being measured.
 its baseline in `scripts/perf-baseline.json` by more than 50 % *and* the absolute slack there.
 A test that did not run, a metric it did not report, a log without numbers and a file without
 baselines fail too. The file can hold hard budgets per test; it holds none, because the
-simulator's hitches are its own. Xcode's
+simulator's hitches are its own.
+
+**The baselines are CI's.** The `xcode-27` runner is about four times slower than a Mac Studio
+and noisier: a cold launch there takes 9 to 27 s, and one thread opening in five can take a
+minute. So the baselines are medians of a CI run, written from the `perf` artifact's
+`perf.log`, and launch is gated on its clock time with 10 s of slack (`per_test`): the runner's
+simulator does not always report Apple's launch metric. The simulator also hides WebKit's
+content from XCUITest there, so the Blog test waits for the web view's scroll bar, not a word
+on the page. Xcode's
 own baselines are tied to one machine's id and cannot follow GitHub's runners. After a change
-that makes the app faster, write new baselines: `scripts/perf.sh baseline`, and commit the file.
+that makes the app faster, write new baselines from that change's CI run, and commit the file:
+
+```bash
+gh run download <run id> -n perf -D build/ci && cp build/ci/perf.log build/perf.log
+python3 scripts/perf-gate.py build/perf.xcresult --write-baseline
+```
+
+On the Mac, the same tests, gated against CI's baselines (so they pass with room):
 
 ```bash
 scripts/perf.sh               # build, run, gate
 PERF_ONLY=testScrollOneChat scripts/perf.sh run
-scripts/perf.sh baseline
 ```
 
 ## On a device

@@ -146,8 +146,10 @@ final class PerformanceTests: XCTestCase {
         allowLocalNetwork()
         let web = app.webViews.firstMatch
         XCTAssertTrue(web.waitForExistence(timeout: 20), "no blog web view")
-        // A fresh simulator on a CI runner starts WebKit's processes slowly.
-        if !web.staticTexts["Artikel 1"].waitForExistence(timeout: 60) {
+        // The page has loaded when its scroll bar counts more than one page. Not the page's own
+        // text: a CI runner's simulator hides WebKit's content from XCUITest.
+        let pages = web.otherElements.matching(NSPredicate(format: "label MATCHES %@", "Vertical scroll bar, ([2-9]|[1-9][0-9]+) pages")).firstMatch
+        if !pages.waitForExistence(timeout: 60) {
             print("PERF-HIERARCHY-BEGIN\n\(app.debugDescription)\nPERF-HIERARCHY-END")
             XCTFail("blog page not loaded")
         }
@@ -225,7 +227,11 @@ final class PerformanceTests: XCTestCase {
         // The only thread in the channel with more than one reply. Its count is what the
         // app has loaded, not always 90, so match the form, not the number.
         let summary = app.buttons.matching(NSPredicate(format: "label MATCHES %@", "[0-9]+ Antworten")).firstMatch
-        for _ in 0..<10 where !summary.isHittable { list.swipeDown(velocity: .slow) }
+        // A CI runner pages older messages in slowly: more swipes, each given a moment.
+        for _ in 0..<25 where !summary.isHittable {
+            list.swipeDown(velocity: .slow)
+            _ = summary.waitForExistence(timeout: 1)
+        }
         guard summary.isHittable else {
             // What the screen holds instead, for whoever reads the log.
             print("PERF-HIERARCHY-BEGIN\n\(app.debugDescription)\nPERF-HIERARCHY-END")
