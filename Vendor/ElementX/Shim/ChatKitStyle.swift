@@ -15,9 +15,9 @@ public struct ChatKitStyle {
         public var accentBright: Color
         /// Soft teal behind your own reactions and others' mentions.
         public var accentSoft: Color
-        /// Coral: what is meant for you.
+        /// A mention of you: its text.
         public var highlight: Color
-        /// Soft coral behind a mention of you.
+        /// A mention of you: its fill.
         public var highlightSoft: Color
         /// Text: main, secondary, faint.
         public var ink: Color
@@ -125,7 +125,7 @@ public struct ChatKitStyle {
                        highlightSoft: Color(red: 0.99, green: 0.93, blue: 0.93),
                        ink: .primary, ink2: .secondary, ink3: Color(.tertiaryLabel),
                        background: Color(.systemBackground), surface: Color(.secondarySystemBackground),
-                       line: Color(.separator), avatars: [.teal, .orange, .purple, .pink, .blue, .green]),
+                       line: Color(.separator), avatars: [.teal, .gray]),
         fonts: Fonts(senderName: .system(size: 16, weight: .bold), time: .system(size: 13),
                      threadSummary: .system(size: 15, weight: .semibold), threadPreview: .system(size: 15),
                      roomTitle: .system(size: 17, weight: .bold), roomSubtitle: .system(size: 13),

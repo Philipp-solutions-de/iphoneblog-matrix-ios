@@ -14,16 +14,21 @@ enum Theme {
     static let tealBright = dynamic(light: 0x149791, dark: 0x1B9791)
     /// Filled buttons (white text on it).
     static let button = dynamic(light: 0x0F7D78, dark: 0x1B9791)
+    /// Unread badges on the tabs and a mention of you: white on this teal, 5:1 in both modes.
+    static let badge = Color(hex: 0x0F7D78)
     /// Soft teal behind a mention and the Diskussion chip.
     static let tealSoft = dynamic(light: 0xE3F2F1, dark: 0x16302F)
-    /// #one: coral. `coral` for marks and badges, `coralText` for coral words and outlines'
-    /// text, `coralButton` for the filled #one button.
+    /// The colour rule (Thorsten, 2026-11-16): teal (the blog's $linkcolor #149791) is the colour
+    /// of all content: links, the active tab, unread badges and dots, reply counts, mentions,
+    /// default avatars. Coral (the blog's $goldcolor #eb686e) marks only what belongs to #one,
+    /// sign-in included: the Anmelden buttons, the #one-Chat lock, #one hints and upgrade
+    /// links. `coral` for marks, `coralText` for coral words, `coralButton` for filled buttons.
     static let coral = dynamic(light: 0xEB686E, dark: 0xEB686E)
     static let coralText = dynamic(light: 0xC4434A, dark: 0xEF8A8F)
     static let coralButton = dynamic(light: 0xC4434A, dark: 0xC4434A)
     static let coralSoft = dynamic(light: 0xFDECED, dark: 0x2E1819)
-    /// An unread mention's row.
-    static let unread = dynamic(light: 0xFDF3F3, dark: 0x1D1617)
+    /// An unread mention's row: a breath of teal.
+    static let unread = dynamic(light: 0xF0F8F7, dark: 0x142221)
 
     /// Text: headings and names, body, quiet.
     static let ink = dynamic(light: 0x111111, dark: 0xECECEC)
@@ -43,8 +48,9 @@ enum Theme {
     /// Badge for "new, but not for you".
     static let quietBadge = dynamic(light: 0xECEFF0, dark: 0x2A2A2A)
 
-    /// Initials avatars: one colour per name, always the same.
-    static let avatarColors: [Color] = [0x3F8FA8, 0xC98A3B, 0x5B7FC7, 0x8A6BB8, 0x4F9A6A, 0xC06A4F, 0x3A7A8C].map { Color(hex: $0) }
+    /// Initials avatars: one colour per name, always the same. Teal and neutral only (the colour
+    /// rule above); every one carries white initials at 4.5:1 or better.
+    static let avatarColors: [Color] = [0x0F7D78, 0x3A6F6C, 0x5C6B6A, 0x0B6662, 0x4F5A5C, 0x2F7F7A, 0x646464].map { Color(hex: $0) }
 
     // MARK: Type (system font throughout)
 

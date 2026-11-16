@@ -39,7 +39,7 @@ extension ChatKitStyle {
     static var app: ChatKitStyle {
         ChatKitStyle(
             colors: .init(accent: Theme.teal, accentBright: Theme.tealBright, accentSoft: Theme.tealSoft,
-                          highlight: Theme.coral, highlightSoft: Theme.coralSoft,
+                          highlight: .white, highlightSoft: Theme.badge,
                           ink: Theme.ink, ink2: Theme.ink2, ink3: Theme.ink3,
                           background: Theme.background, surface: Theme.surface, line: Theme.line,
                           avatars: Theme.avatarColors),

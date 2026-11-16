@@ -90,7 +90,7 @@ struct LockedOneChat: View {
                 if !signedIn {
                     Button("Schon Mitglied? Anmelden") { router.showSignIn = true }
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(Theme.teal)
+                        .foregroundStyle(Theme.coralText)
                         .frame(minHeight: 44)
                 }
             }

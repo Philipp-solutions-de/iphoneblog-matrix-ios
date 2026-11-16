@@ -3,6 +3,22 @@ import SwiftUI
 /// The tab bar (preview 1): Blog, #one-Chat, @Mentions (signed in only), Ich.
 /// The app opens on Blog, readable without an account; sign-in is offered where writing starts.
 struct MainView: View {
+    /// Unread counts on the tabs in teal, not the system red: red is only for #one
+    /// (Theme.swift, the colour rule).
+    init(router: Router, session: ChatSession?) {
+        self.router = router
+        self.session = session
+        let appearance = UITabBarAppearance()
+        appearance.configureWithDefaultBackground()
+        for item in [appearance.stackedLayoutAppearance, appearance.inlineLayoutAppearance, appearance.compactInlineLayoutAppearance] {
+            item.normal.badgeBackgroundColor = UIColor(Theme.badge)
+            item.selected.badgeBackgroundColor = UIColor(Theme.badge)
+        }
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+        UITabBarItem.appearance().badgeColor = UIColor(Theme.badge)
+    }
+
     @EnvironmentObject private var model: AppModel
     @ObservedObject var router: Router
     /// Nil while signed out.

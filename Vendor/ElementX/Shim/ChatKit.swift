@@ -52,7 +52,7 @@ public enum ChatKitTheme {
         colors.override(\.bgSubtlePrimary, with: c.accentSoft)
         colors.override(\.borderInteractivePrimary, with: c.accent)
         colors.override(\.bgSubtleSecondary, with: c.surface)
-        // Mentions of you: coral on soft coral. Others' mentions: Shim/LeftOut.swift, MentionPillColors.
+        // Mentions of you: white on solid teal. Others' mentions: Shim/LeftOut.swift, MentionPillColors.
         colors.override(\.bgBadgeAccent, with: c.highlightSoft)
         colors.override(\.textBadgeAccent, with: c.highlight)
         // Raised canvas (sheets, menus) and dividers, so dark mode sits on the blog's #111.

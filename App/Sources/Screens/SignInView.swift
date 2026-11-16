@@ -42,6 +42,7 @@ struct SignInView: View {
                         .frame(maxWidth: .infinity, minHeight: Theme.Size.buttonHeight)
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(Theme.coralButton)
                 .buttonBorderShape(.roundedRectangle(radius: Theme.Size.corner + 1))
                 .disabled(isBusy)
                 .accessibilityIdentifier("signIn.blog")
@@ -84,6 +85,7 @@ struct SignInView: View {
                 Task { await model.signIn(username: username, password: password) }
             }
             .buttonStyle(.borderedProminent)
+            .tint(Theme.coralButton)
             .disabled(username.isEmpty || password.isEmpty || isBusy)
             .accessibilityIdentifier("signIn.submit")
         }

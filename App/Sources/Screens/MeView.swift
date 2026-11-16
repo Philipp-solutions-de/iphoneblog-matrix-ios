@@ -142,7 +142,7 @@ struct GuestMeView: View {
                     Button { router.showSignIn = true } label: {
                         Text("Mit iphoneblog.de anmelden").frame(maxWidth: .infinity, minHeight: Theme.Size.buttonHeight)
                     }
-                    .buttonStyle(FilledButton(fill: Theme.button))
+                    .buttonStyle(FilledButton(fill: Theme.coralButton))
                     .accessibilityIdentifier("me.signIn")
                     HStack(spacing: 4) {
                         Text("Noch kein Konto?").foregroundStyle(Theme.ink3)

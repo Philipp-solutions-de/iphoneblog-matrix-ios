@@ -77,7 +77,7 @@ struct DiscussionView: View {
             } actions: {
                 Button("Anmelden") { router.showSignIn = true }
                     .buttonStyle(.borderedProminent)
-                    .tint(Theme.button)
+                    .tint(Theme.coralButton)
             }
         case .unavailable:
             ContentUnavailableView {
@@ -212,7 +212,7 @@ struct ReaderPanel: View {
                     Button { router.showSignIn = true } label: {
                         Text("Anmelden").frame(maxWidth: .infinity, minHeight: Theme.Size.smallButtonHeight)
                     }
-                    .buttonStyle(FilledButton(fill: Theme.button))
+                    .buttonStyle(FilledButton(fill: Theme.coralButton))
                 }
                 Button {
                     if let url = URL(string: Brand.oneOfferURL) { router.presentedURL = url }
