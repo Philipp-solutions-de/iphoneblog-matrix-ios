@@ -232,6 +232,54 @@ platform :ios do
     UI.message(response.body[0, 600]) unless response.code == "200"
   end
 
+  desc "TestFlight groups, their builds and Beta App Review; with INVITE_EMAIL and INVITE_GROUP, adds that tester"
+  lane :testers do
+    require "net/http"
+    require "json"
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.from(hash: api_key)
+    app = Spaceship::ConnectAPI::App.find(brand("BUNDLE_ID"))
+    UI.user_error!("no app record for #{brand('BUNDLE_ID')}") unless app
+    asc = lambda do |method, path, body = nil|
+      uri = URI("https://api.appstoreconnect.apple.com#{path}")
+      request = (method == :post ? Net::HTTP::Post : Net::HTTP::Get).new(uri)
+      request["Authorization"] = "Bearer #{Spaceship::ConnectAPI.token.text}"
+      if body
+        request["Content-Type"] = "application/json"
+        request.body = JSON.generate(body)
+      end
+      response = Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |http| http.request(request) }
+      [response.code, (JSON.parse(response.body) rescue {})]
+    end
+
+    _, groups = asc.call(:get, "/v1/apps/#{app.id}/betaGroups?limit=50")
+    (groups["data"] || []).each do |g|
+      a = g["attributes"]
+      _, builds = asc.call(:get, "/v1/betaGroups/#{g['id']}/builds?limit=10&sort=-uploadedDate")
+      _, testers = asc.call(:get, "/v1/betaGroups/#{g['id']}/betaTesters?limit=200")
+      UI.message("group \"#{a['name']}\" #{a['isInternalGroup'] ? 'internal' : 'external'} " \
+                 "testers=#{(testers['data'] || []).size} builds=#{(builds['data'] || []).map { |b| b.dig('attributes', 'version') }.join(',')}")
+    end
+    _, recent = asc.call(:get, "/v1/builds?filter[app]=#{app.id}&sort=-uploadedDate&limit=4&include=buildBetaDetail,betaAppReviewSubmission")
+    (recent["data"] || []).each do |b|
+      detail = (recent["included"] || []).find { |i| i["type"] == "buildBetaDetails" && i["id"] == b.dig("relationships", "buildBetaDetail", "data", "id") }
+      review = (recent["included"] || []).find { |i| i["type"] == "betaAppReviewSubmissions" && i["id"] == b.dig("relationships", "betaAppReviewSubmission", "data", "id") }
+      UI.message("build #{b.dig('attributes', 'version')}: internal=#{detail&.dig('attributes', 'internalBuildState')} " \
+                 "external=#{detail&.dig('attributes', 'externalBuildState')} review=#{review&.dig('attributes', 'betaReviewState') || 'none'}")
+    end
+
+    email = ENV["INVITE_EMAIL"].to_s.strip
+    next if email.empty?
+    group = (groups["data"] || []).find { |g| g.dig("attributes", "name") == ENV["INVITE_GROUP"].to_s }
+    UI.user_error!("no group named \"#{ENV['INVITE_GROUP']}\"") unless group
+    code, body = asc.call(:post, "/v1/betaTesters", {
+      data: { type: "betaTesters", attributes: { email: email },
+              relationships: { betaGroups: { data: [{ type: "betaGroups", id: group["id"] }] } } }
+    })
+    UI.message("invite to \"#{group.dig('attributes', 'name')}\": HTTP #{code}")
+    (body["errors"] || []).each { |e| UI.message("  #{e['code']}: #{e['detail']}") }
+    UI.user_error!("invite failed") unless code.start_with?("2")
+  end
+
   desc "Build and sign for the App Store without uploading (proves signing works)"
   lane :signed_build do
     archive

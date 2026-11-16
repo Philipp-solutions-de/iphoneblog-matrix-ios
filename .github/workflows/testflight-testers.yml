@@ -1,0 +1,50 @@
+name: TestFlight testers
+
+# Run by hand on main. Without inputs it only reads: the groups, their builds and testers, and
+# the newest builds' internal, external and Beta App Review states. With an email and a group
+# it adds that person to the group, and Apple mails the invitation (external groups once a
+# build there has passed Beta App Review).
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: "Tester to add (empty: read only)"
+        required: false
+        default: ""
+      group:
+        description: "Exact group name"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  testers:
+    if: github.ref == 'refs/heads/main'
+    environment: apple
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BUNDLE_FROZEN: "true"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+      - name: Groups, builds, and the invite
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          INVITE_EMAIL: ${{ inputs.email }}
+          INVITE_GROUP: ${{ inputs.group }}
+        run: |
+          # The address stays out of the log.
+          if [ -n "$INVITE_EMAIL" ]; then echo "::add-mask::$INVITE_EMAIL"; fi
+          bundle exec fastlane ios testers
