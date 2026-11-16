@@ -58,14 +58,20 @@ question (violence, sexual content, gambling, contests, medical) **none**; no lo
 ## Export compliance
 
 The app uses HTTPS, which is exempt, and ships the Matrix SDK's own cryptography (vodozemac:
-Curve25519, AES, HMAC-SHA-256), standard algorithms not provided by iOS. Answers in App Store
-Connect: uses encryption **yes**; exempt **no**; proprietary **no**; standard algorithms instead
-of or in addition to Apple's **yes**. That needs the French declaration (ANSSI) for France,
-uploaded under App Store Connect → Users and Access… → Export Compliance; Apple then gives a
-code. Set `ITSAppUsesNonExemptEncryption: true` and `ITSEncryptionExportComplianceCode` in
-`project.yml`, so builds no longer ask. US: the mass-market self-classification report (EAR
-740.17(b)(1)) is due once a year by 1 February. **Unverified:** whether BIS still requires it for
-this case.
+Curve25519, Ed25519, AES-256, HMAC-SHA-256, HKDF), standard algorithms not provided by iOS.
+Thorsten's answer (2026-11-16): standard encryption, with the French declaration.
+
+- **France**: the publisher, as supplier, files a "déclaration de fourniture" with ANSSI
+  (online at demarche.numerique.gouv.fr) and uploads ANSSI's attestation in App Store Connect →
+  App Information → App Encryption Documentation. Until it arrives, France stays unticked under
+  Pricing and Availability.
+- **App Store Connect**: "Standard encryption algorithms instead of, or in addition to, using
+  or accessing the encryption within Apple's operating system"; available in France: yes, with
+  the attestation. Apple then gives a key: set `ITSAppUsesNonExemptEncryption: true` and
+  `ITSEncryptionExportComplianceCode` in `project.yml`, so builds no longer ask.
+- **US**: nothing to file. A free mass-market app with standard encryption is 5D992.c, and since
+  BIS's rule of March 2021 it needs no annual self-classification report. **Unverified** for
+  this app until Apple's form has been answered.
 
 ## Review notes and demo account
 
