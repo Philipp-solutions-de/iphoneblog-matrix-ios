@@ -8,23 +8,23 @@ final class RouterTests: XCTestCase {
         XCTAssertEqual(Router().tab, .blog)
     }
 
-    /// From another tab a channel's thread waits until the channel's stack exists.
-    func testOpenThreadFromAnotherTabSelectsChannelAndQueuesThread() {
+    /// A thread opens over its room in #one-Chat, from any tab, so back leads into the room.
+    func testOpenThreadPutsItOverItsRoom() {
         let router = Router()
+        router.tab = .mentions
         router.openThread(roomID: "!a", rootEventID: "$root")
         XCTAssertEqual(router.tab, .chat)
+        XCTAssertEqual(router.chatPath, [.room("!a"), .thread(Router.ThreadRoute(roomID: "!a", rootEventID: "$root"))])
         XCTAssertEqual(router.selectedRoomID, "!a")
-        XCTAssertEqual(router.pendingThread, Router.ThreadRoute(roomID: "!a", rootEventID: "$root"))
-        XCTAssertTrue(router.threadPath.isEmpty)
     }
 
-    /// Inside the open channel the thread opens at once.
-    func testOpenThreadInOpenChannelPushesDirectly() {
+    /// From the Threads list or a search, a thread replaces them.
+    func testThreadFromTheThreadsListReplacesIt() {
         let router = Router()
-        router.openRoom("!a")
-        router.openThread(roomID: "!a", rootEventID: "$root")
-        XCTAssertEqual(router.threadPath, [Router.ThreadRoute(roomID: "!a", rootEventID: "$root")])
-        XCTAssertNil(router.pendingThread)
+        router.openThreadsList()
+        router.openThread(roomID: "!b", rootEventID: "$r")
+        XCTAssertEqual(router.chatPath.first, .room("!b"))
+        XCTAssertFalse(router.chatPath.contains(.threads))
     }
 
     /// A push or link into an article thread opens it in the Blog tab, not in #one-Chat.
@@ -45,7 +45,7 @@ final class RouterTests: XCTestCase {
         router.openRoom("!a")
         router.reset()
         XCTAssertEqual(router.tab, .blog)
-        XCTAssertNil(router.selectedRoomID)
+        XCTAssertTrue(router.chatPath.isEmpty)
         XCTAssertNil(router.blogRoomID)
     }
 }

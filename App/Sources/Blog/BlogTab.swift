@@ -154,8 +154,20 @@ final class BlogWebModel: NSObject, ObservableObject, WKNavigationDelegate, WKUI
         let refresh = UIRefreshControl()
         refresh.addTarget(self, action: #selector(pulled(_:)), for: .valueChanged)
         webView.scrollView.refreshControl = refresh
+        #if DEBUG && targetEnvironment(simulator)
+        if TestGate.cookie() != nil {
+            // Set before the first request, or the first page meets the gate (TestGate.swift).
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if await TestGate.install(in: configuration.websiteDataStore) { log.info("beta test gate cookie set") }
+                webView.load(URLRequest(url: start))
+            }
+            return
+        }
+        #endif
         webView.load(URLRequest(url: start))
     }
+
 
     func retry() {
         phase = .loading

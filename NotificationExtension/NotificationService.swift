@@ -65,7 +65,8 @@ final class NotificationService: UNNotificationServiceExtension {
         if item.roomInfo.isDirect {
             content.title = sender
         } else {
-            content.title = "#\(room)"
+            // One "#" ("#one-Chat" carries its own), and "· Thread" for a thread reply (PushText).
+            content.title = PushText.title(room: room, inThread: item.threadId != nil)
             content.subtitle = sender
         }
         if let threadID = item.threadId {
@@ -80,9 +81,10 @@ final class NotificationService: UNNotificationServiceExtension {
 
     static func text(of type: MessageType) -> String {
         switch type {
-        case .text(let c): c.body
-        case .notice(let c): c.body
-        case .emote(let c): "* \(c.body)"
+        // Plain text on the lock screen: no markdown, links or HTML (PushText).
+        case .text(let c): PushText.plain(body: c.body, formattedBody: html(c.formatted))
+        case .notice(let c): PushText.plain(body: c.body, formattedBody: html(c.formatted))
+        case .emote(let c): "* " + PushText.plain(body: c.body, formattedBody: html(c.formatted))
         case .image(let c): c.caption ?? "Bild"
         case .video: "Video"
         case .audio: "Audio"
@@ -91,5 +93,10 @@ final class NotificationService: UNNotificationServiceExtension {
         case .location: "Standort"
         case .other(_, let body): body
         }
+    }
+
+    private static func html(_ formatted: FormattedBody?) -> String? {
+        guard let formatted, case .html = formatted.format else { return nil }
+        return formatted.body
     }
 }

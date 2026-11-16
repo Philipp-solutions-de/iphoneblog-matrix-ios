@@ -50,7 +50,21 @@ enum GuestAPI {
         let ts: Int64
         let senderName: String
         let body: String
+        /// "m.text", "m.image", …; a picture's or file's body says to see it in the app.
+        let msgtype: String?
+        /// Sanitized on the server with the website's allowlist (ReplyHTML).
+        let formattedBody: String?
+        /// A picture, copied by the server to a public address (EXIF stripped, max 800×600).
+        let media: Media?
+    }
 
+    struct Media: Decodable, Equatable {
+        let url: URL
+        let w: Int?
+        let h: Int?
+        let thumbnailUrl: URL?
+        let thumbnailW: Int?
+        let thumbnailH: Int?
     }
 
     /// The bot's field on every article root event: `de.iphoneblog.article`.

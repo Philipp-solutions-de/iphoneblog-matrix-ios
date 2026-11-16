@@ -30,27 +30,23 @@ struct MainView: View {
                 .tabItem { Label("Blog", systemImage: "doc.richtext") }
                 .tag(Router.Tab.blog)
 
-            OneChatTab(router: router, session: session)
+            // #one-Chat for everyone: the rooms for members, otherwise sign-in or "Nur für
+            // #one-Mitglieder". @Mentions and Ich for members only (Thorsten, 2026-11-16).
+            OneChatGate(router: router, session: session)
                 .tabItem { Label("#one-Chat", systemImage: "number") }
                 .tag(Router.Tab.chat)
-                .badge(chatBadge)
+                .badge(router.chatBadge)
 
-            if let session {
+            if let session, router.isMember {
                 MentionsView(session: session, mentions: session.mentions, router: router)
                     .tabItem { Label("@Mentions", systemImage: "at") }
                     .tag(Router.Tab.mentions)
-                    .badge(session.mentions.unreadCount)
-            }
+                    .badge(router.mentionsBadge)
 
-            Group {
-                if let session {
-                    MeView(session: session, prefs: session.notificationPrefs, router: router)
-                } else {
-                    GuestMeView(router: router)
-                }
+                MeView(session: session, prefs: session.notificationPrefs, router: router)
+                    .tabItem { Label("Ich", systemImage: "person") }
+                    .tag(Router.Tab.me)
             }
-            .tabItem { Label("Ich", systemImage: "person") }
-            .tag(Router.Tab.me)
         }
         .onChange(of: session == nil) { _, signedOut in
             if signedOut, router.tab == .mentions { router.tab = .blog }
@@ -81,8 +77,4 @@ struct MainView: View {
     }
 
     /// #one-Chat counts unread messages in the channel, for members.
-    private var chatBadge: Int {
-        guard let session, session.isOneMember, let channel = session.oneChannelID else { return 0 }
-        return session.rooms.rooms.first { $0.id == channel }?.unreadMessages ?? 0
-    }
 }

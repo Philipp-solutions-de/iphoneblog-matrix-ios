@@ -68,6 +68,9 @@ def main():
     video, size = upload("video.mp4", "video/mp4")
     send({"msgtype": "m.video", "body": "video.mp4", "url": video,
           "info": {"mimetype": "video/mp4", "size": size, "w": 320, "h": 200, "duration": 2000}})
+    gif, size = upload("animation.gif", "image/gif")
+    send({"msgtype": "m.image", "body": "animation.gif", "url": gif,
+          "info": {"mimetype": "image/gif", "size": size, "w": 240, "h": 160}})
     pdf, size = upload("dokument.pdf", "application/pdf")
     send({"msgtype": "m.file", "body": "dokument.pdf", "url": pdf,
           "info": {"mimetype": "application/pdf", "size": size}})

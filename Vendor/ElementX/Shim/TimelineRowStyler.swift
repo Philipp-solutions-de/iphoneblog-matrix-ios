@@ -15,6 +15,9 @@ struct TimelineItemRowStylerView<Content: View>: View {
     @Environment(\.timelineGroupStyle) private var timelineGroupStyle
     @Environment(\.focussedEventID) private var focussedEventID
     @ObservedObject private var uploads = ChatUploadProgress.shared
+    @Environment(\.openURL) private var parentOpenURL
+    /// When a link or mention in this message was last tapped: that tap is not a thread tap.
+    @State private var linkTappedAt: Date?
 
     let timelineItem: EventBasedTimelineItemProtocol
     let adjustedDeliveryStatus: TimelineItemDeliveryStatus?
@@ -103,7 +106,7 @@ struct TimelineItemRowStylerView<Content: View>: View {
                 .font(style.fonts.senderName)
                 .foregroundStyle(style.colors.ink)
                 .lineLimit(1)
-            Text(timelineItem.timestamp.formatted(date: .omitted, time: .shortened))
+            Text(ChatTimeLabel.short(timelineItem.timestamp))
                 .font(style.fonts.time)
                 .foregroundStyle(style.colors.ink3)
         }
@@ -138,6 +141,16 @@ struct TimelineItemRowStylerView<Content: View>: View {
             context.send(viewAction: .displayTimelineItemMenu(itemID: timelineItem.id))
         }
         .onTapGesture { } // keeps the long press working, as in Element X's bubble view
+        // A tap on a message opens its thread, as in Slack, also to start one; inside a thread it
+        // does nothing. The text is a UITextView that keeps taps to itself, so the gesture runs
+        // alongside it; a link or mention it opened (through openURL, recorded here) wins.
+        // Pictures and videos keep their own tap (the preview).
+        .environment(\.openURL, OpenURLAction { url in
+            linkTappedAt = .now
+            parentOpenURL(url)
+            return .handled
+        })
+        .simultaneousGesture(TapGesture().onEnded { openThreadUnlessLink() }, including: isMedia ? .subviews : .all)
         .longPressWithFeedback(isEnabled: !isMessageSelectionActive) {
             context.send(viewAction: .displayTimelineItemMenu(itemID: timelineItem.id))
         }
@@ -150,6 +163,16 @@ struct TimelineItemRowStylerView<Content: View>: View {
         } action: {
             context.send(viewAction: .handleTimelineItemMenuAction(itemID: timelineItem.id,
                                                                    action: .reply(isThread: timelineItem.properties.isThreaded)))
+        }
+    }
+
+    private func openThreadUnlessLink() {
+        guard !context.viewState.timelineKind.isThread, !isMessageSelectionActive,
+              timelineItem.canBeRepliedTo else { return }
+        // The text view reports a link on touch-up too; give it a moment to do so.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            if let linkTappedAt, Date.now.timeIntervalSince(linkTappedAt) < 0.6 { return }
+            context.send(viewAction: .displayThread(itemID: timelineItem.id))
         }
     }
 
@@ -167,7 +190,9 @@ struct TimelineItemRowStylerView<Content: View>: View {
            !context.viewState.timelineKind.isThread,
            let summary = timelineItem.properties.threadSummary,
            case let .loaded(_, sender, latestEventContent, numberOfReplies) = summary {
-            ChatThreadSummary(sender: sender,
+            ChatThreadSummary(roomID: context.viewState.roomID,
+                              rootEventID: timelineItem.id.eventID ?? "",
+                              latestSender: sender,
                               preview: latestEventContent.plainPreview,
                               numberOfReplies: numberOfReplies,
                               mediaProvider: context.mediaProvider) {
@@ -186,8 +211,8 @@ struct TimelineItemRowStylerView<Content: View>: View {
     private var threadRootFooter: some View {
         VStack(alignment: .leading, spacing: 0) {
             Rectangle().fill(style.colors.line).frame(height: 1).padding(.top, 12)
-            // The count the timeline shows, so it always matches the replies below it.
-            Text(ChatKitStrings.replies(threadReplies.count))
+            ThreadRootCount(roomID: context.viewState.roomID, rootEventID: threadRootID ?? "",
+                            loaded: threadReplies.count)
                 .font(style.fonts.dayDivider)
                 .foregroundStyle(style.colors.ink3)
                 .padding(.horizontal, style.metrics.page)
@@ -235,35 +260,81 @@ struct ChatAvatar: View {
     }
 }
 
+// MARK: - Thread root count
+
+/// "90 Antworten" under a thread's first message: the server's count, since the thread timeline
+/// loads replies page by page (it said 20 for a thread of 90 in the perf tests); the loaded
+/// count until the server has answered. Its own view, so only it follows ChatThreadActivity.
+struct ThreadRootCount: View {
+    let roomID: String
+    let rootEventID: String
+    let loaded: Int
+    @ObservedObject private var activity = ChatThreadActivity.shared
+    private var style: ChatKitStyle { ChatKitStyle.current }
+
+    var body: some View {
+        Text(ChatKitStrings.replies(max(loaded, activity.thread(roomID: roomID, rootEventID: rootEventID)?.serverReplies ?? 0)))
+            .onAppear { activity.loadRepliers(roomID: roomID, rootEventID: rootEventID, hint: -1) }
+    }
+}
+
 // MARK: - Thread summary
 
-/// "5 Antworten" under a message: the last replier's avatar, the count in teal, their text after it.
+/// The thread row under a message (Slack's pattern, our colours): up to three repliers, the
+/// count in teal, when the last reply came in grey. Unread replies make it bold with a dot.
 struct ChatThreadSummary: View {
-    let sender: TimelineItemSender
+    let roomID: String
+    let rootEventID: String
+    let latestSender: TimelineItemSender
     let preview: String
     let numberOfReplies: Int
     let mediaProvider: MediaProviderProtocol?
     let action: () -> Void
 
+    @ObservedObject private var activity = ChatThreadActivity.shared
     private var style: ChatKitStyle { ChatKitStyle.current }
+
+    private var thread: ChatThreadActivity.Thread? { activity.thread(roomID: roomID, rootEventID: rootEventID) }
+    /// The server's count once fetched; the timeline's summary and the thread list can be off.
+    private var count: Int { thread?.serverReplies ?? numberOfReplies }
+    private var isUnread: Bool { activity.isUnread(roomID: roomID, rootEventID: rootEventID) }
+    private var repliers: [TimelineItemSender] {
+        let known = thread?.repliers ?? []
+        return Array((known.isEmpty ? [latestSender] : known).prefix(3))
+    }
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                ChatAvatar(sender: sender, size: style.metrics.summaryAvatar, mediaProvider: mediaProvider)
-                Text(ChatKitStrings.replies(numberOfReplies))
-                    .font(style.fonts.threadSummary)
+                HStack(spacing: -6) {
+                    ForEach(repliers, id: \.id) { sender in
+                        ChatAvatar(sender: sender, size: style.metrics.summaryAvatar, mediaProvider: mediaProvider)
+                            .overlay(Circle().stroke(style.colors.background, lineWidth: 1.5))
+                    }
+                }
+                Text(ChatKitStrings.replies(count))
+                    .font(style.fonts.threadSummary.weight(isUnread ? .bold : .semibold))
                     .foregroundStyle(style.colors.accent)
-                Text("· \(sender.displayName ?? sender.id): \(preview)")
-                    .font(style.fonts.threadPreview)
-                    .foregroundStyle(style.colors.ink3)
-                    .lineLimit(1)
+                if let last = thread?.lastReply {
+                    Text(ChatKitStrings.lastReply(last))
+                        .font(style.fonts.threadPreview.weight(isUnread ? .semibold : .regular))
+                        .foregroundStyle(style.colors.ink3)
+                        .lineLimit(1)
+                }
+                if isUnread {
+                    Circle().fill(style.colors.accent).frame(width: 7, height: 7)
+                        .accessibilityLabel(ChatKitStrings.unread)
+                }
+                Spacer(minLength: 0)
             }
             .padding(.vertical, 4)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(ChatKitStrings.replies(numberOfReplies))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("thread-row")
+        .onAppear { activity.loadRepliers(roomID: roomID, rootEventID: rootEventID, hint: numberOfReplies) }
+        .onChange(of: numberOfReplies) { activity.loadRepliers(roomID: roomID, rootEventID: rootEventID, hint: numberOfReplies) }
     }
 }
 
@@ -285,5 +356,27 @@ private extension TimelineEventContent {
         default:
             ""
         }
+    }
+}
+
+/// "14:02" for a message row, formatted once per time: SwiftUI re-renders rows on every view
+/// state change, and Date.formatted builds a formatter each time (perf review, 2026-11-16).
+@MainActor
+enum ChatTimeLabel {
+    private static let formatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter
+    }()
+    private static var cache: [TimeInterval: String] = [:]
+
+    static func short(_ date: Date) -> String {
+        let key = date.timeIntervalSinceReferenceDate.rounded(.down)
+        if let known = cache[key] { return known }
+        if cache.count > 2_000 { cache.removeAll(keepingCapacity: true) }
+        let label = formatter.string(from: date)
+        cache[key] = label
+        return label
     }
 }

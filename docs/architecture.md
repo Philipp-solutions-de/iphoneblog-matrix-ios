@@ -71,8 +71,14 @@ A tap opens the channel or the thread. Unencrypted rooms make this simple: no ke
 with the extension. Apple's notification-filtering entitlement is requested for Alex's
 account so the extension may drop pushes it cannot show.
 
-**Four tabs, the blog as the front page.** Blog, #one-Chat, @Mentions (signed in only), Ich,
-as in the approved previews; every visual value lives in `App/Sources/Theme.swift`, light and
+**Four tabs for members, two for everyone else; the blog as the front page.** #one members see
+Blog, #one-Chat, @Mentions and Ich. Everyone else sees Blog and #one-Chat: signed out, a neutral
+sign-in ("Der Chat für #one-Mitglieder", Anmelden); signed in without #one, "Nur für
+#one-Mitglieder" with Abmelden and Konto löschen (App Store 5.1.1(v), since they have no Ich).
+No price, no way to buy, no hint where to get #one; they read discussions without writing
+(Thorsten, 2026-11-16). The tabs follow membership as it changes (`Router.isMember`). For
+members, #one-Chat lists the #one rooms (`GET /_iphoneblog/v1/rooms`, else the space #one's
+children) with Threads on top. every visual value lives in `App/Sources/Theme.swift`, light and
 dark by the system. The Blog tab is a `WKWebView` on WordPress's app view (`?app=1`, which
 drops banner, header, menu and footer), not native article cards: the blog renders articles,
 paywall included, exactly as the site does, and the app adds only the discussion. The web
@@ -95,11 +101,45 @@ replies). An article nobody has opened yet shows "Noch keine Antworten" and "Anm
 mitzudiskutieren", never an empty screen; links.json lists a new thread within a minute.
 #one members get the conversation views and write in the thread; the reply count under the
 thread's first message counts the live replies, so the header shows the file's count to
-readers only (it lags by up to a minute). Readers see each reply's `body` with its markdown
-(bold, italic, code, links) and every address linked (`ReplyText`); the files carry no
-pictures, files or reply quotes yet. `scripts/build.sh ui` drives this path in the simulator
+readers only (it lags by up to a minute). Readers see each reply's `formatted_body`, which
+the server sanitizes with the website's allowlist (`ReplyHTML`, no WebKit), or else its
+`body` with its markdown and every address linked (`ReplyText`), and a picture from `media`
+(the server's public copy, EXIF stripped; a tap opens the full size). Files and videos show
+their body text ("in der App zu sehen"); reply quotes and link previews are not in the files. `scripts/build.sh ui` drives this path in the simulator
 against `scripts/blog-fixture-server.py`, and `RichMessagesUITests` checks formatting, links,
 replies, pictures, video, files and the composer against the test homeserver.
+
+**Threads work as in Slack.** Under a message with replies, a row shows up to three repliers,
+"n Antworten" in teal and when the last reply came; unread replies make it bold with a dot. A
+tap on a message opens its thread, also to start one (links, mentions and pictures keep their
+own tap), and the long-press menu offers "Im Thread antworten" first. "Threads" at the top of
+#one-Chat lists the threads you started or wrote in, newest first, with a count of those with
+news; it sits there, beside the channel as in Slack, so @Mentions stays the list of people who
+named you. Counts come from the server's thread relations (`ChatThreadActivity`): the SDK's
+timeline summary and thread list counted 3 and 9 for a thread with 6 replies. Unread is per
+device (`ChatThreadSeen`). Not built: "Auch an #one-Chat senden" (Matrix has no event that is
+both a thread reply and a channel message; it would take two events), push for replies in
+threads you are in without a mention (Synapse sends none), and thread rows in the Blog tab,
+which shows the website.
+
+**No direct messages.** The app offers no way to start one (a tap on a person opens nothing),
+and direct rooms stay out of #one-Chat, Threads and @Mentions; the server refuses to create
+them (Thorsten, 2026-11-16).
+
+**Search is Matrix's own.** The magnifier in #one-Chat sends `POST /_matrix/client/v3/search`
+(room_events, filtered to the channel, newest first, `next_batch` paging); the rooms are
+unencrypted, so Synapse can read them, and there is no index of our own. A hit shows sender,
+time and the words marked; a thread reply opens its thread, a channel message scrolls the
+channel to it (`ChatKitSession.focus`, Element X's focus on an event). Synapse stems in English
+only, hard-coded in its source, so German inflections may not match; the empty state suggests
+the word stem. @Mentions filters its loaded list on the device.
+
+**Tab badges come from the server's counts.** The SDK counts a room's unread mentions in the
+last few events it holds, so a mention with six or more messages after it dropped out. A room's
+mention count is the larger of the SDK's and the server's notification list (the one @Mentions
+reads); `ChatSession` puts the #one-Chat and @Mentions badges on `Router`, which `MainView`
+observes (before, the @Mentions badge never appeared). iOS 26's tab bar does not expose badges
+to accessibility, so the sign-in test checks the counts and `BadgesUITests` keeps a screenshot.
 
 **Members read #one articles in the Blog tab.** Once the page shows a blog page, a signed-in
 app asks WordPress for a one-time sign-in address (`POST /wp-json/iphoneblog/v1/chat/web-login`
@@ -131,7 +171,7 @@ That code is AGPL-3.0, so this app is AGPL-3.0 too; the repository is public, as
 | Timeline | `Timeline`: pagination, local echo, send queue, edits, reactions, receipts | `Screens/Timeline` (cells, list, reactions, replies, thread summaries), `Services/Timeline` (SDK wrapper, view items) | adapters, our colours and type, cells we do not want removed |
 | Threads | thread focus, `ThreadListService`, thread subscriptions | `Screens/ThreadTimelineScreen`, `Screens/RoomThreadListScreen` | the article discussions and the threads in #one-Chat |
 | Composer | send queue, replies, edits, `Mentions`, markdown to HTML, media upload | the composer, its formatting toolbar (+ › Textformatierung) and mention suggestions from `Screens/RoomScreen`, `Other/Pills` | no polls, no voice messages |
-| Media | thumbnails, files, upload with progress | `Screens/FilePreviewScreen`, `Screens/MediaPickerScreen`, `Screens/MediaUploadPreviewScreen`; link previews through Apple's `LPMetadataProvider` (the phone fetches the page, not Synapse's preview_url) | the upload progress bar under a sending photo, video or file (`Shim/ChatUploadProgress.swift`) |
+| Media | thumbnails, files, upload with progress | `Screens/FilePreviewScreen`, `Screens/MediaPickerScreen`, `Screens/MediaUploadPreviewScreen`; link previews through Apple's `LPMetadataProvider` (the phone fetches the page, not Synapse's preview_url) | the upload progress bar under a sending photo, video or file (`Shim/ChatUploadProgress.swift`); animated GIFs play from the original and go out unchanged (Element X), with Reduce Motion as their first frame (patch) |
 | Design system | | `compound-ios` (needed by the views), recoloured through its override API | our tokens: teal, coral, greys; teal for all content, coral only for #one and sign-in (the colour rule in `App/Sources/Theme.swift`; it overrides the coral badges and mentions in `design/screens.html`) |
 | Push | `NotificationClient` | | extension text, pusher registration, tap routing |
 | Sign-in | OAuth 2.0, PKCE, dynamic registration | | one button, `ASWebAuthenticationSession` |

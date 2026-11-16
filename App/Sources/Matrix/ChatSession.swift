@@ -21,11 +21,27 @@ final class ChatSession: ObservableObject, ChatHost {
     @Published private(set) var syncState: SyncServiceState = .idle
     @Published private(set) var displayName: String?
 
-    /// #one-Chat's one channel (#allgemein, a child of the space #one).
+    /// #one-Chat's first room ("Allgemein"); the push-rule mode is read from it.
     @Published private(set) var oneChannelID: String?
+    /// The #one rooms in their order, from the server's list (GET /_iphoneblog/v1/rooms,
+    /// 2026-11-14_interfaces.md "The #one rooms"), else from the space #one's children.
+    /// A non-member gets them locked: listed, not opened.
+    @Published private(set) var oneRooms: [OneRoom] = []
+    struct OneRoom: Identifiable, Equatable {
+        let id: String
+        var name: String
+        var topic: String?
+        var locked: Bool
+    }
+    /// The space's children in the order the space lists them (the fallback's order).
+    private var spaceOrder: [String] = []
     private var oneRoomID: String?
     private var membershipWatch: AnyCancellable?
     private var membershipTimer: Task<Void, Never>?
+    private var badgeWatch: AnyCancellable?
+    /// Called when the server refuses the token on one of our own calls (AppModel signs out).
+    var onAuthLost: (() -> Void)?
+    private var membershipRetry: Task<Void, Never>?
 
     private var syncService: SyncService?
     private var stateHandle: TaskHandle?
@@ -51,7 +67,12 @@ final class ChatSession: ObservableObject, ChatHost {
             let service = try await client.syncService().finish()
             syncService = service
             stateHandle = service.state(listener: SyncStateObserver { [weak self] state in
-                Task { @MainActor in self?.syncState = state }
+                Task { @MainActor in
+                    self?.syncState = state
+                    // A sync that fails may have lost its token: ask the server who we are; a
+                    // 401 M_UNKNOWN_TOKEN there ends the session (api(), onAuthLost).
+                    if case .error = state { _ = try? await self?.api("GET", "/_matrix/client/v3/account/whoami") }
+                }
             })
             try await rooms.attach(to: service.roomListService())
         }
@@ -82,11 +103,34 @@ final class ChatSession: ObservableObject, ChatHost {
         oneRoomID = await resolve(Self.alias("IPHONEBLOG_ONE_ALIAS", Brand.oneRoomAlias))?.roomId
         oneChannelID = await resolve(Self.alias("IPHONEBLOG_CHANNEL_ALIAS", Brand.oneChannelAlias))?.roomId
         await refreshMembership()
+        // The space may not have synced yet at this first look, and the room list may then go
+        // quiet: look again a few times soon, rather than waiting for the 5-minute timer.
+        membershipRetry = Task { [weak self] in
+            for delay in [2, 5, 10, 20, 40] {
+                try? await Task.sleep(for: .seconds(delay))
+                guard let self, !Task.isCancelled, !self.isOneMember else { return }
+                await self.refreshMembership()
+            }
+        }
         // The bot invites and removes; every change in the room list is a moment to look again,
         // and a slow timer catches an invite that arrives while nothing else moves.
         membershipWatch = rooms.$rooms
             .debounce(for: .seconds(2), scheduler: RunLoop.main)
             .sink { [weak self] _ in Task { await self?.refreshMembership() } }
+        // The tab badges and each room's mention count follow the room list and @Mentions.
+        badgeWatch = rooms.$rooms.combineLatest(mentions.$items, $isOneMember)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] rooms, items, member in
+                guard let self else { return }
+                let byRoom = items.filter(\.unread).reduce(into: [String: Int]()) { $0[$1.roomID, default: 0] += 1 }
+                self.rooms.serverMentions = byRoom
+                // Every #one room counts towards the #one-Chat badge.
+                let channels = self.rooms.channelIDs
+                let chat = member ? rooms.filter { channels.contains($0.id) }.reduce(0) { $0 + $1.unreadMessages } : 0
+                let unread = items.filter(\.unread).count
+                if router.chatBadge != chat { router.chatBadge = chat }
+                if router.mentionsBadge != unread { router.mentionsBadge = unread }
+            }
         membershipTimer = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(300))
@@ -113,16 +157,45 @@ final class ChatSession: ObservableObject, ChatHost {
             return
         }
         var children: Set<String> = []
+        var order: [String] = []
         if let list = try? await client.spaceService().spaceRoomList(spaceId: one) {
             try? await list.paginate()
             for child in await list.rooms() {
                 children.insert(child.roomId)
+                order.append(child.roomId)
                 if child.state == .invited || child.state == nil {
                     _ = try? await client.joinRoomById(roomId: child.roomId)
                 }
             }
         }
+        spaceOrder = order
         setMembership(true, channels: children)
+    }
+
+    /// Fetches the #one room list (names, order, locked for non-members); without the server's
+    /// endpoint (the test server), the space's children as the joined rooms name them.
+    func loadOneRooms() async {
+        struct Response: Decodable {
+            struct Room: Decodable {
+                let room_id: String // swiftlint:disable:this identifier_name
+                let name: String
+                let topic: String?
+                let locked: Bool?
+            }
+            let rooms: [Room]
+        }
+        if let data = try? await api("GET", "/_iphoneblog/v1/rooms"),
+           let response = try? JSONDecoder().decode(Response.self, from: data) {
+            let list = response.rooms.map { OneRoom(id: $0.room_id, name: $0.name, topic: $0.topic, locked: $0.locked ?? !isOneMember) }
+            if list != oneRooms { oneRooms = list }
+            return
+        }
+        let ids = spaceOrder.isEmpty ? rooms.channelIDs.sorted() : spaceOrder
+        let list = ids.map { id in
+            OneRoom(id: id, name: rooms.rooms.first { $0.id == id }?.name ?? ((try? client.getRoom(roomId: id))?.displayName() ?? id),
+                    topic: nil, locked: !isOneMember)
+        }
+        if list != oneRooms { oneRooms = list }
     }
 
     private func setMembership(_ member: Bool, channels: Set<String>) {
@@ -131,6 +204,7 @@ final class ChatSession: ObservableObject, ChatHost {
             if let first = channels.sorted().first { oneChannelID = first }
         }
         if member != isOneMember { isOneMember = member }
+        if router.isMember != member { router.isMember = member }
         if rooms.channelIDs != channels { rooms.channelIDs = channels }
     }
 
@@ -152,7 +226,10 @@ final class ChatSession: ObservableObject, ChatHost {
         return fallback
     }
 
-    deinit { membershipTimer?.cancel() }
+    deinit {
+        membershipTimer?.cancel()
+        membershipRetry?.cancel()
+    }
 
     func stop() async {
         await syncService?.stop()
@@ -227,6 +304,10 @@ final class ChatSession: ObservableObject, ChatHost {
         }
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            if (response as? HTTPURLResponse)?.statusCode == 401,
+               String(data: data.prefix(300), encoding: .utf8)?.contains("M_UNKNOWN_TOKEN") == true {
+                onAuthLost?()
+            }
             throw URLError(.badServerResponse)
         }
         return data

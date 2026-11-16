@@ -53,6 +53,13 @@ run() {
     return "$status"
 }
 
+# The app's own settings live in its data container (no simctl command reaches them).
+clear_app_settings() {
+    local data
+    data="$(xcrun simctl get_app_container "$device" de.iphoneblog.matrix.preview data 2>/dev/null)" || return 0
+    rm -f "${data:?}/Library/Preferences/de.iphoneblog.matrix.preview.plist"
+}
+
 case "$action" in
     build)
         run build "${common[@]}" -scheme iphoneblog -destination 'generic/platform=iOS Simulator' build
@@ -63,6 +70,12 @@ case "$action" in
         ;;
     integration)
         [[ -n "$device" ]] || { echo "build.sh: no iPhone simulator" >&2; exit 1; }
+        # A session from an earlier test server survives in the simulator's keychain, even an
+        # uninstall, and its token is dead on a fresh server.
+        xcrun simctl keychain "$device" reset 2>/dev/null || true
+        # And the app's settings: every fresh test server has the same @tester, whose "Neue
+        # Artikel" rule the app would remember as seeded.
+        clear_app_settings
         # xcodebuild hands TEST_RUNNER_<NAME> to the test process as <NAME>.
         export TEST_RUNNER_IPHONEBLOG_TEST_HOMESERVER="${IPHONEBLOG_TEST_HOMESERVER:?}"
         export TEST_RUNNER_IPHONEBLOG_TEST_USER="${IPHONEBLOG_TEST_USER:?}"
@@ -78,6 +91,10 @@ case "$action" in
         # The reader's way from the blog into a discussion and back. Starts the blog fixture;
         # the member test also runs when IPHONEBLOG_TEST_* name a test homeserver.
         [[ -n "$device" ]] || { echo "build.sh: no iPhone simulator" >&2; exit 1; }
+        xcrun simctl keychain "$device" reset 2>/dev/null || true # as for integration
+        # An animated GIF in the photo library, for the test that sends one (GifUITests).
+        xcrun simctl addmedia "$device" scripts/fixtures/animation.gif 2>/dev/null || true
+        clear_app_settings
         if curl -s -o /dev/null http://127.0.0.1:8793/calls; then
             echo "build.sh: port 8793 is taken; stop the old fixture server first" >&2; exit 1
         fi
@@ -86,7 +103,7 @@ case "$action" in
         trap 'kill "$fixture" 2>/dev/null' EXIT
         sleep 1
         export TEST_RUNNER_IPHONEBLOG_FIXTURE="http://127.0.0.1:8793"
-        for name in TEST_HOMESERVER TEST_USER TEST_PASSWORD ONE_ALIAS BLOG_ALIAS CHANNEL_ALIAS TEST_CHANNEL_ROOM TEST_ARTICLE_ROOT; do
+        for name in TEST_HOMESERVER TEST_USER TEST_PASSWORD TEST_USER2 TEST_PASSWORD2 ONE_ALIAS BLOG_ALIAS CHANNEL_ALIAS TEST_CHANNEL_ROOM TEST_CHANNEL_THREAD TEST_ARTICLE_ROOT; do
             var="IPHONEBLOG_$name"
             [[ -n "${!var:-}" ]] && export "TEST_RUNNER_$var=${!var}"
         done

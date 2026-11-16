@@ -10,8 +10,8 @@ import OSLog
 final class MentionsModel: ObservableObject {
     struct Mention: Identifiable, Equatable {
         enum Place: Equatable {
-            /// The #one-Chat channel; `thread` when it was said in a thread.
-            case channel(roomID: String, threadRoot: String?)
+            /// A #one room, by its name; `threadRoot` when it was said in a thread.
+            case channel(roomID: String, threadRoot: String?, name: String?)
             /// The discussion under an article.
             case discussion(rootEventID: String, title: String?)
             /// Anywhere else the account is joined.
@@ -19,6 +19,8 @@ final class MentionsModel: ObservableObject {
         }
 
         let id: String
+        /// The room it was said in, whatever the place.
+        let roomID: String
         let place: Place
         let senderID: String
         var senderName: String
@@ -40,7 +42,11 @@ final class MentionsModel: ObservableObject {
     /// Loads now and again whenever the room list moves (a new message, a read receipt).
     func attach(to session: ChatSession) {
         self.session = session
+        // Only when a room's unread counts move: a new message or a read receipt, not every
+        // room-list update (perf review, 2026-11-16).
         watch = session.rooms.$rooms
+            .map { rooms in rooms.map { "\($0.id):\($0.unreadMessages):\($0.sdkMentions)" } }
+            .removeDuplicates()
             .debounce(for: .seconds(1.5), scheduler: RunLoop.main)
             .sink { [weak self] _ in self?.reload() }
         reload()
@@ -73,21 +79,34 @@ final class MentionsModel: ObservableObject {
     private func mention(from entry: NotificationPage.Entry, session: ChatSession) async -> Mention? {
         let event = entry.event
         guard event.sender != session.userID, let body = event.content?.body else { return nil }
+        // No direct messages in this app (Thorsten, 2026-11-16): a mention in one stays out.
+        if session.rooms.rooms.first(where: { $0.id == entry.roomId })?.isDirect == true { return nil }
         let thread = event.content?.relatesTo?.relType == "m.thread" ? event.content?.relatesTo?.eventId : nil
         let place: Mention.Place
         if entry.roomId == session.blogRoomID {
             guard let root = thread else { return nil }
-            let title = try? await DiscussionStore.shared.thread(root).root.title
+            let title = await threadTitle(root)
             place = .discussion(rootEventID: root, title: title)
-        } else if entry.roomId == session.oneChannelID {
-            place = .channel(roomID: entry.roomId, threadRoot: thread)
+        } else if session.rooms.channelIDs.contains(entry.roomId) {
+            let name = session.oneRooms.first { $0.id == entry.roomId }?.name
+                ?? session.rooms.rooms.first { $0.id == entry.roomId }?.name
+            place = .channel(roomID: entry.roomId, threadRoot: thread, name: name)
         } else {
             place = .room(roomID: entry.roomId, name: try? session.client.getRoom(roomId: entry.roomId)?.displayName())
         }
-        return Mention(id: event.eventId, place: place, senderID: event.sender,
+        return Mention(id: event.eventId, roomID: entry.roomId, place: place, senderID: event.sender,
                        senderName: await name(of: event.sender, session: session),
                        body: body, date: Date(milliseconds: event.originServerTs ?? entry.ts),
                        unread: !entry.read)
+    }
+
+    /// An article's title by its thread root, fetched once per app run.
+    private var titles: [String: String] = [:]
+    private func threadTitle(_ root: String) async -> String? {
+        if let known = titles[root] { return known }
+        guard let title = try? await DiscussionStore.shared.thread(root).root.title else { return nil }
+        titles[root] = title
+        return title
     }
 
     private func name(of userID: String, session: ChatSession) async -> String {
@@ -159,7 +178,9 @@ final class NotificationPrefs: ObservableObject {
     /// An override rule: in the Blog room, an event that carries an article (only the bot posts
     /// those, 2026-11-14_interfaces.md). Replies there stay quiet unless they mention me.
     static let articleRuleID = "de.iphoneblog.new_articles"
-    private static let articleRuleSeeded = "articleRuleSeeded"
+    /// Per account: the device-wide flag left a second account on the same phone without the
+    /// rule (it stayed "seeded" from the first).
+    private static func articleRuleSeeded(_ userID: String) -> String { "articleRuleSeeded.\(userID)" }
 
     private weak var session: ChatSession?
     private let log = Logger(subsystem: Brand.bundleID, category: "push-rules")
@@ -179,9 +200,15 @@ final class NotificationPrefs: ObservableObject {
                 try? await settings.setRoomNotificationMode(roomId: blog, mode: .mentionsAndKeywordsOnly)
             }
             // New articles ring by default, once; after that the switch decides.
-            if !UserDefaults.standard.bool(forKey: Self.articleRuleSeeded) {
+            // Builds up to 72 kept one flag for the device; it counts for the account signed in now,
+            // so a switch someone turned off stays off.
+            if UserDefaults.standard.bool(forKey: "articleRuleSeeded") {
+                UserDefaults.standard.set(true, forKey: Self.articleRuleSeeded(session.userID))
+                UserDefaults.standard.removeObject(forKey: "articleRuleSeeded")
+            }
+            if !UserDefaults.standard.bool(forKey: Self.articleRuleSeeded(session.userID)) {
                 if (try? await putArticleRule(blogRoomID: blog, session: session)) != nil {
-                    UserDefaults.standard.set(true, forKey: Self.articleRuleSeeded)
+                    UserDefaults.standard.set(true, forKey: Self.articleRuleSeeded(session.userID))
                 }
             }
         }
@@ -231,7 +258,9 @@ final class NotificationPrefs: ObservableObject {
     }
 
     func setChannel(_ mode: ChannelMode) {
-        guard let session, let channelID = session.oneChannelID else { return }
+        // One switch for the whole #one-Chat area: every #one room gets the mode.
+        guard let session, !session.rooms.channelIDs.isEmpty else { return }
+        let channelIDs = session.rooms.channelIDs
         channel = mode
         Task {
             let settings = await session.client.getNotificationSettings()
@@ -241,7 +270,9 @@ final class NotificationPrefs: ObservableObject {
             case .mute: .mute
             }
             do {
-                try await settings.setRoomNotificationMode(roomId: channelID, mode: sdkMode)
+                for channelID in channelIDs {
+                    try await settings.setRoomNotificationMode(roomId: channelID, mode: sdkMode)
+                }
             } catch {
                 log.error("channel mode failed: \(error.localizedDescription, privacy: .public)")
                 await load()

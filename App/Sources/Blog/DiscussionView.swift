@@ -70,14 +70,18 @@ struct DiscussionView: View {
         case .loading:
             ProgressView().frame(maxHeight: .infinity)
         case .signInToStart:
-            ContentUnavailableView {
-                Label("Noch keine Antworten", systemImage: "bubble.left.and.bubble.right")
-            } description: {
-                Text("Anmelden, um mitzudiskutieren.")
-            } actions: {
-                Button("Anmelden") { router.showSignIn = true }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.coralButton)
+            if session == nil {
+                ContentUnavailableView {
+                    Label("Noch keine Antworten", systemImage: "bubble.left.and.bubble.right")
+                } description: {
+                    Text("Anmelden, um mitzudiskutieren.")
+                } actions: {
+                    Button("Anmelden") { router.showSignIn = true }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.coralButton)
+                }
+            } else {
+                ContentUnavailableView("Noch keine Antworten", systemImage: "bubble.left.and.bubble.right")
             }
         case .unavailable:
             ContentUnavailableView {
@@ -103,7 +107,8 @@ struct DiscussionView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(page?.replies ?? [], id: \.eventId) { reply in
-                    ReplyRow(name: reply.senderName, date: Date(milliseconds: reply.ts), text: reply.body)
+                    ReplyRow(name: reply.senderName, date: Date(milliseconds: reply.ts), text: reply.body, html: reply.formattedBody,
+                             media: reply.media) { router.presentedURL = $0 }
                 }
                 if page?.replies.isEmpty ?? true {
                     Text("Noch keine Antworten.")
@@ -117,9 +122,12 @@ struct DiscussionView: View {
             .padding(.bottom, 180)
         }
         .overlay(alignment: .bottom) {
-            ReaderPanel(signedIn: session != nil, router: router)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 12)
+            // Read-only for everyone but #one members; signed out, a way to sign in.
+            if session == nil {
+                ReaderPanel(router: router)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
+            }
         }
     }
 
@@ -131,7 +139,9 @@ struct DiscussionView: View {
         switch route {
         case .article(let url):
             do {
-                rootEventID = try await store.rootEventID(for: url, token: session.flatMap { try? $0.client.session().accessToken })
+                // Only a member's tap makes a thread; everyone else reads the existing ones.
+                let token = isMember ? session.flatMap { try? $0.client.session().accessToken } : nil
+                rootEventID = try await store.rootEventID(for: url, token: token)
             } catch {
                 // Not "no discussion", which would be wrong and final: try again.
                 state = .unavailable
@@ -156,11 +166,46 @@ struct DiscussionView: View {
     }
 }
 
-/// One reply: round initials, name, time, text (preview 2b).
+/// A reply's picture for readers: the server's thumbnail at its own proportions, at most the
+/// chat's media width; a tap opens the full picture.
+struct ReplyPicture: View {
+    let media: GuestAPI.Media
+    let label: String
+    let action: () -> Void
+
+    private var ratio: CGFloat {
+        let w = media.thumbnailW ?? media.w ?? 4, h = media.thumbnailH ?? media.h ?? 3
+        return CGFloat(max(w, 1)) / CGFloat(max(h, 1))
+    }
+
+    var body: some View {
+        Button(action: action) {
+            AsyncImage(url: media.thumbnailUrl ?? media.url) { phase in
+                if let image = phase.image {
+                    image.resizable().scaledToFill()
+                } else {
+                    Theme.surface
+                }
+            }
+            .aspectRatio(ratio, contentMode: .fit)
+            .frame(maxWidth: Theme.Chat.mediaWidth, alignment: .leading)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Size.corner, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 4)
+        .accessibilityLabel(label)
+    }
+}
+
+/// One reply: round initials, name, time, text or picture (preview 2b).
 struct ReplyRow: View {
     let name: String
     let date: Date
     let text: String
+    var html: String?
+    var media: GuestAPI.Media?
+    /// Opens the full picture.
+    var open: (URL) -> Void = { _ in }
 
     var body: some View {
         HStack(alignment: .top, spacing: Theme.Space.rowGap) {
@@ -170,8 +215,12 @@ struct ReplyRow: View {
                     Text(name).font(Theme.Font.name).foregroundStyle(Theme.ink)
                     Text(ReplyRow.format(date)).font(Theme.Font.time).foregroundStyle(Theme.ink3)
                 }
-                Text(ReplyText.attributed(text)).font(Theme.Font.body).foregroundStyle(Theme.ink2)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let media {
+                    ReplyPicture(media: media, label: text) { open(media.url) }
+                } else {
+                    Text(ReplyText.attributed(body: text, formattedBody: html)).font(Theme.Font.body).foregroundStyle(Theme.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
         .padding(.horizontal, Theme.Space.page)
@@ -192,36 +241,16 @@ struct ReplyRow: View {
     }
 }
 
-/// "Mitlesen kann jeder. Mitschreiben können Mitglieder von #one." with the way in.
+/// Under a read-only discussion, signed out: "Anmelden".
 struct ReaderPanel: View {
-    let signedIn: Bool
     @ObservedObject var router: Router
 
+    /// Signed out: the one way in. No #one pitch (Thorsten, 2026-11-16).
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "lock").foregroundStyle(Theme.ink3)
-                (Text("Mitlesen kann jeder. Mitschreiben können Mitglieder von ")
-                 + Text("#one").foregroundStyle(Theme.coral).fontWeight(.semibold)
-                 + Text("."))
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.ink2)
-            }
-            HStack(spacing: 10) {
-                if !signedIn {
-                    Button { router.showSignIn = true } label: {
-                        Text("Anmelden").frame(maxWidth: .infinity, minHeight: Theme.Size.smallButtonHeight)
-                    }
-                    .buttonStyle(FilledButton(fill: Theme.coralButton))
-                }
-                Button {
-                    if let url = URL(string: Brand.oneOfferURL) { router.presentedURL = url }
-                } label: {
-                    Text("#one werden").frame(maxWidth: .infinity, minHeight: Theme.Size.smallButtonHeight)
-                }
-                .buttonStyle(OutlineButton(stroke: Theme.coral, text: Theme.coralText))
-            }
+        Button { router.showSignIn = true } label: {
+            Text("Anmelden").frame(maxWidth: .infinity, minHeight: Theme.Size.smallButtonHeight)
         }
+        .buttonStyle(FilledButton(fill: Theme.coralButton))
         .padding(16)
         .background(Theme.panel, in: RoundedRectangle(cornerRadius: Theme.Size.panelCorner))
         .overlay(RoundedRectangle(cornerRadius: Theme.Size.panelCorner).stroke(Theme.line))

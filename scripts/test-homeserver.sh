@@ -86,10 +86,13 @@ for name in "${rooms[@]}"; do
 done
 
 # As on the real server (2026-11-14_interfaces.md, "Matrix Blog feed"): #one is a space whose
-# children are the #one-Chat channels; the tester is a member, Allgemein its child.
+# children are the #one rooms (Allgemein, Raum 2, as on the live server); the tester is a member.
 one="$(create "$token" '{"name":"#one","preset":"private_chat","room_alias_name":"one","creation_content":{"type":"m.space"}}')"
 curl -fs -X PUT "$url/_matrix/client/v3/rooms/$one/state/m.space.child/$allgemein" \
-    -H "Authorization: Bearer $token" -d '{"via":["localhost"]}' >/dev/null
+    -H "Authorization: Bearer $token" -d '{"via":["localhost"],"order":"a"}' >/dev/null
+raum2="$(create "$token" '{"name":"Raum 2","preset":"public_chat"}')"
+curl -fs -X PUT "$url/_matrix/client/v3/rooms/$one/state/m.space.child/$raum2" \
+    -H "Authorization: Bearer $token" -d '{"via":["localhost"],"order":"b"}' >/dev/null
 
 curl -fs -X POST "$url/_matrix/client/v3/join/$allgemein" -H "Authorization: Bearer $writer" -d '{}' >/dev/null
 send() { # room, txn, json
@@ -99,12 +102,31 @@ send() { # room, txn, json
 send "$allgemein" t1 '{"msgtype":"m.text","body":"Hallo zusammen"}' >/dev/null
 hello="$(send "$allgemein" t1b '{"msgtype":"m.text","body":"Hat jemand schon das neue iPad mini im Alltag?"}')"
 send "$allgemein" t1c "{\"msgtype\":\"m.text\",\"body\":\"Ja, seit einer Woche. Der Dock-Adapter passt.\",\"m.relates_to\":{\"rel_type\":\"m.thread\",\"event_id\":\"$hello\"}}" >/dev/null
-# One message of every rich kind (formatting, link, reply, image, video, file) in Allgemein,
-# before the mention: the SDK counts a room's unread mentions from its last few events only,
-# and six messages after the mention made the sign-in test count 0 (an open bug: a busy
-# channel can hide a mention's badge).
-python3 "$here/scripts/test-rich-messages.py" "$url" "$writer" "$allgemein"
+# A busy thread for the thread row: five more replies from three people (Tests/UITests/ThreadsUITests).
+reader_password="$(openssl rand -hex 16)"
+run register_new_matrix_user -c homeserver.yaml -u anna -p "$reader_password" --no-admin "$url" >/dev/null
+anna="$(login anna "$reader_password")"
+curl -fs -X PUT "$url/_matrix/client/v3/profile/@anna:localhost/displayname" -H "Authorization: Bearer $anna" \
+    -d '{"displayname":"Anna K."}' >/dev/null
+curl -fs -X POST "$url/_matrix/client/v3/join/$allgemein" -H "Authorization: Bearer $anna" -d '{}' >/dev/null
+reply() { # token, txn, text
+    curl -fs -X PUT "$url/_matrix/client/v3/rooms/$allgemein/send/m.room.message/$2" -H "Authorization: Bearer $1" \
+        -d "{\"msgtype\":\"m.text\",\"body\":\"$3\",\"m.relates_to\":{\"rel_type\":\"m.thread\",\"event_id\":\"$hello\"}}" >/dev/null
+}
+reply "$anna" r1 "Ich warte noch auf das Cellular-Modell."
+reply "$writer" r2 "Das kommt laut Gerüchten im Frühjahr."
+reply "$token" r3 "Ich nutze meins vor allem zum Lesen."
+reply "$anna" r4 "Mit welcher App liest du?"
+reply "$writer" r5 "Bei mir sind es Comics in Panels."
 send "$allgemein" t2 "{\"msgtype\":\"m.text\",\"body\":\"tester: schau mal\",\"m.mentions\":{\"user_ids\":[\"@$user:localhost\"]}}" >/dev/null
+# A busy channel: ten messages and the rich set (six) after the mention. The SDK alone loses a mention behind six;
+# the sign-in test and BadgesUITests check that it still counts (RoomListModel, ChatSession).
+for n in $(seq 1 10); do
+    send "$allgemein" "busy$n" "{\"msgtype\":\"m.text\",\"body\":\"Nachricht $n im vollen Kanal\"}" >/dev/null
+done
+# Then one message of every rich kind (formatting, link, reply, image, video, file), last in
+# Allgemein where Tests/UITests/RichMessagesUITests.swift looks for them.
+python3 "$here/scripts/test-rich-messages.py" "$url" "$writer" "$allgemein"
 
 # The Blog room: the writer plays the article bot, one article root with the bot's field and a
 # reply in its thread. The app joins it by itself (public).
@@ -120,7 +142,9 @@ cat > "$here/build/test-homeserver.env" <<EOF
 IPHONEBLOG_TEST_HOMESERVER=$url
 IPHONEBLOG_TEST_USER=$user
 IPHONEBLOG_TEST_PASSWORD=$password
-IPHONEBLOG_TEST_ROOMS=$(IFS=,; echo "${rooms[*]}")
+IPHONEBLOG_TEST_USER2=anna
+IPHONEBLOG_TEST_PASSWORD2=$reader_password
+IPHONEBLOG_TEST_ROOMS='$(IFS=,; echo "${rooms[*]}")'
 IPHONEBLOG_TEST_MENTION_ROOM=Allgemein
 IPHONEBLOG_ONE_ALIAS=#one:localhost
 IPHONEBLOG_BLOG_ALIAS=#blog:localhost
