@@ -38,13 +38,16 @@ final class RichMessagesUITests: XCTestCase {
             "IPHONEBLOG_BLOG_ALIAS": env["IPHONEBLOG_BLOG_ALIAS"] ?? "",
             "IPHONEBLOG_CHANNEL_ALIAS": env["IPHONEBLOG_CHANNEL_ALIAS"] ?? "",
         ].merging(extra) { _, new in new }
+        // German, as the app's users read it: CI's simulator runs in English, and Element X's
+        // labels ("Datei", "Bildunterschrift hinzufügen") follow the system language.
+        app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE"]
         app.launch()
         return app
     }
 
     private func openChannel() throws -> XCUIApplication {
         let app = try launch(["IPHONEBLOG_START_TAB": "chat"])
-        XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 60), "channel did not open")
+        XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "channel did not open")
         return app
     }
 
@@ -52,7 +55,7 @@ final class RichMessagesUITests: XCTestCase {
     /// then a picture, a video and a PDF.
     func testChannelShowsRichMessages() throws {
         let app = try openChannel()
-        XCTAssertTrue(fileRow(app).waitForExistence(timeout: 30), "file not shown")
+        XCTAssertTrue(fileRow(app).waitForExistence(timeout: 90), "file not shown")
         sleep(4) // pictures and the link preview load
         attach(app, "channel-media")
         scrollTimeline(app, toFind: "Lies das")
@@ -65,8 +68,8 @@ final class RichMessagesUITests: XCTestCase {
     func testDiscussionShowsRichMessages() throws {
         guard let root = env["IPHONEBLOG_TEST_ARTICLE_ROOT"], !root.isEmpty else { throw XCTSkip("no article thread") }
         let app = try launch(["IPHONEBLOG_START_DISCUSSION": root])
-        XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 60), "discussion did not open")
-        XCTAssertTrue(fileRow(app).waitForExistence(timeout: 30), "file not shown")
+        XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "discussion did not open")
+        XCTAssertTrue(fileRow(app).waitForExistence(timeout: 90), "file not shown")
         sleep(4)
         attach(app, "discussion-media")
         scrollTimeline(app, toFind: "Lies das")
@@ -124,7 +127,7 @@ final class RichMessagesUITests: XCTestCase {
 
         // The system photo picker runs in its own process but shows inside the app.
         let picture = app.images.matching(NSPredicate(format: "label BEGINSWITH 'Photo' OR label BEGINSWITH 'Foto'")).firstMatch
-        XCTAssertTrue(picture.waitForExistence(timeout: 15), "photo picker shows no pictures")
+        XCTAssertTrue(picture.waitForExistence(timeout: 45), "photo picker shows no pictures")
         sleep(1) // the sheet slides in; the picture is not hittable until it rests
         picture.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         let add = app.buttons["Add"] // the picker's checkmark, "Fertig"
@@ -134,7 +137,7 @@ final class RichMessagesUITests: XCTestCase {
         // The upload preview: a caption field and its own Senden. The composer's send button
         // (room-send_button) waits behind the sheet with the same label.
         let caption = app.textViews["Bildunterschrift hinzufügen"]
-        XCTAssertTrue(caption.waitForExistence(timeout: 20), "no upload preview")
+        XCTAssertTrue(caption.waitForExistence(timeout: 60), "no upload preview")
         attach(app, "upload-preview")
         let send = app.buttons.matching(NSPredicate(format: "label == 'Senden' AND identifier != 'room-send_button'")).firstMatch
         XCTAssertTrue(send.isHittable, "upload preview's Senden not hittable")

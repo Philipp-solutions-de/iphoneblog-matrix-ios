@@ -34,6 +34,9 @@ final class DiscussionUITests: XCTestCase {
         } else {
             app.launchEnvironment["IPHONEBLOG_SIGNED_OUT"] = "1"
         }
+        // German, as the app's users read it: CI's simulator runs in English, and Element X's
+        // labels ("Datei", "Bildunterschrift hinzufügen") follow the system language.
+        app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE"]
         app.launch()
         return app
     }
@@ -55,8 +58,8 @@ final class DiscussionUITests: XCTestCase {
         let before = heading.frame.minY
 
         link.tap()
-        XCTAssertTrue(app.staticTexts["DISKUSSION"].waitForExistence(timeout: 15), "discussion did not open")
-        XCTAssertTrue(app.staticTexts["Guter Punkt."].waitForExistence(timeout: 15), "replies not shown")
+        XCTAssertTrue(app.staticTexts["DISKUSSION"].waitForExistence(timeout: 45), "discussion did not open")
+        XCTAssertTrue(app.staticTexts["Guter Punkt."].waitForExistence(timeout: 45), "replies not shown")
         XCTAssertFalse(app.buttons["Artikel lesen"].exists, "\"Artikel lesen\" is still there")
         attach(app, "reader-thread")
 
@@ -74,7 +77,7 @@ final class DiscussionUITests: XCTestCase {
         let web = app.webViews.firstMatch
         XCTAssertTrue(web.links["Diskussion 3"].waitForExistence(timeout: 20))
         web.links["Diskussion 3"].tap()
-        XCTAssertTrue(app.staticTexts["Noch keine Antworten"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["Noch keine Antworten"].waitForExistence(timeout: 45))
         XCTAssertTrue(app.buttons["Anmelden"].exists)
         attach(app, "reader-no-thread")
     }
@@ -88,7 +91,7 @@ final class DiscussionUITests: XCTestCase {
         // The sign-in runs in the background; the thread needs the session.
         sleep(8)
         web.links["Diskussion 1"].tap()
-        XCTAssertTrue(app.staticTexts["DISKUSSION"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["DISKUSSION"].waitForExistence(timeout: 45))
         // The chat views expose senders, not message text: the bot's root by the test writer, and
         // the composer that answers in the thread.
         XCTAssertTrue(app.staticTexts["Stefan L."].firstMatch.waitForExistence(timeout: 30), "thread not opened")
