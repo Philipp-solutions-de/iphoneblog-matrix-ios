@@ -63,6 +63,9 @@ case "$action" in
         ;;
     integration)
         [[ -n "$device" ]] || { echo "build.sh: no iPhone simulator" >&2; exit 1; }
+        # A session from an earlier test server survives in the simulator's keychain, even an
+        # uninstall, and its token is dead on a fresh server.
+        xcrun simctl keychain "$device" reset 2>/dev/null || true
         # xcodebuild hands TEST_RUNNER_<NAME> to the test process as <NAME>.
         export TEST_RUNNER_IPHONEBLOG_TEST_HOMESERVER="${IPHONEBLOG_TEST_HOMESERVER:?}"
         export TEST_RUNNER_IPHONEBLOG_TEST_USER="${IPHONEBLOG_TEST_USER:?}"
@@ -78,6 +81,7 @@ case "$action" in
         # The reader's way from the blog into a discussion and back. Starts the blog fixture;
         # the member test also runs when IPHONEBLOG_TEST_* name a test homeserver.
         [[ -n "$device" ]] || { echo "build.sh: no iPhone simulator" >&2; exit 1; }
+        xcrun simctl keychain "$device" reset 2>/dev/null || true # as for integration
         if curl -s -o /dev/null http://127.0.0.1:8793/calls; then
             echo "build.sh: port 8793 is taken; stop the old fixture server first" >&2; exit 1
         fi

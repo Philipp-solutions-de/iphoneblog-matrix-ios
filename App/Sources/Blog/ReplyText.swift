@@ -6,6 +6,12 @@ import SwiftUI
 /// inline parts (bold, italic, code, links), makes every address a link, and drops the quoted
 /// lines a Matrix reply starts with ("> <@stefan:…> …"), which the chat shows as a quote instead.
 enum ReplyText {
+    /// The server's sanitized HTML when the reply has it, otherwise the plain body.
+    static func attributed(body: String, formattedBody: String?) -> AttributedString {
+        if let formattedBody, !formattedBody.isEmpty { return ReplyHTML.attributed(formattedBody) }
+        return attributed(body)
+    }
+
     static func attributed(_ body: String) -> AttributedString {
         let text = withoutReplyFallback(body)
         var result = (try? AttributedString(markdown: text, options: .init(
@@ -28,7 +34,7 @@ enum ReplyText {
     }
 
     /// Bare "https://…" and "www.…" addresses become links; markdown links stay as they are.
-    private static func linkAddresses(in text: inout AttributedString) {
+    static func linkAddresses(in text: inout AttributedString) {
         let plain = String(text.characters)
         guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else { return }
         for match in detector.matches(in: plain, range: NSRange(plain.startIndex..., in: plain)) {

@@ -95,11 +95,20 @@ replies). An article nobody has opened yet shows "Noch keine Antworten" and "Anm
 mitzudiskutieren", never an empty screen; links.json lists a new thread within a minute.
 #one members get the conversation views and write in the thread; the reply count under the
 thread's first message counts the live replies, so the header shows the file's count to
-readers only (it lags by up to a minute). Readers see each reply's `body` with its markdown
-(bold, italic, code, links) and every address linked (`ReplyText`); the files carry no
-pictures, files or reply quotes yet. `scripts/build.sh ui` drives this path in the simulator
+readers only (it lags by up to a minute). Readers see each reply's `formatted_body`, which
+the server sanitizes with the website's allowlist (`ReplyHTML`, no WebKit), or else its
+`body` with its markdown and every address linked (`ReplyText`), and a picture from `media`
+(the server's public copy, EXIF stripped; a tap opens the full size). Files and videos show
+their body text ("in der App zu sehen"); reply quotes and link previews are not in the files. `scripts/build.sh ui` drives this path in the simulator
 against `scripts/blog-fixture-server.py`, and `RichMessagesUITests` checks formatting, links,
 replies, pictures, video, files and the composer against the test homeserver.
+
+**Tab badges come from the server's counts.** The SDK counts a room's unread mentions in the
+last few events it holds, so a mention with six or more messages after it dropped out. A room's
+mention count is the larger of the SDK's and the server's notification list (the one @Mentions
+reads); `ChatSession` puts the #one-Chat and @Mentions badges on `Router`, which `MainView`
+observes (before, the @Mentions badge never appeared). iOS 26's tab bar does not expose badges
+to accessibility, so the sign-in test checks the counts and `BadgesUITests` keeps a screenshot.
 
 **Members read #one articles in the Blog tab.** Once the page shows a blog page, a signed-in
 app asks WordPress for a one-time sign-in address (`POST /wp-json/iphoneblog/v1/chat/web-login`

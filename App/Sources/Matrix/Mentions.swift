@@ -19,6 +19,8 @@ final class MentionsModel: ObservableObject {
         }
 
         let id: String
+        /// The room it was said in, whatever the place.
+        let roomID: String
         let place: Place
         let senderID: String
         var senderName: String
@@ -84,7 +86,7 @@ final class MentionsModel: ObservableObject {
         } else {
             place = .room(roomID: entry.roomId, name: try? session.client.getRoom(roomId: entry.roomId)?.displayName())
         }
-        return Mention(id: event.eventId, place: place, senderID: event.sender,
+        return Mention(id: event.eventId, roomID: entry.roomId, place: place, senderID: event.sender,
                        senderName: await name(of: event.sender, session: session),
                        body: body, date: Date(milliseconds: event.originServerTs ?? entry.ts),
                        unread: !entry.read)
@@ -159,7 +161,9 @@ final class NotificationPrefs: ObservableObject {
     /// An override rule: in the Blog room, an event that carries an article (only the bot posts
     /// those, 2026-11-14_interfaces.md). Replies there stay quiet unless they mention me.
     static let articleRuleID = "de.iphoneblog.new_articles"
-    private static let articleRuleSeeded = "articleRuleSeeded"
+    /// Per account: the device-wide flag left a second account on the same phone without the
+    /// rule (it stayed "seeded" from the first).
+    private static func articleRuleSeeded(_ userID: String) -> String { "articleRuleSeeded.\(userID)" }
 
     private weak var session: ChatSession?
     private let log = Logger(subsystem: Brand.bundleID, category: "push-rules")
@@ -179,9 +183,15 @@ final class NotificationPrefs: ObservableObject {
                 try? await settings.setRoomNotificationMode(roomId: blog, mode: .mentionsAndKeywordsOnly)
             }
             // New articles ring by default, once; after that the switch decides.
-            if !UserDefaults.standard.bool(forKey: Self.articleRuleSeeded) {
+            // Builds up to 72 kept one flag for the device; it counts for the account signed in now,
+            // so a switch someone turned off stays off.
+            if UserDefaults.standard.bool(forKey: "articleRuleSeeded") {
+                UserDefaults.standard.set(true, forKey: Self.articleRuleSeeded(session.userID))
+                UserDefaults.standard.removeObject(forKey: "articleRuleSeeded")
+            }
+            if !UserDefaults.standard.bool(forKey: Self.articleRuleSeeded(session.userID)) {
                 if (try? await putArticleRule(blogRoomID: blog, session: session)) != nil {
-                    UserDefaults.standard.set(true, forKey: Self.articleRuleSeeded)
+                    UserDefaults.standard.set(true, forKey: Self.articleRuleSeeded(session.userID))
                 }
             }
         }
