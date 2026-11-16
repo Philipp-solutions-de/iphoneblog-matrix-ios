@@ -4,6 +4,7 @@
 #
 #   scripts/build.sh build              build the app
 #   scripts/build.sh test               build and run the unit tests
+#   scripts/build.sh ui                 run the UI tests (blog → discussion → swipe back)
 #   scripts/build.sh integration        run the sign-in test against a test homeserver
 #                                       (needs IPHONEBLOG_TEST_* in the environment,
 #                                       see scripts/test-homeserver.sh)
@@ -73,6 +74,25 @@ case "$action" in
         export TEST_RUNNER_IPHONEBLOG_CHANNEL_ALIAS="${IPHONEBLOG_CHANNEL_ALIAS:-}"
         run integration "${common[@]}" -scheme Integration -destination "id=$device" test
         ;;
+    ui)
+        # The reader's way from the blog into a discussion and back. Starts the blog fixture;
+        # the member test also runs when IPHONEBLOG_TEST_* name a test homeserver.
+        [[ -n "$device" ]] || { echo "build.sh: no iPhone simulator" >&2; exit 1; }
+        if curl -s -o /dev/null http://127.0.0.1:8793/calls; then
+            echo "build.sh: port 8793 is taken; stop the old fixture server first" >&2; exit 1
+        fi
+        python3 scripts/blog-fixture-server.py 8793 "${IPHONEBLOG_TEST_ARTICLE_ROOT:-\$madebypost}" &
+        fixture=$!
+        trap 'kill "$fixture" 2>/dev/null' EXIT
+        sleep 1
+        export TEST_RUNNER_IPHONEBLOG_FIXTURE="http://127.0.0.1:8793"
+        for name in TEST_HOMESERVER TEST_USER TEST_PASSWORD ONE_ALIAS BLOG_ALIAS CHANNEL_ALIAS; do
+            var="IPHONEBLOG_$name"
+            [[ -n "${!var:-}" ]] && export "TEST_RUNNER_$var=${!var}"
+        done
+        rm -rf build/ui.xcresult
+        run ui "${common[@]}" -scheme UITests -destination "id=$device" -resultBundlePath build/ui.xcresult test
+        ;;
     *)
-        echo "usage: scripts/build.sh build|test|integration" >&2; exit 2 ;;
+        echo "usage: scripts/build.sh build|test|integration|ui" >&2; exit 2 ;;
 esac

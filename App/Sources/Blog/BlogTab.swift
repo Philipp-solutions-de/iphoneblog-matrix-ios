@@ -17,14 +17,12 @@ struct BlogTab: View {
     var body: some View {
         NavigationStack(path: $router.blogPath) {
             BlogHome(web: web)
+                // The bar stays hidden over the blog; its title is what the system back button
+                // on the discussion says ("‹ Blog"), and the system button keeps the edge swipe.
+                .navigationTitle("Blog")
                 .toolbar(.hidden, for: .navigationBar)
                 .navigationDestination(for: Router.DiscussionRoute.self) { route in
-                    DiscussionView(route: route, session: session, router: router) { article in
-                        // "Artikel lesen": the article in the blog view, not in a Safari sheet,
-                        // which would meet beta's staff gate without the web view's session.
-                        web.open(article)
-                        router.blogPath = []
-                    }
+                    DiscussionView(route: route, session: session, router: router)
                 }
         }
         .onAppear {

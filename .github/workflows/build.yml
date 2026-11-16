@@ -70,6 +70,11 @@ jobs:
           set -a; . build/test-homeserver.env; set +a
           scripts/build.sh integration
 
+      - name: UI tests (blog, discussion, swipe back)
+        run: |
+          set -a; . build/test-homeserver.env; set +a
+          scripts/build.sh ui
+
       - name: Keep the logs
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

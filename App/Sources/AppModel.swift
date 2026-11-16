@@ -33,6 +33,14 @@ final class AppModel: ObservableObject {
     // MARK: - Start
 
     func restore() async {
+        #if DEBUG
+        // UI tests of the signed-out app start without the session a member test left behind.
+        if ProcessInfo.processInfo.environment["IPHONEBLOG_SIGNED_OUT"] == "1" {
+            store.delete()
+            state = .signedOut
+            return
+        }
+        #endif
         guard let stored = store.load() else {
             #if DEBUG
             // Screenshots and UI tests against a test server sign in by themselves.

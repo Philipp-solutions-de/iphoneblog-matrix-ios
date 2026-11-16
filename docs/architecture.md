@@ -80,12 +80,21 @@ view routes taps only: a "Diskussion" link opens the native discussion, a link t
 keeps `app=1`, any other site opens in Safari. Redirects and the page's own loads go where the
 server sends them, so beta's staff gate (Authelia at `auth.phso.de`) signs in inside the view.
 One web view lives as long as the app (`BlogWebModel`): a tab switch, a sign-in or a
-discussion never reloads the page the reader is on, and "Artikel lesen" opens the article there
-rather than in a Safari sheet that has none of the view's cookies. Reading a discussion needs no account: the app reads the static files the
-article bot writes (`links.json` maps an article URL to its thread, matched by path so `www`
-and `beta` find the same one; `threads/<root>.json` holds the replies; a key is the decoded, lower-case path with one trailing
-slash, and a miss in a copy older than a minute reads the file again). #one members get the
-conversation views and write in the thread.
+discussion never reloads the page the reader is on. The discussion uses the system back
+button, so a swipe from the left edge returns to the blog where the reader was; a custom back
+button would switch that swipe off (Thorsten's test of build 70).
+
+**Every article has a thread when someone signed in opens it.** A signed-in tap on
+"Diskussion" calls `POST /_iphoneblog/v1/article-thread` with the article's www address and
+the Matrix token; the server makes the thread if there is none (idempotent per post) and the
+app opens the root it returns. The call needs a token, so nobody can make the bot post a
+thread per article from outside. Signed out, the app reads the static files the article bot
+writes (`links.json` maps an article URL to its thread, matched by the decoded, lower-case path
+with one trailing slash, so `www` and `beta` find the same one; `threads/<root>.json` holds the
+replies). An article nobody has opened yet shows "Noch keine Antworten" and "Anmelden, um
+mitzudiskutieren", never an empty screen; links.json lists a new thread within a minute.
+#one members get the conversation views and write in the thread. `scripts/build.sh ui` drives
+this path in the simulator against `scripts/blog-fixture-server.py`.
 
 **Members read #one articles in the Blog tab.** Once the page shows a blog page, a signed-in
 app asks WordPress for a one-time sign-in address (`POST /wp-json/iphoneblog/v1/chat/web-login`
