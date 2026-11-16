@@ -116,6 +116,10 @@ both a thread reply and a channel message; it would take two events), push for r
 threads you are in without a mention (Synapse sends none), and thread rows in the Blog tab,
 which shows the website.
 
+**No direct messages.** The app offers no way to start one (a tap on a person opens nothing),
+and direct rooms stay out of #one-Chat, Threads and @Mentions; the server refuses to create
+them (Thorsten, 2026-11-16).
+
 **Search is Matrix's own.** The magnifier in #one-Chat sends `POST /_matrix/client/v3/search`
 (room_events, filtered to the channel, newest first, `next_batch` paging); the rooms are
 unencrypted, so Synapse can read them, and there is no index of our own. A hit shows sender,

@@ -175,6 +175,8 @@ final class ChatThreadsListModel: ObservableObject {
         var activity: [String: ChatThreadActivity.Thread] = [:]
         for (roomID, items) in itemsByRoom {
             let info = roomInfo[roomID] ?? (roomID, false)
+            // No direct messages in this app (Thorsten, 2026-11-16): their threads stay out.
+            if info.isDirect { continue }
             let mine = participated[roomID] ?? []
             for item in items {
                 let root = item.rootEvent

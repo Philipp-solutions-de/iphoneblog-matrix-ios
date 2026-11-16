@@ -79,6 +79,8 @@ final class MentionsModel: ObservableObject {
     private func mention(from entry: NotificationPage.Entry, session: ChatSession) async -> Mention? {
         let event = entry.event
         guard event.sender != session.userID, let body = event.content?.body else { return nil }
+        // No direct messages in this app (Thorsten, 2026-11-16): a mention in one stays out.
+        if session.rooms.rooms.first(where: { $0.id == entry.roomId })?.isDirect == true { return nil }
         let thread = event.content?.relatesTo?.relType == "m.thread" ? event.content?.relatesTo?.eventId : nil
         let place: Mention.Place
         if entry.roomId == session.blogRoomID {
