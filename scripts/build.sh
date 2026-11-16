@@ -92,7 +92,10 @@ case "$action" in
         done
         rm -rf build/ui.xcresult
         # UI_ONLY=RichMessagesUITests (or Class/test) runs a part.
+        # A failed test runs once more: on CI's slow runners the simulator now and then fails to
+        # launch the app at all ("does not have a process ID").
         run ui "${common[@]}" -scheme UITests -destination "id=$device" -resultBundlePath build/ui.xcresult \
+            -retry-tests-on-failure -test-iterations 2 \
             ${UI_ONLY:+-only-testing:"UITests/$UI_ONLY"} test
         ;;
     *)
