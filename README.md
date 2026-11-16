@@ -48,6 +48,21 @@ scripts/test-homeserver.sh stop
 To see the app against the test server, launch it with `IPHONEBLOG_HOMESERVER`, and in a
 debug build `IPHONEBLOG_DEV_USER` and `IPHONEBLOG_DEV_PASSWORD` to sign in by itself.
 
+### Beta in the simulator
+
+Beta sits behind the staff gate, whose second factor is a passkey the simulator does not have.
+A Debug build in the simulator sends beta's machine token as the cookie `test_gate`, to
+`beta.iphoneblog.de` only (infra `docs/staff-gate.md`, "A token for machines"). It reads the
+token on the Mac from `~/.config/iphoneblog/test-gate-beta`; write that file once, from the
+infra checkout's sops file (prints only the path):
+
+```bash
+mkdir -p ~/.config/iphoneblog && (umask 077; sops -d --extract '["test_gate_tokens"]["beta"]' ~/localprojects/infra/inventory/group_vars/all/secrets.sops.yml > ~/.config/iphoneblog/test-gate-beta) && echo "written: ~/.config/iphoneblog/test-gate-beta"
+```
+
+Release and TestFlight builds do not compile this path, and `scripts/check-release-clean.sh`
+fails the TestFlight lane if one does.
+
 ## Where things are
 
 | | |
