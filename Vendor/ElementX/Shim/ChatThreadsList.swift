@@ -216,6 +216,18 @@ final class ChatThreadsListModel: ObservableObject {
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               (response as? HTTPURLResponse)?.statusCode == 200,
               let body = try? JSONDecoder().decode(RelationsResponse.self, from: data) else { return ([], 0) }
+        // The count is the server's own (the root's bundled thread relation); the page above holds
+        // at most 100 replies and only serves the repliers.
+        var count = body.chunk.count
+        if let rootURL = URL(string: "\(client.homeserver().trimmingCharacters(in: CharacterSet(charactersIn: "/")))/_matrix/client/v3/rooms/\(room)/event/\(root)") {
+            var rootRequest = URLRequest(url: rootURL)
+            rootRequest.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+            if let (data, _) = try? await URLSession.shared.data(for: rootRequest),
+               let event = try? JSONDecoder().decode(RootEvent.self, from: data),
+               let bundled = event.unsigned?.relations?.thread?.count {
+                count = bundled
+            }
+        }
         var seen: [String] = []
         for event in body.chunk where !seen.contains(event.sender) {
             seen.append(event.sender)
@@ -226,7 +238,20 @@ final class ChatThreadsListModel: ObservableObject {
             let profile = try? await client.getProfile(userId: userID)
             senders.append(TimelineItemSender(id: userID, displayName: profile?.displayName, avatarURL: profile?.avatarUrl.flatMap(URL.init(string:))))
         }
-        return (senders, body.chunk.count)
+        return (senders, count)
+    }
+
+    private struct RootEvent: Decodable {
+        struct Unsigned: Decodable {
+            struct Relations: Decodable {
+                struct Thread: Decodable { let count: Int }
+                let thread: Thread?
+                enum CodingKeys: String, CodingKey { case thread = "m.thread" }
+            }
+            let relations: Relations?
+            enum CodingKeys: String, CodingKey { case relations = "m.relations" }
+        }
+        let unsigned: Unsigned?
     }
 
     private struct RelationsResponse: Decodable {

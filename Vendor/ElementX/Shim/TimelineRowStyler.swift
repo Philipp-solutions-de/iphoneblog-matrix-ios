@@ -211,8 +211,8 @@ struct TimelineItemRowStylerView<Content: View>: View {
     private var threadRootFooter: some View {
         VStack(alignment: .leading, spacing: 0) {
             Rectangle().fill(style.colors.line).frame(height: 1).padding(.top, 12)
-            // The count the timeline shows, so it always matches the replies below it.
-            Text(ChatKitStrings.replies(threadReplies.count))
+            ThreadRootCount(roomID: context.viewState.roomID, rootEventID: threadRootID ?? "",
+                            loaded: threadReplies.count)
                 .font(style.fonts.dayDivider)
                 .foregroundStyle(style.colors.ink3)
                 .padding(.horizontal, style.metrics.page)
@@ -257,6 +257,24 @@ struct ChatAvatar: View {
         guard !colors.isEmpty else { return style.colors.accent }
         let sum = sender.id.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0x7FFF_FFFF }
         return colors[sum % colors.count]
+    }
+}
+
+// MARK: - Thread root count
+
+/// "90 Antworten" under a thread's first message: the server's count, since the thread timeline
+/// loads replies page by page (it said 20 for a thread of 90 in the perf tests); the loaded
+/// count until the server has answered. Its own view, so only it follows ChatThreadActivity.
+struct ThreadRootCount: View {
+    let roomID: String
+    let rootEventID: String
+    let loaded: Int
+    @ObservedObject private var activity = ChatThreadActivity.shared
+    private var style: ChatKitStyle { ChatKitStyle.current }
+
+    var body: some View {
+        Text(ChatKitStrings.replies(max(loaded, activity.thread(roomID: roomID, rootEventID: rootEventID)?.serverReplies ?? 0)))
+            .onAppear { activity.loadRepliers(roomID: roomID, rootEventID: rootEventID, hint: -1) }
     }
 }
 
