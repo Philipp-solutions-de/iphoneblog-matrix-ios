@@ -95,6 +95,14 @@ final class DiscussionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["room-send_button"].exists, "no composer")
         attach(app, "member-thread")
 
+        // At the top: the root, a line, the live count, and the first reply with its sender (the
+        // root's writer answered, which must not read like a caption under the root).
+        let count = app.staticTexts.matching(NSPredicate(format: "label MATCHES '[0-9]+ Antworten|1 Antwort'")).firstMatch
+        for _ in 0..<8 where !count.isHittable { app.swipeDown(velocity: .fast) }
+        XCTAssertTrue(count.isHittable, "no reply count under the root")
+        XCTAssertNotEqual(count.label, "0 Antworten")
+        attach(app, "member-thread-top")
+
         swipeBackFromLeftEdge(app)
         XCTAssertTrue(app.staticTexts["DISKUSSION"].waitForNonExistence(timeout: 5), "swipe did not go back")
         attach(app, "member-after-swipe-back")

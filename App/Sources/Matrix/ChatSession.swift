@@ -46,6 +46,8 @@ final class ChatSession: ObservableObject, ChatHost {
     /// Starts sliding sync and the room list. Safe to call again after `stop()`.
     func start() async throws {
         if syncService == nil {
+            // The send queue reports how far an upload is; the message row shows it as a bar.
+            client.enableSendQueueUploadProgress(enable: true)
             let service = try await client.syncService().finish()
             syncService = service
             stateHandle = service.state(listener: SyncStateObserver { [weak self] state in

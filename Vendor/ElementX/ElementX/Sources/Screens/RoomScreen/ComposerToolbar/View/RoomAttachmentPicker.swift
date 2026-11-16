@@ -30,7 +30,14 @@ struct RoomAttachmentPicker: View {
     
     var menuContent: some View {
         VStack(alignment: .leading, spacing: 0.0) {
-            // iphoneblog: no text formatting and no polls; photos, camera and files only.
+            Button {
+                context.send(viewAction: .enableTextFormatting)
+            } label: {
+                Label(L10n.screenRoomAttachmentTextFormatting, icon: \.textFormatting)
+            }
+            .accessibilityIdentifier(A11yIdentifiers.roomScreen.attachmentPickerTextFormatting)
+            
+            // iphoneblog: no polls; formatting, photos, camera and files.
             
             if context.viewState.isLocationSharingEnabled {
                 Button {

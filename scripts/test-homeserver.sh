@@ -106,6 +106,11 @@ send "$allgemein" t2 "{\"msgtype\":\"m.text\",\"body\":\"tester: schau mal\",\"m
 blog="$(create "$writer" '{"name":"Blog","preset":"public_chat","room_alias_name":"blog"}')"
 root="$(send "$blog" a1 '{"msgtype":"m.text","body":"Ein Testartikel\nhttps://www.iphoneblog.de/test/","de.iphoneblog.article":{"title":"Ein Testartikel","link":"https://www.iphoneblog.de/test/","teaser":"Zwei Zeilen Vorschau auf den Artikel.","image_url":null,"published_ts":1763200000000}}')"
 send "$blog" a2 "{\"msgtype\":\"m.text\",\"body\":\"Erste Antwort\",\"m.relates_to\":{\"rel_type\":\"m.thread\",\"event_id\":\"$root\"}}" >/dev/null
+
+# One message of every rich kind (formatting, link, reply, image, video, file) at the end of
+# Allgemein and in the article's thread; Tests/UITests/RichMessagesUITests.swift looks at them.
+python3 "$here/scripts/test-rich-messages.py" "$url" "$writer" "$allgemein"
+python3 "$here/scripts/test-rich-messages.py" "$url" "$writer" "$blog" "$root"
 curl -fs -X POST "$url/_matrix/client/v3/logout" -H "Authorization: Bearer $token" >/dev/null
 
 cat > "$here/build/test-homeserver.env" <<EOF

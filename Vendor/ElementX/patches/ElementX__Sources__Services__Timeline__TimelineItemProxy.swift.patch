@@ -8,16 +8,24 @@
  
  /// A light wrapper around timeline items returned from Rust.
  nonisolated enum TimelineItemProxy {
-@@ -258,12 +257,6 @@
+@@ -84,6 +83,7 @@
+     }
+     
+     var deliveryStatus: TimelineItemDeliveryStatus? {
++        ChatUploadProgress.report(id, state: item.localSendState) // iphoneblog: upload progress bar
+         guard let pendingSend else {
+             return nil
+         }
+@@ -257,12 +257,6 @@
+     
      func hash(into hasher: inout Hasher) {
          hasher.combine(itemID)
-     }
+-    }
 -    
 -    static var mock: SendHandleProxy {
 -        .init(itemID: .event(uniqueID: .init(UUID().uuidString),
 -                             eventOrTransactionID: .eventID(UUID().uuidString)),
 -              underlyingHandle: SendHandleSDKMock())
--    }
+     }
  }
  
- nonisolated struct VideoInfoProxy: Hashable {
