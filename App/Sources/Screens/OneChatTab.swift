@@ -33,6 +33,16 @@ private struct MemberGate: View {
                 .navigationDestination(for: Router.ThreadRoute.self) { route in
                     ChatScreens.provider.threadScreen(roomID: route.roomID, rootEventID: route.rootEventID, host: session)
                 }
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { router.showSearch = true } label: { Image(systemName: "magnifyingglass") }
+                            .accessibilityLabel("In #one-Chat suchen")
+                            .accessibilityIdentifier("chat-search")
+                    }
+                }
+                .navigationDestination(isPresented: $router.showSearch) {
+                    ChatSearchView(model: ChatSearchModel(session: session, roomIDs: [channel]), router: router)
+                }
                 .navigationDestination(isPresented: $router.showThreads) {
                     ChatScreens.provider.threadsScreen(host: session)
                         .navigationTitle("Threads")

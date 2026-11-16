@@ -133,6 +133,11 @@ public final class ChatKitSession {
         })
     }
 
+    /// Shows a message in its room's timeline, in context (a search result's tap).
+    public func focus(roomID: String, eventID: String) {
+        ChatFocusRequests.shared.pending = .init(roomID: roomID, eventID: eventID)
+    }
+
     /// The "Threads" row for the top of a channel: your threads with news, counted.
     public func threadsEntryView(open: @escaping () -> Void) -> AnyView {
         AnyView(ChatThreadsEntryRow(model: self.threadsModel, open: open))

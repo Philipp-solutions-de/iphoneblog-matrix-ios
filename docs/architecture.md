@@ -116,6 +116,14 @@ both a thread reply and a channel message; it would take two events), push for r
 threads you are in without a mention (Synapse sends none), and thread rows in the Blog tab,
 which shows the website.
 
+**Search is Matrix's own.** The magnifier in #one-Chat sends `POST /_matrix/client/v3/search`
+(room_events, filtered to the channel, newest first, `next_batch` paging); the rooms are
+unencrypted, so Synapse can read them, and there is no index of our own. A hit shows sender,
+time and the words marked; a thread reply opens its thread, a channel message scrolls the
+channel to it (`ChatKitSession.focus`, Element X's focus on an event). Synapse stems in English
+only, hard-coded in its source, so German inflections may not match; the empty state suggests
+the word stem. @Mentions filters its loaded list on the device.
+
 **Tab badges come from the server's counts.** The SDK counts a room's unread mentions in the
 last few events it holds, so a mention with six or more messages after it dropped out. A room's
 mention count is the larger of the SDK's and the server's notification list (the one @Mentions

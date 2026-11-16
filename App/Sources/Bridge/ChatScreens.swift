@@ -46,6 +46,8 @@ protocol ChatScreenProviding: AnyObject {
     /// The Threads tab: every thread you take part in across channels, newest activity first,
     /// unread marked. A tap calls `host.openThread(roomID:rootEventID:)`.
     func threadsScreen(host: ChatHost) -> AnyView
+    /// Scrolls a room's timeline to a message and highlights it (a search result).
+    func focus(roomID: String, eventID: String)
     /// The "Threads" row at the top of #one-Chat, with the count of your threads that have news.
     func threadsEntry(host: ChatHost, open: @escaping () -> Void) -> AnyView
     /// An article's thread under the app's own discussion header: the thread screen without

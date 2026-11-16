@@ -184,6 +184,16 @@ private struct ChatSheets {
 
 // MARK: - Room
 
+/// "Show this message in its room": set by a search result, taken by that room's screen when it
+/// is (or becomes) live. Element X's own focus then loads the message in context.
+@MainActor
+final class ChatFocusRequests: ObservableObject {
+    struct Request: Equatable { let roomID: String; let eventID: String }
+    static let shared = ChatFocusRequests()
+    @Published var pending: Request?
+}
+
+
 /// A channel or direct message. Element X's room coordinator, without the room screen view
 /// model's calls, pinned messages, knock requests and identity warnings.
 @MainActor
@@ -239,6 +249,16 @@ final class ChatRoomCoordinator: ChatScreenCoordinator {
             .store(in: &cancellables)
 
         composerViewModel.start()
+
+        // A search result asked to show a message here (ChatKitSession.focus).
+        ChatFocusRequests.shared.$pending
+            .compactMap { [roomID = roomProxy.id] in $0?.roomID == roomID ? $0 : nil }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] request in
+                ChatFocusRequests.shared.pending = nil
+                self?.timelineViewModel.context.send(viewAction: .focusOnEventID(request.eventID))
+            }
+            .store(in: &cancellables)
     }
 
     func stop() {

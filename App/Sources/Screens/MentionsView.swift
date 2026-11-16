@@ -6,11 +6,29 @@ struct MentionsView: View {
     @ObservedObject var session: ChatSession
     @ObservedObject var mentions: MentionsModel
     @ObservedObject var router: Router
+    @State private var filter = ""
+
+    /// The loaded mentions that contain the filter in their text, sender or place.
+    private var shown: [MentionsModel.Mention] {
+        let term = filter.trimmingCharacters(in: .whitespaces)
+        guard !term.isEmpty else { return mentions.items }
+        return mentions.items.filter { mention in
+            [mention.body, mention.senderName, MentionRow.placeName(mention.place)]
+                .contains { $0.range(of: term, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             ScreenTitle("@Mentions")
-            if mentions.items.isEmpty {
+            if !mentions.items.isEmpty {
+                SearchField(text: $filter, prompt: "@Mentions durchsuchen")
+                    .padding(.horizontal, Theme.Space.page)
+                    .padding(.bottom, 8)
+            }
+            if !mentions.items.isEmpty, shown.isEmpty {
+                ContentUnavailableView("Keine Treffer", systemImage: "magnifyingglass")
+            } else if mentions.items.isEmpty {
                 if mentions.hasLoaded {
                     ContentUnavailableView("Noch keine @Mentions", systemImage: "at",
                                            description: Text("Wenn dich jemand erwähnt, steht es hier."))
@@ -20,7 +38,7 @@ struct MentionsView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        ForEach(mentions.items) { mention in
+                        ForEach(shown) { mention in
                             Button { open(mention) } label: {
                                 MentionRow(mention: mention, me: myNames)
                             }
@@ -98,6 +116,15 @@ struct MentionRow: View {
         .background(mention.unread ? Theme.unread : Theme.background)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+    }
+
+    /// The place as words, for the filter.
+    static func placeName(_ place: MentionsModel.Mention.Place) -> String {
+        switch place {
+        case .channel(_, let root): "#one-Chat " + (root == nil ? "Allgemein" : "Thread")
+        case .discussion(_, let title): "Diskussion " + (title ?? "")
+        case .room(_, let name): name ?? ""
+        }
     }
 
     private var context: (text: String, color: Color) {

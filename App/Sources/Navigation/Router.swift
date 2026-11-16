@@ -35,6 +35,8 @@ final class Router: ObservableObject {
     @Published var showSignIn = false
     /// The Threads list in #one-Chat.
     @Published var showThreads = false
+    /// The search in #one-Chat.
+    @Published var showSearch = false
     /// The tab badges: #one-Chat's unread messages and unread @Mentions. ChatSession keeps them
     /// current; MainView observes only the router, so they live here.
     @Published var chatBadge = 0
@@ -79,6 +81,13 @@ final class Router: ObservableObject {
         selectedRoomID = roomID
     }
 
+    /// A search result: the message in its channel, scrolled to and highlighted.
+    func openMessage(roomID: String, eventID: String) {
+        openRoom(roomID)
+        showSearch = false
+        ChatScreens.provider.focus(roomID: roomID, eventID: eventID)
+    }
+
     func openThread(roomID: String, rootEventID: String) {
         if roomID == blogRoomID {
             tab = .blog
@@ -87,6 +96,7 @@ final class Router: ObservableObject {
         }
         let route = ThreadRoute(roomID: roomID, rootEventID: rootEventID)
         showThreads = false // from the Threads list: the thread replaces it
+        showSearch = false
         if tab == .chat, selectedRoomID == roomID {
             threadPath = [route]
         } else {
