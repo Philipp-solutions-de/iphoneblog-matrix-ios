@@ -70,7 +70,7 @@ jobs:
           set -a; . build/test-homeserver.env; set +a
           scripts/build.sh integration
 
-      - name: UI tests (blog, discussion, swipe back)
+      - name: UI tests (blog, discussion, swipe back, rich messages, uploads)
         run: |
           set -a; . build/test-homeserver.env; set +a
           scripts/build.sh ui

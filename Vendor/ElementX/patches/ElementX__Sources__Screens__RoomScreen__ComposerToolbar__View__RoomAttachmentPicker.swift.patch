@@ -1,16 +1,8 @@
 --- a/ElementX/Sources/Screens/RoomScreen/ComposerToolbar/View/RoomAttachmentPicker.swift
 +++ b/ElementX/Sources/Screens/RoomScreen/ComposerToolbar/View/RoomAttachmentPicker.swift
-@@ -30,20 +30,8 @@
-     
-     var menuContent: some View {
-         VStack(alignment: .leading, spacing: 0.0) {
--            Button {
--                context.send(viewAction: .enableTextFormatting)
--            } label: {
--                Label(L10n.screenRoomAttachmentTextFormatting, icon: \.textFormatting)
--            }
--            .accessibilityIdentifier(A11yIdentifiers.roomScreen.attachmentPickerTextFormatting)
-+            // iphoneblog: no text formatting and no polls; photos, camera and files only.
+@@ -37,12 +37,7 @@
+             }
+             .accessibilityIdentifier(A11yIdentifiers.roomScreen.attachmentPickerTextFormatting)
              
 -            Button {
 -                context.send(viewAction: .attach(.poll))
@@ -18,7 +10,7 @@
 -                Label(L10n.screenRoomAttachmentSourcePoll, icon: \.polls)
 -            }
 -            .accessibilityIdentifier(A11yIdentifiers.roomScreen.attachmentPickerPoll)
--            
++            // iphoneblog: no polls; formatting, photos, camera and files.
+             
              if context.viewState.isLocationSharingEnabled {
                  Button {
-                     context.send(viewAction: .attach(.location))

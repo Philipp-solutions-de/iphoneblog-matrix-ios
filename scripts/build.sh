@@ -86,12 +86,17 @@ case "$action" in
         trap 'kill "$fixture" 2>/dev/null' EXIT
         sleep 1
         export TEST_RUNNER_IPHONEBLOG_FIXTURE="http://127.0.0.1:8793"
-        for name in TEST_HOMESERVER TEST_USER TEST_PASSWORD ONE_ALIAS BLOG_ALIAS CHANNEL_ALIAS; do
+        for name in TEST_HOMESERVER TEST_USER TEST_PASSWORD ONE_ALIAS BLOG_ALIAS CHANNEL_ALIAS TEST_CHANNEL_ROOM TEST_ARTICLE_ROOT; do
             var="IPHONEBLOG_$name"
             [[ -n "${!var:-}" ]] && export "TEST_RUNNER_$var=${!var}"
         done
         rm -rf build/ui.xcresult
-        run ui "${common[@]}" -scheme UITests -destination "id=$device" -resultBundlePath build/ui.xcresult test
+        # UI_ONLY=RichMessagesUITests (or Class/test) runs a part.
+        # A failed test runs once more: on CI's slow runners the simulator now and then fails to
+        # launch the app at all ("does not have a process ID").
+        run ui "${common[@]}" -scheme UITests -destination "id=$device" -resultBundlePath build/ui.xcresult \
+            -retry-tests-on-failure -test-iterations 2 \
+            ${UI_ONLY:+-only-testing:"UITests/$UI_ONLY"} test
         ;;
     *)
         echo "usage: scripts/build.sh build|test|integration|ui" >&2; exit 2 ;;

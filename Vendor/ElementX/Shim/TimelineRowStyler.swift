@@ -14,6 +14,7 @@ struct TimelineItemRowStylerView<Content: View>: View {
     @EnvironmentObject private var context: TimelineViewModel.Context
     @Environment(\.timelineGroupStyle) private var timelineGroupStyle
     @Environment(\.focussedEventID) private var focussedEventID
+    @ObservedObject private var uploads = ChatUploadProgress.shared
 
     let timelineItem: EventBasedTimelineItemProtocol
     let adjustedDeliveryStatus: TimelineItemDeliveryStatus?
@@ -21,7 +22,28 @@ struct TimelineItemRowStylerView<Content: View>: View {
 
     private var style: ChatKitStyle { ChatKitStyle.current }
 
-    private var showsSender: Bool { timelineGroupStyle.shouldShowSenderDetails }
+    /// The first reply under a thread's root always names its sender, even when the root's
+    /// writer answers; otherwise it reads like a caption of the line above.
+    private var showsSender: Bool { timelineGroupStyle.shouldShowSenderDetails || isFirstThreadReply }
+
+    private var threadRootID: String? {
+        if case .thread(let rootEventID) = context.viewState.timelineKind { return rootEventID }
+        return nil
+    }
+
+    /// The thread's messages after the root, as the timeline holds them now (sent and sending).
+    private var threadReplies: [TimelineItemIdentifier.UniqueID] {
+        guard let threadRootID else { return [] }
+        return context.viewState.timelineState.itemViewStates.compactMap { item in
+            guard case .event = item.identifier, item.identifier.eventID != threadRootID else { return nil }
+            if case .state = item.type { return nil }
+            return item.id
+        }
+    }
+
+    private var isFirstThreadReply: Bool {
+        threadRootID != nil && threadReplies.first == timelineItem.id.uniqueID
+    }
 
     private var isFocussed: Bool {
         focussedEventID != nil && timelineItem.id.eventID == focussedEventID
@@ -102,6 +124,14 @@ struct TimelineItemRowStylerView<Content: View>: View {
             } else {
                 content()
             }
+            // A photo, video or file on its way up: how far it is, from the SDK's send state.
+            if let fraction = uploads.fraction(for: timelineItem.id) {
+                ProgressView(value: fraction)
+                    .tint(style.colors.accent)
+                    .frame(maxWidth: style.metrics.mediaWidth)
+                    .accessibilityLabel(ChatKitStrings.uploading)
+                    .accessibilityValue("\(Int(fraction * 100)) %")
+            }
         }
         .contentShape(Rectangle())
         .timelineItemAccessibility(timelineItem) {
@@ -156,13 +186,12 @@ struct TimelineItemRowStylerView<Content: View>: View {
     private var threadRootFooter: some View {
         VStack(alignment: .leading, spacing: 0) {
             Rectangle().fill(style.colors.line).frame(height: 1).padding(.top, 12)
-            if case let .loaded(_, _, _, numberOfReplies)? = timelineItem.properties.threadSummary {
-                Text(ChatKitStrings.replies(numberOfReplies))
-                    .font(style.fonts.dayDivider)
-                    .foregroundStyle(style.colors.ink3)
-                    .padding(.horizontal, style.metrics.page)
-                    .padding(.top, 14)
-            }
+            // The count the timeline shows, so it always matches the replies below it.
+            Text(ChatKitStrings.replies(threadReplies.count))
+                .font(style.fonts.dayDivider)
+                .foregroundStyle(style.colors.ink3)
+                .padding(.horizontal, style.metrics.page)
+                .padding(.top, 14)
         }
     }
 }

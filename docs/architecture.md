@@ -93,8 +93,13 @@ writes (`links.json` maps an article URL to its thread, matched by the decoded, 
 with one trailing slash, so `www` and `beta` find the same one; `threads/<root>.json` holds the
 replies). An article nobody has opened yet shows "Noch keine Antworten" and "Anmelden, um
 mitzudiskutieren", never an empty screen; links.json lists a new thread within a minute.
-#one members get the conversation views and write in the thread. `scripts/build.sh ui` drives
-this path in the simulator against `scripts/blog-fixture-server.py`.
+#one members get the conversation views and write in the thread; the reply count under the
+thread's first message counts the live replies, so the header shows the file's count to
+readers only (it lags by up to a minute). Readers see each reply's `body` with its markdown
+(bold, italic, code, links) and every address linked (`ReplyText`); the files carry no
+pictures, files or reply quotes yet. `scripts/build.sh ui` drives this path in the simulator
+against `scripts/blog-fixture-server.py`, and `RichMessagesUITests` checks formatting, links,
+replies, pictures, video, files and the composer against the test homeserver.
 
 **Members read #one articles in the Blog tab.** Once the page shows a blog page, a signed-in
 app asks WordPress for a one-time sign-in address (`POST /wp-json/iphoneblog/v1/chat/web-login`
@@ -125,9 +130,9 @@ That code is AGPL-3.0, so this app is AGPL-3.0 too; the repository is public, as
 | Room list | `RoomListService`, filters, diffs, unread and mention counts | | `RoomListModel`, the channel list view (our design) |
 | Timeline | `Timeline`: pagination, local echo, send queue, edits, reactions, receipts | `Screens/Timeline` (cells, list, reactions, replies, thread summaries), `Services/Timeline` (SDK wrapper, view items) | adapters, our colours and type, cells we do not want removed |
 | Threads | thread focus, `ThreadListService`, thread subscriptions | `Screens/ThreadTimelineScreen`, `Screens/RoomThreadListScreen` | the article discussions and the threads in #one-Chat |
-| Composer | send queue, replies, edits, `Mentions`, media upload | the composer toolbar and mention suggestions from `Screens/RoomScreen`, `Other/Pills` | plain-text mode only (no rich-text editor) |
-| Media | thumbnails, files, upload with progress | `Screens/FilePreviewScreen`, `Screens/MediaPickerScreen` | |
-| Design system | | `compound-ios` (needed by the views), recoloured through its override API | our tokens: teal, coral, greys |
+| Composer | send queue, replies, edits, `Mentions`, markdown to HTML, media upload | the composer, its formatting toolbar (+ › Textformatierung) and mention suggestions from `Screens/RoomScreen`, `Other/Pills` | no polls, no voice messages |
+| Media | thumbnails, files, upload with progress | `Screens/FilePreviewScreen`, `Screens/MediaPickerScreen`, `Screens/MediaUploadPreviewScreen`; link previews through Apple's `LPMetadataProvider` (the phone fetches the page, not Synapse's preview_url) | the upload progress bar under a sending photo, video or file (`Shim/ChatUploadProgress.swift`) |
+| Design system | | `compound-ios` (needed by the views), recoloured through its override API | our tokens: teal, coral, greys; teal for all content, coral only for #one and sign-in (the colour rule in `App/Sources/Theme.swift`; it overrides the coral badges and mentions in `design/screens.html`) |
 | Push | `NotificationClient` | | extension text, pusher registration, tap routing |
 | Sign-in | OAuth 2.0, PKCE, dynamic registration | | one button, `ASWebAuthenticationSession` |
 

@@ -83,6 +83,7 @@ final nonisolated class EventTimelineItemProxy: Sendable {
     }
     
     var deliveryStatus: TimelineItemDeliveryStatus? {
+        ChatUploadProgress.report(id, state: item.localSendState) // iphoneblog: upload progress bar
         guard let pendingSend else {
             return nil
         }

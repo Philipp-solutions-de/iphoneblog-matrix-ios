@@ -122,7 +122,7 @@ final class ChatKitBundleToken { }
 
 /// Colours of a pill that mentions someone else (Element X: a dark solid badge). Ours: teal text
 /// on soft teal, from the app's theme. A mention of you uses Compound's badge-accent tokens,
-/// which ChatKitTheme sets to coral.
+/// which ChatKitTheme sets to white on solid teal.
 enum MentionPillColors {
     @MainActor static var foreground: Color { ChatKitStyle.current.colors.accent }
     @MainActor static var background: Color { ChatKitStyle.current.colors.accentSoft }

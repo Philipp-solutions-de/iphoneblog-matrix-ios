@@ -49,7 +49,9 @@ struct DiscussionView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .redacted(reason: page == nil ? .placeholder : [])
             }
-            if let page {
+            // Members see the live count under the thread's first message; the file's count
+            // lags behind the chat by up to a minute.
+            if let page, session == nil {
                 Text(page.root.replyCount == 1 ? "1 Antwort" : "\(page.root.replyCount) Antworten")
                     .font(Theme.Font.footnote)
                     .foregroundStyle(Theme.ink3)
@@ -75,7 +77,7 @@ struct DiscussionView: View {
             } actions: {
                 Button("Anmelden") { router.showSignIn = true }
                     .buttonStyle(.borderedProminent)
-                    .tint(Theme.button)
+                    .tint(Theme.coralButton)
             }
         case .unavailable:
             ContentUnavailableView {
@@ -168,7 +170,7 @@ struct ReplyRow: View {
                     Text(name).font(Theme.Font.name).foregroundStyle(Theme.ink)
                     Text(ReplyRow.format(date)).font(Theme.Font.time).foregroundStyle(Theme.ink3)
                 }
-                Text(text).font(Theme.Font.body).foregroundStyle(Theme.ink2)
+                Text(ReplyText.attributed(text)).font(Theme.Font.body).foregroundStyle(Theme.ink2)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -210,7 +212,7 @@ struct ReaderPanel: View {
                     Button { router.showSignIn = true } label: {
                         Text("Anmelden").frame(maxWidth: .infinity, minHeight: Theme.Size.smallButtonHeight)
                     }
-                    .buttonStyle(FilledButton(fill: Theme.button))
+                    .buttonStyle(FilledButton(fill: Theme.coralButton))
                 }
                 Button {
                     if let url = URL(string: Brand.oneOfferURL) { router.presentedURL = url }

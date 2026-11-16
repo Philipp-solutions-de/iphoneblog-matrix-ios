@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// @Mentions (preview 4): who mentioned me where, newest first; unread rows tinted with a coral
+/// @Mentions (preview 4): who mentioned me where, newest first; unread rows tinted teal with a teal
 /// dot. A tap opens the place: the channel, its thread, or the article's discussion.
 struct MentionsView: View {
     @ObservedObject var session: ChatSession
@@ -76,7 +76,7 @@ struct MentionRow: View {
                         .foregroundStyle(Theme.ink3)
                     Spacer(minLength: 4)
                     if mention.unread {
-                        Circle().fill(Theme.coral)
+                        Circle().fill(Theme.teal)
                             .frame(width: Theme.Size.unreadDot, height: Theme.Size.unreadDot)
                             .accessibilityLabel("ungelesen")
                     }

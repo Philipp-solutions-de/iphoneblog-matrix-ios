@@ -99,6 +99,11 @@ send() { # room, txn, json
 send "$allgemein" t1 '{"msgtype":"m.text","body":"Hallo zusammen"}' >/dev/null
 hello="$(send "$allgemein" t1b '{"msgtype":"m.text","body":"Hat jemand schon das neue iPad mini im Alltag?"}')"
 send "$allgemein" t1c "{\"msgtype\":\"m.text\",\"body\":\"Ja, seit einer Woche. Der Dock-Adapter passt.\",\"m.relates_to\":{\"rel_type\":\"m.thread\",\"event_id\":\"$hello\"}}" >/dev/null
+# One message of every rich kind (formatting, link, reply, image, video, file) in Allgemein,
+# before the mention: the SDK counts a room's unread mentions from its last few events only,
+# and six messages after the mention made the sign-in test count 0 (an open bug: a busy
+# channel can hide a mention's badge).
+python3 "$here/scripts/test-rich-messages.py" "$url" "$writer" "$allgemein"
 send "$allgemein" t2 "{\"msgtype\":\"m.text\",\"body\":\"tester: schau mal\",\"m.mentions\":{\"user_ids\":[\"@$user:localhost\"]}}" >/dev/null
 
 # The Blog room: the writer plays the article bot, one article root with the bot's field and a
@@ -106,6 +111,9 @@ send "$allgemein" t2 "{\"msgtype\":\"m.text\",\"body\":\"tester: schau mal\",\"m
 blog="$(create "$writer" '{"name":"Blog","preset":"public_chat","room_alias_name":"blog"}')"
 root="$(send "$blog" a1 '{"msgtype":"m.text","body":"Ein Testartikel\nhttps://www.iphoneblog.de/test/","de.iphoneblog.article":{"title":"Ein Testartikel","link":"https://www.iphoneblog.de/test/","teaser":"Zwei Zeilen Vorschau auf den Artikel.","image_url":null,"published_ts":1763200000000}}')"
 send "$blog" a2 "{\"msgtype\":\"m.text\",\"body\":\"Erste Antwort\",\"m.relates_to\":{\"rel_type\":\"m.thread\",\"event_id\":\"$root\"}}" >/dev/null
+
+# The same set in the article's thread (Tests/UITests/RichMessagesUITests.swift).
+python3 "$here/scripts/test-rich-messages.py" "$url" "$writer" "$blog" "$root"
 curl -fs -X POST "$url/_matrix/client/v3/logout" -H "Authorization: Bearer $token" >/dev/null
 
 cat > "$here/build/test-homeserver.env" <<EOF

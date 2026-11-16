@@ -24,16 +24,26 @@ final class ChatScreenPresenter: ObservableObject {
         let view: AnyView
     }
 
-    @Published var sheet: Sheet?
+    /// The sheet on screen. A sheet that leaves, closed, swiped away or replaced by the next one
+    /// (the photo picker by the upload preview), stops its own coordinator here. Stopping in the
+    /// sheet's onDismiss stopped the wrong one: by then `sheet` already held the next screen,
+    /// and the upload preview's preparation was cancelled before Senden could use it.
+    @Published var sheet: Sheet? {
+        didSet {
+            if let oldValue, oldValue.id != sheet?.id { oldValue.coordinator.stop() }
+        }
+    }
     let userIndicatorController = UserIndicatorController()
 
-    func present(_ coordinator: CoordinatorProtocol) {
+    /// `inNavigation` gives screens with a toolbar (the upload preview's Abbrechen) the
+    /// navigation bar Element X's navigation stack would.
+    func present(_ coordinator: CoordinatorProtocol, inNavigation: Bool = false) {
         coordinator.start()
-        sheet = Sheet(coordinator: coordinator, view: coordinator.toPresentable())
+        let view = coordinator.toPresentable()
+        sheet = Sheet(coordinator: coordinator, view: inNavigation ? AnyView(NavigationStack { view }) : view)
     }
 
     func dismiss() {
-        sheet?.coordinator.stop()
         sheet = nil
     }
 }
@@ -83,8 +93,13 @@ struct ChatScreenLoader: View {
                 #endif
             }
         }
-        .sheet(item: $presenter.sheet, onDismiss: { presenter.sheet?.coordinator.stop() }) { sheet in
-            sheet.view
+        .sheet(item: $presenter.sheet) { sheet in
+            // The sheet covers the screen, so its spinners and errors (preparing an upload,
+            // a failed one) show on top of it, as Element X's window-wide indicators do.
+            sheet.view.overlay {
+                UserIndicatorPresenter(userIndicatorController: presenter.userIndicatorController)
+                    .allowsHitTesting(presenter.userIndicatorController.activeIndicator?.type == .modal)
+            }
         }
         .overlay {
             UserIndicatorPresenter(userIndicatorController: presenter.userIndicatorController)
@@ -163,7 +178,7 @@ private struct ChatSheets {
                 cancellable?.cancel()
             }
         }
-        presenter.present(coordinator)
+        presenter.present(coordinator, inNavigation: true)
     }
 }
 
@@ -420,7 +435,8 @@ final class ChatThreadCoordinator: ChatScreenCoordinator {
 
 // MARK: - Composer
 
-/// Element X's composer in plain-text mode: mentions and replies, no formatting toolbar.
+/// Element X's composer: markdown in plain-text mode, its formatting toolbar behind + ›
+/// Textformatierung, mentions and replies.
 @MainActor
 enum ChatComposer {
     static func make(roomProxy: JoinedRoomProxyProtocol, threadRootEventID: String?, session: ChatKitSession,
@@ -450,14 +466,17 @@ enum ChatComposer {
 enum ChatKitStrings {
     static let reportNotOffered = "Melden gibt es hier noch nicht. Schreib dem Team eine Direktnachricht."
 
-    /// "1 Antwort", "5 Antworten".
+    /// "Noch keine Antworten", "1 Antwort", "5 Antworten".
     static func replies(_ count: Int) -> String {
-        count == 1 ? "1 Antwort" : "\(count) Antworten"
+        count == 0 ? "Noch keine Antworten" : count == 1 ? "1 Antwort" : "\(count) Antworten"
     }
 
     /// Composer placeholder in a channel and in a thread.
     static func messageTo(_ roomName: String) -> String { "Nachricht an \(roomName)" }
     static let replyPlaceholder = "Antworten"
+
+    /// Under a photo, video or file while it uploads.
+    static let uploading = "Wird hochgeladen"
 
     /// The Threads tab when it is empty.
     static let noThreadsTitle = "Noch keine Threads"
