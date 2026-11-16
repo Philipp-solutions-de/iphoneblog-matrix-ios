@@ -54,6 +54,9 @@ struct MainView: View {
         .sheet(item: $router.presentedURL) { url in
             SafariView(url: url).ignoresSafeArea()
         }
+        .sheet(item: $router.moderation) { request in
+            if let session { ModerationSheet(request: request, session: session) }
+        }
         .sheet(isPresented: $router.showSignIn) {
             SignInView()
                 .environmentObject(model)

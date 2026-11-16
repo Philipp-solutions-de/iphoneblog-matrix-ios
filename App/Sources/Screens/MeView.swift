@@ -66,6 +66,7 @@ struct MeView: View {
                         if let url = URL(string: Brand.oauthPolicyURI) { router.presentedURL = url }
                     }
                 }
+                MeModerationRows(session: session, router: router)
 
                 SettingsGroup {
                     Button { confirmSignOut = true } label: {

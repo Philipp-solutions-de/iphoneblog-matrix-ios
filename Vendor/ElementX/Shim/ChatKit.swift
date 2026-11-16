@@ -24,6 +24,8 @@ public protocol ChatKitHost: AnyObject {
     func openURL(_ url: URL)
     /// A short notice for something ChatKit does not offer.
     func showMessage(_ text: String)
+    /// "Melden" in a message's menu (App Review 1.2): the app asks why and reports it.
+    func reportMessage(roomID: String, eventID: String)
 }
 
 /// The app's look for ChatKit: our own views read `ChatKitStyle.current`, Element X's views read

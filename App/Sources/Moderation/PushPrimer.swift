@@ -41,3 +41,24 @@ struct PushPrimerCard: View {
         .padding(.horizontal, Theme.Space.page)
     }
 }
+
+/// The card where it belongs: on top of #one-Chat's rooms, once, until iOS has been asked or the
+/// member said "Später".
+struct PushPrimerSlot: View {
+    @ObservedObject private var push = PushCenter.shared
+    @AppStorage(PushPrimer.askedKey) private var shown = false
+
+    var body: some View {
+        if PushPrimer.shouldShow(status: push.authorization, alreadyShown: shown) {
+            PushPrimerCard(
+                allow: {
+                    shown = true
+                    Task { await push.requestPermission() }
+                },
+                later: { shown = true }
+            )
+            .padding(.vertical, 8)
+            .accessibilityIdentifier("pushPrimer")
+        }
+    }
+}

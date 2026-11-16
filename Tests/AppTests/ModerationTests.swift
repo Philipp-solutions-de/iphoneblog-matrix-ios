@@ -49,4 +49,21 @@ final class ModerationTests: XCTestCase {
         XCTAssertFalse(PushPrimer.shouldShow(status: .denied, alreadyShown: false))
         XCTAssertFalse(PushPrimer.shouldShow(status: .authorized, alreadyShown: false))
     }
+
+    /// The app signs out only on WordPress's confirmation page, not on the page that asks.
+    func testOnlyTheConfirmationPageCountsAsDeleted() {
+        XCTAssertTrue(AccountDeletionView.isDeletedPage(URL(string: "https://www.iphoneblog.de/konto/loeschen/?geloescht=1&app=1")!))
+        XCTAssertTrue(AccountDeletionView.isDeletedPage(URL(string: "https://beta.iphoneblog.de/konto/loeschen/?geloescht=1")!))
+        XCTAssertFalse(AccountDeletionView.isDeletedPage(URL(string: "https://www.iphoneblog.de/konto/loeschen/?app=1")!))
+        XCTAssertFalse(AccountDeletionView.isDeletedPage(URL(string: "https://www.iphoneblog.de/konto/loeschen/?geloescht=0")!))
+        XCTAssertFalse(AccountDeletionView.isDeletedPage(URL(string: "https://www.iphoneblog.de/anmelden/?geloescht=1")!))
+    }
+
+    func testModerationRequestsAreDistinct() {
+        let a = ModerationRequest.reportMessage(roomID: "!abc:iphoneblog.de", eventID: "$e1")
+        let b = ModerationRequest.reportMessage(roomID: "!abc:iphoneblog.de", eventID: "$e2")
+        let c = ModerationRequest.profile(userID: "@anna.mueller:iphoneblog.de")
+        XCTAssertNotEqual(a.id, b.id)
+        XCTAssertNotEqual(a.id, c.id)
+    }
 }

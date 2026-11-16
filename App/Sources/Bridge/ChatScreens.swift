@@ -30,6 +30,10 @@ protocol ChatHost: AnyObject {
     func openURL(_ url: URL)
     /// Shows a short notice (sent, copied, failed) the app's way.
     func showMessage(_ text: String)
+    /// A person's profile with "Melden" and "Blockieren" (App/Sources/Moderation).
+    func showProfile(userID: String)
+    /// Asks why, then reports the message to the moderators (App/Sources/Moderation).
+    func reportMessage(roomID: String, eventID: String)
 }
 
 /// What the conversation views give the app. Implemented once in Vendor/ (today Element X's

@@ -74,7 +74,9 @@ private final class HostAdapter: ChatKitHost {
 
     func openThread(roomID: String, rootEventID: String) { host?.openThread(roomID: roomID, rootEventID: rootEventID) }
     func openRoom(roomID: String) { host?.openRoom(roomID: roomID) }
-    func openUser(userID: String) { host?.openUser(userID: userID) }
+    // A sender's name or avatar opens the profile with "Melden" and "Blockieren" (Moderation/).
+    func openUser(userID: String) { host?.showProfile(userID: userID) }
+    func reportMessage(roomID: String, eventID: String) { host?.reportMessage(roomID: roomID, eventID: eventID) }
     func openURL(_ url: URL) { host?.openURL(url) }
     func showMessage(_ text: String) { host?.showMessage(text) }
 }

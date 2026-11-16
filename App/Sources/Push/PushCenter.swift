@@ -16,26 +16,33 @@ final class PushCenter: NSObject, ObservableObject {
     private var pendingTap: [AnyHashable: Any]?
     private let log = Logger(subsystem: Brand.bundleID, category: "push")
 
-    /// Called once the account is signed in: ask for permission, then register for pushes.
+    /// Called once the account is signed in. Asks nothing: iOS's question comes from PushPrimer on
+    /// the first visit to #one-Chat (App Review asks for permission requests in context). If
+    /// pushes were allowed before, this registers at once.
     func attach(_ session: ChatSession) async {
         self.session = session
-        let center = UNUserNotificationCenter.current()
-        center.delegate = self
-        // Screenshot runs (IPHONEBLOG_NO_PUSH_PROMPT=1) keep the system prompt off the screen.
-        var granted = false
-        #if DEBUG
-        let prompt = ProcessInfo.processInfo.environment["IPHONEBLOG_NO_PUSH_PROMPT"] != "1"
-        #else
-        let prompt = true
-        #endif
-        if prompt { granted = (try? await center.requestAuthorization(options: [.alert, .badge, .sound])) ?? false }
+        UNUserNotificationCenter.current().delegate = self
         await refreshAuthorization()
-        if granted { UIApplication.shared.registerForRemoteNotifications() }
+        if authorization == .authorized || authorization == .provisional {
+            UIApplication.shared.registerForRemoteNotifications()
+        }
         if let token { await session.registerPusher(token: token) }
         if let pendingTap {
             self.pendingTap = nil
             open(userInfo: pendingTap)
         }
+    }
+
+    /// iOS's question, after PushPrimer's sentence on what is pushed.
+    func requestPermission() async {
+        // Screenshot runs (IPHONEBLOG_NO_PUSH_PROMPT=1) keep the system prompt off the screen.
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["IPHONEBLOG_NO_PUSH_PROMPT"] == "1" { return }
+        #endif
+        let granted = (try? await UNUserNotificationCenter.current()
+            .requestAuthorization(options: [.alert, .badge, .sound])) ?? false
+        await refreshAuthorization()
+        if granted { UIApplication.shared.registerForRemoteNotifications() }
     }
 
     func detach() async {

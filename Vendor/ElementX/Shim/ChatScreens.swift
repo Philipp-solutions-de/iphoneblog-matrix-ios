@@ -301,8 +301,10 @@ final class ChatRoomCoordinator: ChatScreenCoordinator {
             host?.openRoom(roomID: roomID)
         case .composer(let action):
             composerViewModel.process(timelineAction: action)
-        case .displayReportContent:
-            host?.showMessage(ChatKitStrings.reportNotOffered)
+        case .displayReportContent(let itemID, _):
+            if let eventID = itemID.eventID {
+                host?.reportMessage(roomID: roomProxy.id, eventID: eventID)
+            }
         default:
             // Calls, polls, location, forwarding and the pinned timeline are not part of our app.
             break
@@ -445,8 +447,10 @@ final class ChatThreadCoordinator: ChatScreenCoordinator {
             sheets.uploadPreview(mediaURLs: mediaURLs, caption: caption)
         case .presentRoomMemberDetails(let userID):
             host?.openUser(userID: userID)
-        case .presentReportContent:
-            host?.showMessage(ChatKitStrings.reportNotOffered)
+        case .presentReportContent(let itemID, _):
+            if let eventID = itemID.eventID {
+                host?.reportMessage(roomID: roomID, eventID: eventID)
+            }
         default:
             break
         }
@@ -484,7 +488,6 @@ enum ChatComposer {
 
 /// Texts ChatKit adds to Element X's. German, like the rest of the app.
 enum ChatKitStrings {
-    static let reportNotOffered = "Melden gibt es hier noch nicht. Schreib dem Team eine Direktnachricht."
 
     /// "Noch keine Antworten", "1 Antwort", "5 Antworten".
     static func replies(_ count: Int) -> String {
