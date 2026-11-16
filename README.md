@@ -32,6 +32,7 @@ scripts/build.sh test              # unit tests
 scripts/test-homeserver.sh start   # throwaway Synapse on 127.0.0.1:8008 with a user and two rooms
 set -a; . build/test-homeserver.env; set +a
 scripts/build.sh integration       # sign in and list rooms against it
+scripts/build.sh ui                # blog → Diskussion → swipe back, signed out and in
 scripts/test-homeserver.sh stop
 ```
 

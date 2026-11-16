@@ -268,6 +268,18 @@ targets:
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/iphoneblog.app/iphoneblog
         BUNDLE_LOADER: $(TEST_HOST)
 
+  UITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [Tests/UITests]
+    dependencies:
+      - target: App
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ${BUNDLE_ID}.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: App
+
 schemes:
   ChatKit:
     build:
@@ -286,3 +298,9 @@ schemes:
         App: all
     test:
       targets: [IntegrationTests]
+  UITests:
+    build:
+      targets:
+        App: all
+    test:
+      targets: [UITests]

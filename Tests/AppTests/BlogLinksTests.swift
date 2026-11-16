@@ -53,4 +53,17 @@ final class BlogLinksTests: XCTestCase {
         XCTAssertTrue(ReplyRow.format(yesterday, now: now).hasPrefix("Gestern, "))
         XCTAssertEqual(MentionRow.shortTime(yesterday, now: now), "Gestern")
     }
+
+    func testArticleThreadEndpointSitsBesideTheBlogFiles() {
+        let base = URL(string: "https://chat.iphoneblog.de/_iphoneblog/v1/blog")!
+        XCTAssertEqual(DiscussionStore.articleThreadURL(base: base).absoluteString,
+                       "https://chat.iphoneblog.de/_iphoneblog/v1/article-thread")
+    }
+
+    func testArticleThreadGetsTheArticlesOwnAddress() {
+        // The web view may be on beta with app=1; the server wants www without a query.
+        let beta = URL(string: "https://beta.iphoneblog.de/2023/02/28/tipp-in-der-reader-darstellung/?app=1#c")!
+        XCTAssertEqual(DiscussionStore.canonical(beta).absoluteString,
+                       "https://www.iphoneblog.de/2023/02/28/tipp-in-der-reader-darstellung/")
+    }
 }

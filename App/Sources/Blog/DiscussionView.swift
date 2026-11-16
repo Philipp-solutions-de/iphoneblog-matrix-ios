@@ -1,22 +1,21 @@
 import SwiftUI
 
 /// An article's discussion (previews 2a and 2b): "DISKUSSION", the article's title,
-/// "n Antworten · Artikel lesen", then the thread. #one members read and write in the
+/// "n Antworten", then the thread. #one members read and write in the
 /// conversation views; everyone else reads, with a panel that says who can write.
 struct DiscussionView: View {
     let route: Router.DiscussionRoute
     /// Nil while signed out.
     let session: ChatSession?
     @ObservedObject var router: Router
-    /// "Artikel lesen": the Blog tab shows the article in its web view.
-    let readArticle: (URL) -> Void
-    @Environment(\.dismiss) private var dismiss
 
     @State private var rootEventID: String?
     @State private var page: GuestAPI.ThreadPage?
     @State private var state: LoadState = .loading
 
-    enum LoadState { case loading, ready, noDiscussion, unavailable }
+    /// `signInToStart`: an article without a thread, and a reader without an account to have
+    /// one made (the server makes threads only for signed-in calls).
+    enum LoadState { case loading, ready, signInToStart, unavailable }
 
     private var isMember: Bool { session?.isOneMember ?? false }
 
@@ -27,18 +26,9 @@ struct DiscussionView: View {
             content
         }
         .background(Theme.background)
-        .navigationBarBackButtonHidden()
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { dismiss() } label: {
-                    HStack(spacing: 2) {
-                        Image(systemName: "chevron.left").fontWeight(.semibold)
-                        Text("Blog")
-                    }
-                }
-                .tint(Theme.teal)
-            }
-        }
+        // The system back button ("‹ Blog", from the blog's title): a custom one would switch
+        // off the swipe from the left edge back to the blog.
+        .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.background, for: .navigationBar)
         .task(id: route) { await load() }
     }
@@ -51,34 +41,24 @@ struct DiscussionView: View {
                 .font(Theme.Font.overline)
                 .tracking(0.5)
                 .foregroundStyle(Theme.ink3)
-            Text(page?.root.title ?? " ")
-                .font(.system(size: 22))
-                .foregroundStyle(Theme.tealBright)
-                .fixedSize(horizontal: false, vertical: true)
-                .redacted(reason: page == nil && state == .loading ? .placeholder : [])
-            HStack(spacing: 6) {
-                if let page {
-                    Text(page.root.replyCount == 1 ? "1 Antwort" : "\(page.root.replyCount) Antworten")
-                    Text("·").accessibilityHidden(true)
-                }
-                if let link = articleURL {
-                    Button("Artikel lesen") { readArticle(link) }
-                        .fontWeight(.medium)
-                        .foregroundStyle(Theme.teal)
-                }
+            // No thread file yet (a new thread, or none): no empty title line.
+            if page != nil || state == .loading {
+                Text(page?.root.title ?? " ")
+                    .font(.system(size: 22))
+                    .foregroundStyle(Theme.tealBright)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .redacted(reason: page == nil ? .placeholder : [])
             }
-            .font(Theme.Font.footnote)
-            .foregroundStyle(Theme.ink3)
+            if let page {
+                Text(page.root.replyCount == 1 ? "1 Antwort" : "\(page.root.replyCount) Antworten")
+                    .font(Theme.Font.footnote)
+                    .foregroundStyle(Theme.ink3)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, Theme.Space.page)
         .padding(.top, 4)
         .padding(.bottom, 14)
-    }
-
-    private var articleURL: URL? {
-        if case .article(let url) = route { return url }
-        return page?.root.link.flatMap(URL.init(string:))
     }
 
     // MARK: Content
@@ -87,9 +67,16 @@ struct DiscussionView: View {
         switch state {
         case .loading:
             ProgressView().frame(maxHeight: .infinity)
-        case .noDiscussion:
-            ContentUnavailableView("Noch keine Diskussion", systemImage: "bubble.left.and.bubble.right",
-                                   description: Text("Zu diesem Artikel gibt es noch keinen Thread."))
+        case .signInToStart:
+            ContentUnavailableView {
+                Label("Noch keine Antworten", systemImage: "bubble.left.and.bubble.right")
+            } description: {
+                Text("Anmelden, um mitzudiskutieren.")
+            } actions: {
+                Button("Anmelden") { router.showSignIn = true }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.button)
+            }
         case .unavailable:
             ContentUnavailableView {
                 Label("Nicht erreichbar", systemImage: "wifi.slash")
@@ -116,6 +103,13 @@ struct DiscussionView: View {
                 ForEach(page?.replies ?? [], id: \.eventId) { reply in
                     ReplyRow(name: reply.senderName, date: Date(milliseconds: reply.ts), text: reply.body)
                 }
+                if page?.replies.isEmpty ?? true {
+                    Text("Noch keine Antworten.")
+                        .font(Theme.Font.body)
+                        .foregroundStyle(Theme.ink3)
+                        .padding(.horizontal, Theme.Space.page)
+                        .padding(.vertical, Theme.Space.row)
+                }
             }
             .padding(.top, 6)
             .padding(.bottom, 180)
@@ -135,9 +129,9 @@ struct DiscussionView: View {
         switch route {
         case .article(let url):
             do {
-                rootEventID = try await store.rootEventID(for: url)
+                rootEventID = try await store.rootEventID(for: url, token: session.flatMap { try? $0.client.session().accessToken })
             } catch {
-                // links.json unreadable: not "no discussion", which would be wrong and final.
+                // Not "no discussion", which would be wrong and final: try again.
                 state = .unavailable
                 return
             }
@@ -145,12 +139,18 @@ struct DiscussionView: View {
             rootEventID = id
         }
         guard let rootEventID else {
-            state = .noDiscussion
+            state = .signInToStart
             return
         }
+        // A thread made a moment ago has no file yet; the bot writes it within a minute.
         page = try? await store.thread(rootEventID)
-        // Members read the thread through Matrix; the file only adds the header.
-        state = page == nil && !isMember ? .unavailable : .ready
+        state = .ready
+        var waited = 0
+        while page == nil, waited < 6, !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(10))
+            waited += 1
+            page = try? await store.thread(rootEventID)
+        }
     }
 }
 
