@@ -116,6 +116,34 @@ final class DiscussionUITests: XCTestCase {
         XCTAssertEqual(calls["created"], 1, "the server should make the thread once: \(calls)")
     }
 
+    /// A member's reply in a discussion shows at once, and is still there after going back and
+    /// opening the thread again (testers: "Wo ist meine Antwort?" until they restarted the app).
+    func testMemberReplyShowsAndStays() throws {
+        let app = try launch(member: true)
+        let web = app.webViews.firstMatch
+        XCTAssertTrue(web.links["Diskussion 1"].waitForExistence(timeout: 30))
+        sleep(8)
+        web.links["Diskussion 1"].tap()
+        let composer = app.textViews["room-message_composer"].firstMatch
+        XCTAssertTrue(composer.waitForExistence(timeout: 60), "no composer")
+        sleep(3) // the thread loads
+        composer.tap()
+        let marker = "antwort\(Int.random(in: 1000...9999))"
+        composer.typeText("Meine \(marker)")
+        app.buttons["room-send_button"].tap()
+        let reply = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", marker)).firstMatch
+        XCTAssertTrue(reply.waitForExistence(timeout: 20), "the reply does not show after sending")
+        attach(app, "member-reply-sent")
+
+        swipeBackFromLeftEdge(app)
+        XCTAssertTrue(app.staticTexts["DISKUSSION"].waitForNonExistence(timeout: 5), "swipe did not go back")
+        sleep(12) // the guest file refetch and a sync pass
+        web.links["Diskussion 1"].tap()
+        XCTAssertTrue(app.textViews.matching(NSPredicate(format: "value CONTAINS %@", marker)).firstMatch
+            .waitForExistence(timeout: 30), "the reply is gone after reopening the thread")
+        attach(app, "member-reply-reopened")
+    }
+
     // MARK: Helpers
 
     private func swipeBackFromLeftEdge(_ app: XCUIApplication) {

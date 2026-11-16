@@ -52,6 +52,16 @@ final class MentionsModel: ObservableObject {
         reload()
     }
 
+    /// "Alle als gelesen": every room with an unread mention gets a read receipt up to its
+    /// newest message, so the mentions, the badges and the rooms' counts clear.
+    func markAllRead() async {
+        guard let session else { return }
+        for roomID in Set(items.filter(\.unread).map(\.roomID)) {
+            try? await session.client.getRoom(roomId: roomID)?.markAsRead(receiptType: .read)
+        }
+        reload()
+    }
+
     func reload() {
         loading?.cancel()
         loading = Task { await load() }

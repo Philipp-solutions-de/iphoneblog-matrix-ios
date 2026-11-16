@@ -20,6 +20,8 @@ final class ChatSession: ObservableObject, ChatHost {
 
     @Published private(set) var syncState: SyncServiceState = .idle
     @Published private(set) var displayName: String?
+    /// The profile picture, small, for Ich; nil without one.
+    @Published private(set) var avatar: UIImage?
 
     /// #one-Chat's first room ("Allgemein"); the push-rule mode is read from it.
     @Published private(set) var oneChannelID: String?
@@ -82,6 +84,7 @@ final class ChatSession: ObservableObject, ChatHost {
         mentions.attach(to: self)
         notificationPrefs.attach(to: self)
         displayName = try? await client.displayName()
+        await loadAvatar()
         log.info("sync started")
     }
 
@@ -311,6 +314,38 @@ final class ChatSession: ObservableObject, ChatHost {
             throw URLError(.badServerResponse)
         }
         return data
+    }
+
+    // MARK: Profile picture
+
+    /// The picture behind the account's avatar URL, as a thumbnail.
+    func loadAvatar() async {
+        guard let url = try? await client.avatarUrl(), let source = try? MediaSource.fromUrl(url: url),
+              let data = try? await client.getMediaThumbnail(mediaSource: source, width: 240, height: 240) else {
+            avatar = nil
+            return
+        }
+        avatar = UIImage(data: data)
+    }
+
+    /// Sets the profile picture: square, at most 512 points, JPEG. The display name stays the
+    /// blog's; only the picture is the person's own choice.
+    func setAvatar(_ image: UIImage) async throws {
+        let side = min(image.size.width, image.size.height)
+        let crop = CGRect(x: (image.size.width - side) / 2, y: (image.size.height - side) / 2, width: side, height: side)
+        let target = CGSize(width: min(side, 512), height: min(side, 512))
+        let square = UIGraphicsImageRenderer(size: target).image { _ in
+            image.draw(in: CGRect(x: -crop.minX * target.width / side, y: -crop.minY * target.height / side,
+                                  width: image.size.width * target.width / side, height: image.size.height * target.height / side))
+        }
+        guard let data = square.jpegData(compressionQuality: 0.85) else { return }
+        try await client.uploadAvatar(mimeType: "image/jpeg", data: data)
+        avatar = square
+    }
+
+    func removeAvatar() async throws {
+        try await client.removeAvatar()
+        avatar = nil
     }
 
     /// The account page on the sign-in service (name, password, devices).

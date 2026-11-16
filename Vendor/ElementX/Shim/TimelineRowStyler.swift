@@ -106,12 +106,27 @@ struct TimelineItemRowStylerView<Content: View>: View {
                 .font(style.fonts.senderName)
                 .foregroundStyle(style.colors.ink)
                 .lineLimit(1)
+                .accessibilityHidden(true) // read by the accessibility modifier below
+                .onTapGesture { context.send(viewAction: .tappedOnSenderDetails(sender: timelineItem.sender)) }
             Text(ChatTimeLabel.short(timelineItem.timestamp))
                 .font(style.fonts.time)
                 .foregroundStyle(style.colors.ink3)
+                .accessibilityHidden(true)
+            Spacer(minLength: 8)
+            // A visible way to react (testers: reactions were "mega versteckt" behind the long
+            // press, which stays); next to existing reactions Element X has its own + button.
+            if timelineItem.canBeRepliedTo, !isMessageSelectionActive {
+                Button { context.send(viewAction: .displayEmojiPicker(itemID: timelineItem.id)) } label: {
+                    CompoundIcon(\.reactionAdd, size: .xSmall, relativeTo: .compound.bodySM)
+                        .foregroundStyle(style.colors.ink3.opacity(0.7))
+                        .frame(width: 32, height: 24, alignment: .trailing)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L10n.actionReact)
+                .accessibilityIdentifier("row-react")
+            }
         }
-        .accessibilityHidden(true) // read by the accessibility modifier below
-        .onTapGesture { context.send(viewAction: .tappedOnSenderDetails(sender: timelineItem.sender)) }
     }
 
     private var messageWithActions: some View {

@@ -20,7 +20,16 @@ struct MentionsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ScreenTitle("@Mentions")
+            HStack(alignment: .firstTextBaseline) {
+                ScreenTitle("@Mentions")
+                if mentions.unreadCount > 0 {
+                    Button("Alle als gelesen") { Task { await mentions.markAllRead() } }
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.teal)
+                        .padding(.trailing, Theme.Space.page)
+                        .accessibilityIdentifier("mentions.markAllRead")
+                }
+            }
             if !mentions.items.isEmpty {
                 SearchField(text: $filter, prompt: "@Mentions durchsuchen")
                     .padding(.horizontal, Theme.Space.page)
