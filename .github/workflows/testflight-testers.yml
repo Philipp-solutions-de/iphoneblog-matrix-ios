@@ -29,6 +29,14 @@ on:
         description: "Last name, for a team invitation"
         required: false
         default: ""
+      check:
+        description: "Check why testers see nothing (groups, builds, tester states)"
+        type: boolean
+        default: false
+      fix:
+        description: "Fix it: all builds on, newest valid builds added, TestFlight invitations sent"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -60,6 +68,8 @@ jobs:
           TEAM_INVITE: ${{ inputs.team }}
           INVITE_FIRST: ${{ inputs.first }}
           INVITE_LAST: ${{ inputs.last }}
+          TESTERS_CHECK: ${{ inputs.check }}
+          TESTERS_FIX: ${{ inputs.fix }}
         run: |
           # The address stays out of the log.
           if [ -n "$INVITE_EMAIL" ]; then echo "::add-mask::$INVITE_EMAIL"; fi
