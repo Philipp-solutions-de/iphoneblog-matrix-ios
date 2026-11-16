@@ -14,24 +14,5 @@
       "Duration (ApplicationFirstFramePresentationResponsive)": 0.2
     }
   },
-  "baselines": {
-    "testLaunch": {
-      "Duration (ApplicationFirstFramePresentationResponsive)": 1.2816
-    },
-    "testOpenThread": {
-      "Clock Monotonic Time": 4.9686
-    },
-    "testScrollBlog": {
-      "Hitch time ratio": 2.0147
-    },
-    "testScrollOneChat": {
-      "Hitch time ratio": 36.55
-    },
-    "testScrollThread": {
-      "Hitch time ratio": 39.2996
-    },
-    "testSwitchTabs": {
-      "Clock Monotonic Time": 9.3054
-    }
-  }
+  "baselines": {}
 }

@@ -60,7 +60,8 @@ final class PerformanceTests: XCTestCase {
     /// Cold launch to the first frame that answers a touch, signed out (the Blog tab).
     func testLaunch() throws {
         let app = try app(member: false)
-        measure(metrics: [XCTApplicationLaunchMetric(waitUntilResponsive: true)], options: options) {
+        // The clock as well: a CI runner's simulator does not always report the launch metric.
+        measure(metrics: [XCTApplicationLaunchMetric(waitUntilResponsive: true), XCTClockMetric()], options: options) {
             app.launch()
             app.terminate()
         }
@@ -145,7 +146,11 @@ final class PerformanceTests: XCTestCase {
         allowLocalNetwork()
         let web = app.webViews.firstMatch
         XCTAssertTrue(web.waitForExistence(timeout: 20), "no blog web view")
-        XCTAssertTrue(web.staticTexts["Artikel 1"].waitForExistence(timeout: 20), "blog page not loaded")
+        // A fresh simulator on a CI runner starts WebKit's processes slowly.
+        if !web.staticTexts["Artikel 1"].waitForExistence(timeout: 60) {
+            print("PERF-HIERARCHY-BEGIN\n\(app.debugDescription)\nPERF-HIERARCHY-END")
+            XCTFail("blog page not loaded")
+        }
         measure(metrics: [HitchMetric(statsPath: statsPath), XCTOSSignpostMetric.scrollDecelerationMetric, XCTOSSignpostMetric.scrollDraggingMetric],
                 options: options) {
             web.swipeUp(velocity: .fast)
