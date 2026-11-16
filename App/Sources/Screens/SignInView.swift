@@ -8,6 +8,10 @@ struct SignInView: View {
 
     @State private var username = ""
     @State private var password = ""
+    #if DEBUG && targetEnvironment(simulator)
+    /// The sign-in page for the gate-cookie web view (TestGate.swift), while it is open.
+    @State private var webSignIn: WebSignInRequest?
+    #endif
 
     private var isBusy: Bool {
         if case .signingIn = model.state { return true }
@@ -68,6 +72,25 @@ struct SignInView: View {
         .overlay {
             if isBusy { ProgressView().controlSize(.large) }
         }
+        #if DEBUG && targetEnvironment(simulator)
+        .sheet(item: $webSignIn) { request in
+            NavigationStack {
+                WebSignInSheet(url: request.url, callbackScheme: Brand.oauthRedirectScheme) { callback in
+                    webSignIn = nil
+                    if let callback { Task { await model.completeOAuth(callbackURL: callback) } }
+                }
+                .ignoresSafeArea(edges: .bottom)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Abbrechen") {
+                            webSignIn = nil
+                            model.cancelOAuth()
+                        }
+                    }
+                }
+            }
+        }
+        #endif
     }
 
     /// For test servers without the blog sign-in.
@@ -97,6 +120,14 @@ struct SignInView: View {
         Task {
             do {
                 let url = try await model.oauthLoginURL()
+                #if DEBUG && targetEnvironment(simulator)
+                // In the simulator with beta's gate token, a web view that carries it; the system
+                // sheet keeps Safari's cookies and meets Authelia (TestGate.swift).
+                if TestGate.cookie() != nil {
+                    webSignIn = WebSignInRequest(url: url)
+                    return
+                }
+                #endif
                 // Not ephemeral: someone signed in to the blog in Safari taps once and is in.
                 let callback = try await webAuthenticationSession.authenticate(
                     using: url,
@@ -111,3 +142,10 @@ struct SignInView: View {
         }
     }
 }
+
+#if DEBUG && targetEnvironment(simulator)
+struct WebSignInRequest: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+#endif
