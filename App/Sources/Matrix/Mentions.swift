@@ -10,8 +10,8 @@ import OSLog
 final class MentionsModel: ObservableObject {
     struct Mention: Identifiable, Equatable {
         enum Place: Equatable {
-            /// The #one-Chat channel; `thread` when it was said in a thread.
-            case channel(roomID: String, threadRoot: String?)
+            /// A #one room, by its name; `threadRoot` when it was said in a thread.
+            case channel(roomID: String, threadRoot: String?, name: String?)
             /// The discussion under an article.
             case discussion(rootEventID: String, title: String?)
             /// Anywhere else the account is joined.
@@ -87,8 +87,10 @@ final class MentionsModel: ObservableObject {
             guard let root = thread else { return nil }
             let title = await threadTitle(root)
             place = .discussion(rootEventID: root, title: title)
-        } else if entry.roomId == session.oneChannelID {
-            place = .channel(roomID: entry.roomId, threadRoot: thread)
+        } else if session.rooms.channelIDs.contains(entry.roomId) {
+            let name = session.oneRooms.first { $0.id == entry.roomId }?.name
+                ?? session.rooms.rooms.first { $0.id == entry.roomId }?.name
+            place = .channel(roomID: entry.roomId, threadRoot: thread, name: name)
         } else {
             place = .room(roomID: entry.roomId, name: try? session.client.getRoom(roomId: entry.roomId)?.displayName())
         }
@@ -256,7 +258,9 @@ final class NotificationPrefs: ObservableObject {
     }
 
     func setChannel(_ mode: ChannelMode) {
-        guard let session, let channelID = session.oneChannelID else { return }
+        // One switch for the whole #one-Chat area: every #one room gets the mode.
+        guard let session, !session.rooms.channelIDs.isEmpty else { return }
+        let channelIDs = session.rooms.channelIDs
         channel = mode
         Task {
             let settings = await session.client.getNotificationSettings()
@@ -266,7 +270,9 @@ final class NotificationPrefs: ObservableObject {
             case .mute: .mute
             }
             do {
-                try await settings.setRoomNotificationMode(roomId: channelID, mode: sdkMode)
+                for channelID in channelIDs {
+                    try await settings.setRoomNotificationMode(roomId: channelID, mode: sdkMode)
+                }
             } catch {
                 log.error("channel mode failed: \(error.localizedDescription, privacy: .public)")
                 await load()

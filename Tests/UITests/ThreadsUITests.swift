@@ -11,7 +11,7 @@ final class ThreadsUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    private func openChannel() throws -> XCUIApplication {
+    private func openChannel(inRoom: Bool = true) throws -> XCUIApplication {
         guard let server = env["IPHONEBLOG_TEST_HOMESERVER"], let user = env["IPHONEBLOG_TEST_USER"],
               let password = env["IPHONEBLOG_TEST_PASSWORD"] else {
             throw XCTSkip("no test homeserver configured")
@@ -20,6 +20,7 @@ final class ThreadsUITests: XCTestCase {
         app.launchEnvironment = [
             "IPHONEBLOG_NO_PUSH_PROMPT": "1",
             "IPHONEBLOG_START_TAB": "chat",
+            "IPHONEBLOG_START_ROOM": inRoom ? env["IPHONEBLOG_TEST_CHANNEL_ROOM"] ?? "" : "",
             "IPHONEBLOG_HOMESERVER": server,
             "IPHONEBLOG_DEV_USER": user,
             "IPHONEBLOG_DEV_PASSWORD": password,
@@ -29,7 +30,9 @@ final class ThreadsUITests: XCTestCase {
         ]
         app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE"]
         app.launch()
-        XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "channel did not open")
+        if inRoom {
+            XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "channel did not open")
+        }
         return app
     }
 
@@ -82,14 +85,27 @@ final class ThreadsUITests: XCTestCase {
     }
 
     func testThreadsRowListsYourThreads() throws {
-        let app = try openChannel()
+        let app = try openChannel(inRoom: false)
         let entry = app.buttons["threads-entry"]
-        XCTAssertTrue(entry.waitForExistence(timeout: 30), "no Threads row")
+        XCTAssertTrue(entry.waitForExistence(timeout: 120), "no Threads row")
         entry.tap()
         XCTAssertTrue(element(app, containing: "iPad mini").waitForExistence(timeout: 30), "your thread is not listed")
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label MATCHES '[67] Antworten'")).firstMatch
             .waitForExistence(timeout: 15), "the list shows the wrong count")
         attach(app, "threads-list")
+    }
+
+    /// #one-Chat lists the #one rooms in order; a tap opens one.
+    func testRoomListOpensARoom() throws {
+        let app = try openChannel(inRoom: false)
+        let rooms = app.buttons.matching(identifier: "one-room")
+        XCTAssertTrue(rooms.element(boundBy: 1).waitForExistence(timeout: 120), "fewer than two rooms")
+        XCTAssertTrue(rooms.element(boundBy: 0).label.contains("Allgemein"), rooms.element(boundBy: 0).label)
+        XCTAssertTrue(rooms.element(boundBy: 1).label.contains("Raum 2"), rooms.element(boundBy: 1).label)
+        attach(app, "room-list")
+        rooms.element(boundBy: 1).tap()
+        XCTAssertTrue(app.textViews["Nachricht an # Raum 2"].waitForExistence(timeout: 60), "Raum 2 did not open")
+        attach(app, "room-raum-2")
     }
 
     private func attach(_ app: XCUIApplication, _ name: String) {

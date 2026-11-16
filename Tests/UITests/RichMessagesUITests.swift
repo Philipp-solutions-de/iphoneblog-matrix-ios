@@ -46,7 +46,7 @@ final class RichMessagesUITests: XCTestCase {
     }
 
     private func openChannel() throws -> XCUIApplication {
-        let app = try launch(["IPHONEBLOG_START_TAB": "chat"])
+        let app = try launch(["IPHONEBLOG_START_TAB": "chat", "IPHONEBLOG_START_ROOM": env["IPHONEBLOG_TEST_CHANNEL_ROOM"] ?? ""])
         XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "channel did not open")
         return app
     }

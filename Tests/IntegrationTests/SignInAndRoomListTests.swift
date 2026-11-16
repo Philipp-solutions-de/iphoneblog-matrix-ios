@@ -47,14 +47,14 @@ final class SignInAndRoomListTests: XCTestCase {
             XCTAssertEqual(session.rooms.withMentions.map(\.name), [mentionRoom])
         }
 
-        // #one: the space makes the tester a member; its child #one-Chat is the one channel.
+        // #one: the space makes the tester a member; its children Allgemein and Raum 2 are the #one rooms.
         if env["IPHONEBLOG_ONE_ALIAS"] != nil {
             let until = Date().addingTimeInterval(30)
             while Date() < until, !session.isOneMember { try await Task.sleep(for: .milliseconds(250)) }
             XCTAssertTrue(session.isOneMember, "not a #one member")
-            XCTAssertEqual(session.rooms.channels.map(\.name), ["#one-Chat"])
+            XCTAssertEqual(Set(session.rooms.channels.map(\.name)), ["Allgemein", "Raum 2"])
             let channel = try XCTUnwrap(session.oneChannelID, "no #one-Chat channel")
-            XCTAssertEqual(session.rooms.rooms.first { $0.id == channel }?.name, "#one-Chat")
+            XCTAssertEqual(session.rooms.rooms.first { $0.id == channel }?.name, "Allgemein")
         }
 
         // The mention also reaches @Mentions, from the server's notification list.

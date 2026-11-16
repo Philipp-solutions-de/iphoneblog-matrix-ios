@@ -16,50 +16,146 @@ struct OneChatTab: View {
     }
 }
 
-/// Decides per sync whether the channel or the lock shows.
+/// #one-Chat: the #one rooms. Members get Threads on top and open a room as a channel;
+/// signed-in non-members see the rooms locked, and a tap offers #one.
 private struct MemberGate: View {
     @ObservedObject var session: ChatSession
     @ObservedObject var router: Router
+    @State private var showOffer = false
 
     var body: some View {
-        if session.isOneMember, let channel = session.oneChannelID {
-            NavigationStack(path: $router.threadPath) {
-                VStack(spacing: 0) {
-                    // Slack's place for threads: above the channel, with a count of the ones with news.
-                    ChatScreens.provider.threadsEntry(host: session) { router.showThreads = true }
-                    ChatScreens.provider.roomScreen(roomID: channel, host: session)
-                        .id(channel)
-                }
-                .navigationDestination(for: Router.ThreadRoute.self) { route in
-                    ChatScreens.provider.threadScreen(roomID: route.roomID, rootEventID: route.rootEventID, host: session)
-                }
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button { router.showSearch = true } label: { Image(systemName: "magnifyingglass") }
-                            .accessibilityLabel("In #one-Chat suchen")
-                            .accessibilityIdentifier("chat-search")
+        if session.isOneMember || session.oneRooms.contains(where: \.locked) {
+            NavigationStack(path: $router.chatPath) {
+                OneRoomsList(session: session, router: router) { showOffer = true }
+                    .navigationDestination(for: Router.ChatRoute.self) { route in
+                        destination(route)
                     }
-                }
-                .navigationDestination(isPresented: $router.showSearch) {
-                    ChatSearchView(model: ChatSearchModel(session: session, roomIDs: [channel]), router: router)
-                }
-                .navigationDestination(isPresented: $router.showThreads) {
-                    ChatScreens.provider.threadsScreen(host: session)
-                        .navigationTitle("Threads")
-                        .navigationBarTitleDisplayMode(.inline)
-                }
             }
-            .onAppear { router.selectedRoomID = channel }
-            .task(id: router.pendingThread) {
-                guard let route = router.pendingThread else { return }
-                // One frame for the stack to settle after the tab change.
-                try? await Task.sleep(for: .milliseconds(150))
-                router.threadPath = [route]
-                router.pendingThread = nil
+            .task(id: session.isOneMember) { await session.loadOneRooms() }
+            .sheet(isPresented: $showOffer) {
+                LockedOneChat(signedIn: true, router: router).presentationDragIndicator(.visible)
             }
         } else {
             LockedOneChat(signedIn: true, router: router)
+                .task(id: session.isOneMember) { await session.loadOneRooms() }
         }
+    }
+
+    @ViewBuilder
+    private func destination(_ route: Router.ChatRoute) -> some View {
+        switch route {
+        case .room(let roomID):
+            ChatScreens.provider.roomScreen(roomID: roomID, host: session)
+                .id(roomID)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { router.openSearch(in: [roomID]) } label: { Image(systemName: "magnifyingglass") }
+                            .accessibilityLabel("In diesem Raum suchen")
+                            .accessibilityIdentifier("room-search")
+                    }
+                }
+        case .thread(let thread):
+            ChatScreens.provider.threadScreen(roomID: thread.roomID, rootEventID: thread.rootEventID, host: session)
+        case .threads:
+            ChatScreens.provider.threadsScreen(host: session)
+                .navigationTitle("Threads")
+                .navigationBarTitleDisplayMode(.inline)
+        case .search(let roomIDs):
+            ChatSearchView(model: ChatSearchModel(session: session, roomIDs: roomIDs), router: router)
+        }
+    }
+}
+
+/// The list: "#one-Chat" with a search over all rooms, Threads, then each room with its unread
+/// count (members) or a lock (non-members).
+private struct OneRoomsList: View {
+    @ObservedObject var session: ChatSession
+    @ObservedObject var router: Router
+    @ObservedObject private var roomList: RoomListModel
+    let offer: () -> Void
+
+    init(session: ChatSession, router: Router, offer: @escaping () -> Void) {
+        self.session = session
+        self.router = router
+        self.roomList = session.rooms
+        self.offer = offer
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                if session.isOneMember {
+                    // Slack's place for threads: above the rooms, with a count of the ones with news.
+                    ChatScreens.provider.threadsEntry(host: session) { router.openThreadsList() }
+                }
+                ForEach(session.oneRooms) { room in
+                    Button {
+                        if room.locked || !session.isOneMember { offer() } else { router.chatPath.append(.room(room.id)) }
+                    } label: {
+                        OneRoomRow(room: room, unread: unread(room.id), locked: room.locked || !session.isOneMember)
+                    }
+                    .buttonStyle(.plain)
+                    Divider().overlay(Theme.line).padding(.leading, Theme.Space.page)
+                }
+            }
+        }
+        .background(Theme.background)
+        .navigationTitle("#one-Chat")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if session.isOneMember {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { router.openSearch(in: session.oneRooms.map(\.id)) } label: { Image(systemName: "magnifyingglass") }
+                        .accessibilityLabel("In #one-Chat suchen")
+                        .accessibilityIdentifier("chat-search")
+                }
+            }
+        }
+        .overlay {
+            if session.oneRooms.isEmpty { ProgressView() }
+        }
+        .refreshable { await session.loadOneRooms() }
+    }
+
+    private func unread(_ roomID: String) -> Int {
+        roomList.rooms.first { $0.id == roomID }?.unreadMessages ?? 0
+    }
+}
+
+/// One #one room: "# Allgemein", its topic, unread count or lock.
+private struct OneRoomRow: View {
+    let room: ChatSession.OneRoom
+    let unread: Int
+    let locked: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text("#").font(Theme.Font.rowHash).foregroundStyle(Theme.ink3).frame(width: 22)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(room.name)
+                    .font(Theme.Font.rowTitle.weight(unread > 0 ? .semibold : .regular))
+                    .foregroundStyle(Theme.ink)
+                if let topic = room.topic, !topic.isEmpty {
+                    Text(topic).font(Theme.Font.footnote).foregroundStyle(Theme.ink3).lineLimit(1)
+                }
+            }
+            Spacer()
+            if locked {
+                Image(systemName: "lock").foregroundStyle(Theme.coral).accessibilityLabel("Nur für #one-Mitglieder")
+            } else if unread > 0 {
+                Text("\(unread)")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7)
+                    .frame(minWidth: 22, minHeight: 22)
+                    .background(Theme.badge, in: Capsule())
+            }
+        }
+        .padding(.horizontal, Theme.Space.page)
+        .padding(.vertical, 13)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("one-room")
     }
 }
 

@@ -62,9 +62,9 @@ struct MentionsView: View {
 
     private func open(_ mention: MentionsModel.Mention) {
         switch mention.place {
-        case .channel(let roomID, let root?):
+        case .channel(let roomID, let root?, _):
             router.openThread(roomID: roomID, rootEventID: root)
-        case .channel(let roomID, nil):
+        case .channel(let roomID, nil, _):
             router.openRoom(roomID)
         case .discussion(let root, _):
             router.tab = .blog
@@ -121,7 +121,7 @@ struct MentionRow: View {
     /// The place as words, for the filter.
     static func placeName(_ place: MentionsModel.Mention.Place) -> String {
         switch place {
-        case .channel(_, let root): "#one-Chat" + (root == nil ? "" : " Thread")
+        case .channel(_, let root, let name): "#one-Chat " + (name ?? "") + (root == nil ? "" : " Thread")
         case .discussion(_, let title): "Diskussion " + (title ?? "")
         case .room(_, let name): name ?? ""
         }
@@ -129,8 +129,8 @@ struct MentionRow: View {
 
     private var context: (text: String, color: Color) {
         switch mention.place {
-        case .channel(_, let root):
-            ("#one-Chat" + (root == nil ? "" : " · Thread"), Theme.coralText)
+        case .channel(_, let root, let name):
+            ("#one-Chat" + (name.map { " · " + $0 } ?? "") + (root == nil ? "" : " · Thread"), Theme.coralText)
         case .discussion(_, let title):
             ("Diskussion" + (title.map { " · " + $0 } ?? ""), Theme.teal)
         case .room(_, let name):

@@ -73,24 +73,26 @@ token="$(login "$user" "$password")"
 writer="$(login writer "$writer_password")"
 curl -fs -X PUT "$url/_matrix/client/v3/profile/@writer:localhost/displayname" -H "Authorization: Bearer $writer" \
     -d '{"displayname":"Stefan L."}' >/dev/null
-rooms=("#one-Chat" Artikel)
+rooms=(Allgemein Artikel)
 allgemein=""
 create() { # token, json → room id
     curl -fs -X POST "$url/_matrix/client/v3/createRoom" -H "Authorization: Bearer $1" -d "$2" \
         | python3 -c 'import json,sys; print(json.load(sys.stdin)["room_id"])'
 }
 for name in "${rooms[@]}"; do
-    alias=""; [[ "$name" == "#one-Chat" ]] && alias=',"room_alias_name":"allgemein"'
+    alias=""; [[ "$name" == Allgemein ]] && alias=',"room_alias_name":"allgemein"'
     id="$(create "$token" "{\"name\":\"$name\",\"preset\":\"public_chat\"$alias}")"
-    [[ "$name" == "#one-Chat" ]] && allgemein="$id"
+    [[ "$name" == Allgemein ]] && allgemein="$id"
 done
 
 # As on the real server (2026-11-14_interfaces.md, "Matrix Blog feed"): #one is a space whose
-# children are the #one-Chat channels; the tester is a member, the channel "#one-Chat" (named as
-# on the live server) its child.
+# children are the #one rooms (Allgemein, Raum 2, as on the live server); the tester is a member.
 one="$(create "$token" '{"name":"#one","preset":"private_chat","room_alias_name":"one","creation_content":{"type":"m.space"}}')"
 curl -fs -X PUT "$url/_matrix/client/v3/rooms/$one/state/m.space.child/$allgemein" \
-    -H "Authorization: Bearer $token" -d '{"via":["localhost"]}' >/dev/null
+    -H "Authorization: Bearer $token" -d '{"via":["localhost"],"order":"a"}' >/dev/null
+raum2="$(create "$token" '{"name":"Raum 2","preset":"public_chat"}')"
+curl -fs -X PUT "$url/_matrix/client/v3/rooms/$one/state/m.space.child/$raum2" \
+    -H "Authorization: Bearer $token" -d '{"via":["localhost"],"order":"b"}' >/dev/null
 
 curl -fs -X POST "$url/_matrix/client/v3/join/$allgemein" -H "Authorization: Bearer $writer" -d '{}' >/dev/null
 send() { # room, txn, json
@@ -143,7 +145,7 @@ IPHONEBLOG_TEST_PASSWORD=$password
 IPHONEBLOG_TEST_USER2=anna
 IPHONEBLOG_TEST_PASSWORD2=$reader_password
 IPHONEBLOG_TEST_ROOMS='$(IFS=,; echo "${rooms[*]}")'
-IPHONEBLOG_TEST_MENTION_ROOM='#one-Chat'
+IPHONEBLOG_TEST_MENTION_ROOM=Allgemein
 IPHONEBLOG_ONE_ALIAS=#one:localhost
 IPHONEBLOG_BLOG_ALIAS=#blog:localhost
 IPHONEBLOG_CHANNEL_ALIAS=#allgemein:localhost
