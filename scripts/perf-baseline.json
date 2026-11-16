@@ -14,21 +14,33 @@
     "per_test": {
       "testLaunch": {
         "Clock Monotonic Time": 10.0
+      },
+      "testOpenThread": {
+        "Clock Monotonic Time": 8.0
+      },
+      "testScrollBlog": {
+        "Hitch time ratio": 40.0
       }
     }
   },
   "baselines": {
     "testLaunch": {
-      "Clock Monotonic Time": 13.9066
+      "Clock Monotonic Time": 8.8938
     },
     "testOpenThread": {
-      "Clock Monotonic Time": 7.5699
+      "Clock Monotonic Time": 12.1337
+    },
+    "testScrollBlog": {
+      "Hitch time ratio": 25.3733
     },
     "testScrollOneChat": {
-      "Hitch time ratio": 186.1193
+      "Hitch time ratio": 140.6524
+    },
+    "testScrollThread": {
+      "Hitch time ratio": 214.6622
     },
     "testSwitchTabs": {
-      "Clock Monotonic Time": 12.2919
+      "Clock Monotonic Time": 12.263
     }
   }
 }
