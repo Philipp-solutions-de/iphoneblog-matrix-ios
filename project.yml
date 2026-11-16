@@ -236,7 +236,10 @@ targets:
         SWIFT_VERSION: "6"
         SWIFT_APPROACHABLE_CONCURRENCY: YES
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
-        OTHER_SWIFT_FLAGS: ["-DIS_MAIN_APP"]
+        # No runtime traps for main-actor closures that SwiftUI calls from its async renderer
+        # (FormattedBodyText's ForEach crashed in a Release build on iOS 27 while scrolling):
+        # the compile-time checks stay. Element X's code assumes Swift 5's runtime behaviour there.
+        OTHER_SWIFT_FLAGS: ["-DIS_MAIN_APP", "-Xfrontend", "-disable-dynamic-actor-isolation"]
         SKIP_INSTALL: YES
         CODE_SIGN_STYLE: Automatic
 
