@@ -193,12 +193,16 @@ final class PerformanceTests: XCTestCase {
         XCTAssertTrue(tab.waitForExistence(timeout: 30), "no #one-Chat tab")
         // The sign-in runs in the background after launch; the tab shows the channel once the
         // session and the space are there.
-        let deadline = Date().addingTimeInterval(60)
+        // Two minutes: a CI runner's simulator signs in and syncs slowly.
+        let deadline = Date().addingTimeInterval(120)
         repeat {
             tab.tap()
             if app.staticTexts["Felix H."].firstMatch.waitForExistence(timeout: 5) { break }
         } while Date() < deadline
-        XCTAssertTrue(app.staticTexts["Felix H."].firstMatch.exists, "#one-Chat shows no seeded messages")
+        if !app.staticTexts["Felix H."].firstMatch.exists {
+            print("PERF-HIERARCHY-BEGIN\n\(app.debugDescription)\nPERF-HIERARCHY-END")
+            XCTFail("#one-Chat shows no seeded messages")
+        }
         return timeline(app)
     }
 

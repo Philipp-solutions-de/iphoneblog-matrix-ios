@@ -68,6 +68,7 @@ jobs:
             build/perf.xcresult
             build/perf*.log
             build/perf-report.md
+            build/perf-synapse/*.log
           if-no-files-found: ignore
 
       - name: Summary
