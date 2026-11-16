@@ -70,10 +70,11 @@ simulator's hitches are its own.
 **The baselines are CI's.** The `xcode-27` runner is about four times slower than a Mac Studio
 and noisier: a cold launch there takes 9 to 27 s, and one thread opening in five can take a
 minute. So the baselines are medians of a CI run, written from the `perf` artifact's
-`perf.log`. Three tests get their own slack (`per_test`): launch, gated on its clock time
+`perf.log`. Five tests get their own slack (`per_test`): launch, gated on its clock time
 because the runner's simulator does not always report Apple's launch metric, 10 s; opening the
 thread, 7.6 s in one run and 12.1 s in the next with the same app, 8 s; the Blog's hitch ratio,
-21 to 128 ms/s within one run, 40 ms/s. The gate on this runner catches a screen that gets
+21 to 128 ms/s within one run, 40 ms/s; the chat's and the thread's hitch ratios, 141 to 227
+ms/s from run to run, 100 ms/s. The gate on this runner catches a screen that gets
 twice as slow; the device run is what measures fluidity. The simulator also hides WebKit's
 content from XCUITest there, so the Blog test waits for the web view's scroll bar, not a word
 on the page. Xcode's

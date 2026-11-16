@@ -231,9 +231,8 @@ final class PerformanceTests: XCTestCase {
     /// The long thread's "NN Antworten" under its root (scripts/seed-perf-data.py puts the root
     /// ten messages above the newest), scrolled into view.
     private func threadSummary(_ app: XCUIApplication, in list: XCUIElement) throws -> XCUIElement {
-        // The only thread in the channel with more than one reply. Its count is what the
-        // app has loaded, not always 90, so match the form, not the number.
-        let summary = app.buttons.matching(NSPredicate(format: "label MATCHES %@", "[0-9]+ Antworten")).firstMatch
+        // The only thread in allgemein with replies: its row under the root ("90 Antworten, …").
+        let summary = app.buttons.matching(identifier: "thread-row").firstMatch
         // A CI runner pages older messages in slowly: more swipes, each given a moment.
         for _ in 0..<25 where !summary.isHittable {
             list.swipeDown(velocity: .slow)
@@ -242,7 +241,7 @@ final class PerformanceTests: XCTestCase {
         guard summary.isHittable else {
             // What the screen holds instead, for whoever reads the log.
             print("PERF-HIERARCHY-BEGIN\n\(app.debugDescription)\nPERF-HIERARCHY-END")
-            XCTFail("no \"NN Antworten\" in #one-Chat")
+            XCTFail("no thread row in allgemein")
             throw XCTSkip("thread summary not found")
         }
         return summary
