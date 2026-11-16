@@ -54,14 +54,16 @@ final class ThreadsUITests: XCTestCase {
 
     func testThreadRowShowsCountAndOpensTheThread() throws {
         let app = try openChannel()
-        let row = app.buttons.matching(NSPredicate(format: "identifier == 'thread-row' AND label CONTAINS '6 Antworten'")).firstMatch
+        // Six seeded replies; RichMessagesUITests may have added a photo before this runs.
+        let row = app.buttons.matching(NSPredicate(format: "identifier == 'thread-row' AND label MATCHES '.*[67] Antworten.*'")).firstMatch
         scrollTo(row, in: app)
-        XCTAssertTrue(row.exists, "no thread row with 6 Antworten")
+        XCTAssertTrue(row.exists, "no thread row with 6 or 7 Antworten")
         sleep(2) // repliers load
         attach(app, "channel-thread-row")
         row.tap()
         XCTAssertTrue(app.textViews["Antworten…"].waitForExistence(timeout: 30), "thread did not open")
-        XCTAssertTrue(element(app, containing: "6 Antworten").exists, "no count under the root")
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label MATCHES '[67] Antworten'")).firstMatch.exists,
+                      "no count under the root")
         attach(app, "thread-view")
     }
 
@@ -85,7 +87,8 @@ final class ThreadsUITests: XCTestCase {
         XCTAssertTrue(entry.waitForExistence(timeout: 30), "no Threads row")
         entry.tap()
         XCTAssertTrue(element(app, containing: "iPad mini").waitForExistence(timeout: 30), "your thread is not listed")
-        XCTAssertTrue(element(app, containing: "6 Antworten").waitForExistence(timeout: 15), "the list shows the wrong count")
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label MATCHES '[67] Antworten'")).firstMatch
+            .waitForExistence(timeout: 15), "the list shows the wrong count")
         attach(app, "threads-list")
     }
 

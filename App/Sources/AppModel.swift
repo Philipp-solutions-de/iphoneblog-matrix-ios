@@ -44,6 +44,11 @@ final class AppModel: ObservableObject {
             state = .signedOut
             return
         }
+        // A test that signs in as someone else does not inherit the last test's session.
+        if let user = ProcessInfo.processInfo.environment["IPHONEBLOG_DEV_USER"], let stored = store.load(),
+           !stored.userID.hasPrefix("@\(user):") {
+            store.delete()
+        }
         #endif
         guard let stored = store.load() else {
             #if DEBUG
