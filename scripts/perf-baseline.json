@@ -1,0 +1,37 @@
+{
+  "_comment": "docs/performance.md. baselines: medians of a good simulator run (scripts/perf.sh baseline); tolerance: how much worse than the baseline fails, relative AND absolute. budgets: hard limits per test, none for the simulator.",
+  "gated": [
+    "Hitch time ratio",
+    "Clock Monotonic Time",
+    "Duration (ApplicationFirstFramePresentationResponsive)"
+  ],
+  "budgets": {},
+  "tolerance": {
+    "relative": 0.5,
+    "absolute": {
+      "Hitch time ratio": 1.0,
+      "Clock Monotonic Time": 0.3,
+      "Duration (ApplicationFirstFramePresentationResponsive)": 0.2
+    }
+  },
+  "baselines": {
+    "testLaunch": {
+      "Duration (ApplicationFirstFramePresentationResponsive)": 1.2816
+    },
+    "testOpenThread": {
+      "Clock Monotonic Time": 4.9686
+    },
+    "testScrollBlog": {
+      "Hitch time ratio": 2.0147
+    },
+    "testScrollOneChat": {
+      "Hitch time ratio": 36.55
+    },
+    "testScrollThread": {
+      "Hitch time ratio": 39.2996
+    },
+    "testSwitchTabs": {
+      "Clock Monotonic Time": 9.3054
+    }
+  }
+}
