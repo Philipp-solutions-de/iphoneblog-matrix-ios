@@ -106,7 +106,7 @@ struct TimelineItemRowStylerView<Content: View>: View {
                 .font(style.fonts.senderName)
                 .foregroundStyle(style.colors.ink)
                 .lineLimit(1)
-            Text(timelineItem.timestamp.formatted(date: .omitted, time: .shortened))
+            Text(ChatTimeLabel.short(timelineItem.timestamp))
                 .font(style.fonts.time)
                 .foregroundStyle(style.colors.ink3)
         }
@@ -338,5 +338,27 @@ private extension TimelineEventContent {
         default:
             ""
         }
+    }
+}
+
+/// "14:02" for a message row, formatted once per time: SwiftUI re-renders rows on every view
+/// state change, and Date.formatted builds a formatter each time (perf review, 2026-11-16).
+@MainActor
+enum ChatTimeLabel {
+    private static let formatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter
+    }()
+    private static var cache: [TimeInterval: String] = [:]
+
+    static func short(_ date: Date) -> String {
+        let key = date.timeIntervalSinceReferenceDate.rounded(.down)
+        if let known = cache[key] { return known }
+        if cache.count > 2_000 { cache.removeAll(keepingCapacity: true) }
+        let label = formatter.string(from: date)
+        cache[key] = label
+        return label
     }
 }

@@ -100,7 +100,9 @@ final class RoomListModel: ObservableObject {
             summary.serverMentions = serverMentions[summary.id] ?? 0
             summaries.append(summary)
         }
-        rooms = summaries
+        // Publish only a real change: every publish re-renders the tab bar and wakes @Mentions
+        // and the membership check (perf review, 2026-11-16).
+        if summaries != rooms { rooms = summaries }
         hasLoaded = true
     }
 }

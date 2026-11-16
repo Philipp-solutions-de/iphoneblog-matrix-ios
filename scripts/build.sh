@@ -101,7 +101,7 @@ case "$action" in
         trap 'kill "$fixture" 2>/dev/null' EXIT
         sleep 1
         export TEST_RUNNER_IPHONEBLOG_FIXTURE="http://127.0.0.1:8793"
-        for name in TEST_HOMESERVER TEST_USER TEST_PASSWORD ONE_ALIAS BLOG_ALIAS CHANNEL_ALIAS TEST_CHANNEL_ROOM TEST_ARTICLE_ROOT; do
+        for name in TEST_HOMESERVER TEST_USER TEST_PASSWORD TEST_USER2 TEST_PASSWORD2 ONE_ALIAS BLOG_ALIAS CHANNEL_ALIAS TEST_CHANNEL_ROOM TEST_CHANNEL_THREAD TEST_ARTICLE_ROOT; do
             var="IPHONEBLOG_$name"
             [[ -n "${!var:-}" ]] && export "TEST_RUNNER_$var=${!var}"
         done

@@ -140,6 +140,8 @@ cat > "$here/build/test-homeserver.env" <<EOF
 IPHONEBLOG_TEST_HOMESERVER=$url
 IPHONEBLOG_TEST_USER=$user
 IPHONEBLOG_TEST_PASSWORD=$password
+IPHONEBLOG_TEST_USER2=anna
+IPHONEBLOG_TEST_PASSWORD2=$reader_password
 IPHONEBLOG_TEST_ROOMS='$(IFS=,; echo "${rooms[*]}")'
 IPHONEBLOG_TEST_MENTION_ROOM='#one-Chat'
 IPHONEBLOG_ONE_ALIAS=#one:localhost

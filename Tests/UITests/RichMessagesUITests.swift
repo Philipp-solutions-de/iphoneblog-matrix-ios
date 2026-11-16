@@ -119,6 +119,25 @@ final class RichMessagesUITests: XCTestCase {
     /// enough to see.
     func testPhotoFromLibraryIsSent() throws {
         let app = try openChannel()
+        let event = try sendPhoto(app)
+        XCTAssertNil(event["m.relates_to"], "a channel photo should not be in a thread: \(event)")
+    }
+
+    /// The same in a thread: the picture arrives as a thread reply.
+    func testPhotoInThreadIsSent() throws {
+        guard let room = env["IPHONEBLOG_TEST_CHANNEL_ROOM"], let root = env["IPHONEBLOG_TEST_CHANNEL_THREAD"] else {
+            throw XCTSkip("no channel thread")
+        }
+        let app = try launch(["IPHONEBLOG_START_TAB": "chat", "IPHONEBLOG_START_THREAD": "\(room)|\(root)"])
+        XCTAssertTrue(app.textViews["Antworten…"].waitForExistence(timeout: 120), "thread did not open")
+        let event = try sendPhoto(app, shotPrefix: "thread-")
+        let relation = event["m.relates_to"] as? [String: Any]
+        XCTAssertEqual(relation?["rel_type"] as? String, "m.thread", "the photo did not go into the thread: \(event)")
+        XCTAssertEqual(relation?["event_id"] as? String, root)
+    }
+
+    /// + › Fotos, the first library picture, Senden in the upload preview; returns the server's event.
+    private func sendPhoto(_ app: XCUIApplication, shotPrefix: String = "") throws -> [String: Any] {
         let before = Date()
         app.buttons["composer_toolbar-open_compose_options"].tap()
         let photos = app.buttons["room-attachment_picker_photo_library"]
@@ -138,16 +157,17 @@ final class RichMessagesUITests: XCTestCase {
         // (room-send_button) waits behind the sheet with the same label.
         let caption = app.textViews["Bildunterschrift hinzufügen"]
         XCTAssertTrue(caption.waitForExistence(timeout: 60), "no upload preview")
-        attach(app, "upload-preview")
+        attach(app, shotPrefix + "upload-preview")
         let send = app.buttons.matching(NSPredicate(format: "label == 'Senden' AND identifier != 'room-send_button'")).firstMatch
         XCTAssertTrue(send.isHittable, "upload preview's Senden not hittable")
         send.tap()
         sleep(2)
-        attach(app, "upload-sending")
+        attach(app, shotPrefix + "upload-sending")
         let event = try latestOwnMessage(msgtype: "m.image", after: before)
         XCTAssertNotNil(event["url"], "image without a file: \(event)")
         sleep(3)
-        attach(app, "upload-sent")
+        attach(app, shotPrefix + "upload-sent")
+        return event
     }
 
     // MARK: Helpers

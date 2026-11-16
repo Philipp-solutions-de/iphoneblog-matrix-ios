@@ -27,6 +27,9 @@ final class ChatSession: ObservableObject, ChatHost {
     private var membershipWatch: AnyCancellable?
     private var membershipTimer: Task<Void, Never>?
     private var badgeWatch: AnyCancellable?
+    /// Called when the server refuses the token on one of our own calls (AppModel signs out).
+    var onAuthLost: (() -> Void)?
+    private var membershipRetry: Task<Void, Never>?
 
     private var syncService: SyncService?
     private var stateHandle: TaskHandle?
@@ -52,7 +55,12 @@ final class ChatSession: ObservableObject, ChatHost {
             let service = try await client.syncService().finish()
             syncService = service
             stateHandle = service.state(listener: SyncStateObserver { [weak self] state in
-                Task { @MainActor in self?.syncState = state }
+                Task { @MainActor in
+                    self?.syncState = state
+                    // A sync that fails may have lost its token: ask the server who we are; a
+                    // 401 M_UNKNOWN_TOKEN there ends the session (api(), onAuthLost).
+                    if case .error = state { _ = try? await self?.api("GET", "/_matrix/client/v3/account/whoami") }
+                }
             })
             try await rooms.attach(to: service.roomListService())
         }
@@ -83,6 +91,15 @@ final class ChatSession: ObservableObject, ChatHost {
         oneRoomID = await resolve(Self.alias("IPHONEBLOG_ONE_ALIAS", Brand.oneRoomAlias))?.roomId
         oneChannelID = await resolve(Self.alias("IPHONEBLOG_CHANNEL_ALIAS", Brand.oneChannelAlias))?.roomId
         await refreshMembership()
+        // The space may not have synced yet at this first look, and the room list may then go
+        // quiet: look again a few times soon, rather than waiting for the 5-minute timer.
+        membershipRetry = Task { [weak self] in
+            for delay in [2, 5, 10, 20, 40] {
+                try? await Task.sleep(for: .seconds(delay))
+                guard let self, !Task.isCancelled, !self.isOneMember else { return }
+                await self.refreshMembership()
+            }
+        }
         // The bot invites and removes; every change in the room list is a moment to look again,
         // and a slow timer catches an invite that arrives while nothing else moves.
         membershipWatch = rooms.$rooms
@@ -165,7 +182,10 @@ final class ChatSession: ObservableObject, ChatHost {
         return fallback
     }
 
-    deinit { membershipTimer?.cancel() }
+    deinit {
+        membershipTimer?.cancel()
+        membershipRetry?.cancel()
+    }
 
     func stop() async {
         await syncService?.stop()
@@ -240,6 +260,10 @@ final class ChatSession: ObservableObject, ChatHost {
         }
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            if (response as? HTTPURLResponse)?.statusCode == 401,
+               String(data: data.prefix(300), encoding: .utf8)?.contains("M_UNKNOWN_TOKEN") == true {
+                onAuthLost?()
+            }
             throw URLError(.badServerResponse)
         }
         return data

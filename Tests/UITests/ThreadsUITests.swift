@@ -75,7 +75,8 @@ final class ThreadsUITests: XCTestCase {
         sleep(2)
         attach(app, "thread-new")
         add(XCTAttachment(string: app.debugDescription))
-        XCTAssertTrue(element(app, containing: "Noch keine Antworten").exists, "a new thread should say it has no replies")
+        XCTAssertTrue(element(app, containing: "Noch keine Antworten").waitForExistence(timeout: 30),
+                      "a new thread should say it has no replies")
     }
 
     func testThreadsRowListsYourThreads() throws {

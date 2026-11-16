@@ -42,7 +42,11 @@ final class MentionsModel: ObservableObject {
     /// Loads now and again whenever the room list moves (a new message, a read receipt).
     func attach(to session: ChatSession) {
         self.session = session
+        // Only when a room's unread counts move: a new message or a read receipt, not every
+        // room-list update (perf review, 2026-11-16).
         watch = session.rooms.$rooms
+            .map { rooms in rooms.map { "\($0.id):\($0.unreadMessages):\($0.sdkMentions)" } }
+            .removeDuplicates()
             .debounce(for: .seconds(1.5), scheduler: RunLoop.main)
             .sink { [weak self] _ in self?.reload() }
         reload()
@@ -79,7 +83,7 @@ final class MentionsModel: ObservableObject {
         let place: Mention.Place
         if entry.roomId == session.blogRoomID {
             guard let root = thread else { return nil }
-            let title = try? await DiscussionStore.shared.thread(root).root.title
+            let title = await threadTitle(root)
             place = .discussion(rootEventID: root, title: title)
         } else if entry.roomId == session.oneChannelID {
             place = .channel(roomID: entry.roomId, threadRoot: thread)
@@ -90,6 +94,15 @@ final class MentionsModel: ObservableObject {
                        senderName: await name(of: event.sender, session: session),
                        body: body, date: Date(milliseconds: event.originServerTs ?? entry.ts),
                        unread: !entry.read)
+    }
+
+    /// An article's title by its thread root, fetched once per app run.
+    private var titles: [String: String] = [:]
+    private func threadTitle(_ root: String) async -> String? {
+        if let known = titles[root] { return known }
+        guard let title = try? await DiscussionStore.shared.thread(root).root.title else { return nil }
+        titles[root] = title
+        return title
     }
 
     private func name(of userID: String, session: ChatSession) async -> String {
