@@ -44,6 +44,14 @@ Enter the same as the manifest: **Data Linked to You**, purpose **App Functional
 | Identifiers | User ID | `@name:iphoneblog.de` |
 | User Content | Emails or Text Messages, Photos or Videos, Audio Data, Other User Content | messages, pictures, voice messages, reactions and reports |
 
+**When the app offers "Kontaktdaten teilen"** (the server's `POST /_iphoneblog/v1/contact-share`,
+infra `docs/matrix.md`, "Sharing contact details"; no screen in the app yet), the same build adds
+**Contact Info → Phone Number** to the labels (typed, mailed once through Mailjet, not stored by
+us; declared because the mail service and the recipient keep it), and this paragraph to
+`review_information/notes.txt` under "USER-GENERATED CONTENT":
+
+> - "Kontaktdaten teilen": a #one member can send their own email address and/or a phone number they type, with a short note, to one other member. It goes as a single email from chat@iphoneblog.de to that member's address on file; nothing appears in the chat, there is no reply in the app, and the recipient's address is never shown. Limits: 5 an hour, 20 a day, 2 a day to the same person. Unwanted mails can be forwarded to ao@iphoneblog.de.
+
 **Data Used to Track You**: none. **Not collected**: purchases (Stripe on the website, not in the
 app), location, contacts, browsing history, diagnostics, usage data. Privacy policy URL
 `https://www.iphoneblog.de/datenschutz/`, once the chat's section is there.
