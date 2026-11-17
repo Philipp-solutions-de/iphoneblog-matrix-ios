@@ -1,0 +1,18 @@
+The app of iPhoneBlog.de, the independent German publication about Apple, the iPhone and the App Store: every article, the discussion under each one, and the members' area of #one. The articles are in German.
+
+ARTICLES
+Every article of iPhoneBlog.de, as on the website, without signing in.
+
+DISCUSSION
+Under each article, "Diskussion" opens the readers' replies. Anyone can read them. Signed in, you reply right in the app, with pictures, reactions and mentions.
+
+#ONE
+The members' area of #one: their channel with threads, pictures, voice messages and notifications for new replies and @mentions.
+
+SIGN IN
+With your iphoneblog.de account. The app has no password of its own.
+
+RESPECTFUL
+Every message and every person can be reported and blocked. iPhoneBlog.de's moderation looks at every report.
+
+No ads, no analytics, no tracking. Everything runs on our own server in Germany.

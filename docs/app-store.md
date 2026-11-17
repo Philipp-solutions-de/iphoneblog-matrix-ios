@@ -83,49 +83,126 @@ Thorsten's answer (2026-11-16): standard encryption, with the French declaration
 
 ## The External Link Account Entitlement (one link to #one on the website)
 
-Thorsten (2026-11-16): request it, describing the app as iPhoneBlog's reader app. Until Apple
-grants it the app shows no link and no buy prompt (3.1.3(f)). Apple's terms, read 2026-11-16
-([reader apps](https://developer.apple.com/support/reader-apps/)):
+Thorsten (2026-11-17): go for it, as a news publication's reader app; it is how the app may point
+to #one without In-App Purchase. Until Apple grants it the app shows no link and no buy prompt
+(3.1.3(f)). Apple's terms, read 2026-11-17 on
+[Distributing "reader" apps with a link to your website](https://developer.apple.com/support/reader-apps/):
 
-- the app's main feature must be digital content (Apple names magazines, newspapers, books,
-  audio, music, video); "a social network that streams video" is named as not eligible, and the
-  terms exclude apps that facilitate real-time person-to-person services;
-- the app offers no In-App Purchase;
-- one request per bundle id, filed by the **Account Holder** (Alex), who answers questions about
-  the app and accepts the entitlement's terms. A developer reports that Admins cannot file it.
+- **Eligible:** apps whose primary functionality is magazines, newspapers, books, audio, music or
+  video; people sign in to an account and reach content bought outside the app. Not eligible:
+  apps with In-App Purchase on iOS, and real-time person-to-person services.
+- **Who and how:** the **Account Holder** only (Alex), one request **per bundle id**, through the
+  form `developer.apple.com/contact/request/external-link-account/` (behind sign-in; its questions
+  are not readable without it).
+- **The link:** shown once per screen, the same text wherever it appears; styled as a plain link
+  (blue, underlined) that contains the domain; no price and no words about prices; opens a new
+  window in the default browser, never a web view; goes to a site we own, with no query
+  parameters, no redirect and no landing page in between. The URL goes in `Info.plist` and must
+  match the binary App Review got; a new URL means a new submission.
+- **The sheet:** before leaving the app, Apple's modal sheet. From iOS 16 it must be the system's,
+  through StoreKit's External Link Account API; the app needs iOS 18.5, so always the system
+  sheet. The app checks first that the person may make payments.
+- **Keys:** entitlement `com.apple.developer.storekit.external-link.account` = true;
+  `Info.plist` `SKExternalLinkAccount`, a dictionary of region code to URL with a `*` default
+  (https, absolute, no query, at most 1,000 characters).
+- **Review:** screenshots of the link and the sheet go into the review notes. No link to buy in
+  the store texts: reader apps may link out only from inside the app.
+- **Commission and reporting:** Apple's page states none. Secondary sources (2026) say the
+  account link itself costs nothing in any storefront, because nothing is sold through it, and
+  that the EU's commission applies to out-of-app *offers* under a different entitlement
+  (StoreKit External Purchases or Offers, from 2026-10-01), which we do not use. **Unverified
+  against Apple's own terms:** the terms Alex accepts in the request form are where this is
+  settled; he reads the fee and reporting clauses before agreeing and sends them here.
+- **United States:** since May 2025 US apps may link out without the entitlement. We still
+  request it, because it covers every storefront.
 
-**Our case for it:** the app opens on the blog's articles, readable without an account; every
-article has its discussion, which is the article's comment section; #one is iPhoneBlog's paid
-membership (videos, a video feed, the members' community), sold on the website. Direct messages
-are switched off everywhere (Thorsten, 2026-11-16). **The risk** is #one-Chat, a live members'
-room: Apple may count it as real-time person-to-person. Non-members see Blog and #one-Chat;
-signed out, #one-Chat is a neutral sign-in screen, and signed in without #one it says "Nur für
-#one-Mitglieder" with "Abmelden" and "Konto löschen", nothing about buying (Thorsten,
-2026-11-16). Members get all four tabs.
+**Our case for it:** iPhoneBlog.de is a news publication about Apple. The app opens on its
+articles, readable without an account; every article has a discussion, which is its comment
+section; #one is the publication's paid membership (weekly videos, a private video feed, the
+members' area), sold on the website. There are no direct messages (Thorsten, 2026-11-16).
+**The risk** is #one-Chat, a live members' room: Apple may count it as real-time
+person-to-person. If Apple refuses, the app stays as it is (3.1.3(f), no link).
 
-**Steps for Alex** (Account Holder, once the new app record exists):
+### Alex's steps (Account Holder)
 
-1. developer.apple.com → the reader-app page above → **request form** for the External Link
-   Account Entitlement; the app's bundle id.
-2. Answer from the text below; agree to the terms.
-3. Apple's answer comes by mail. If granted: Thorsten adds the entitlement to the app id and
-   profile, and the app gets one link built with StoreKit's `ExternalLinkAccount` (Apple's
-   notice sheet first); in the EU the terms of the EU addendum apply (commission on sales within
-   the window Apple sets, monthly reporting).
+1. Wait until `de.iphoneblog.app` exists in his team and the app record exists in App Store
+   Connect (the bundle-id switch, iphoneblog-wordpress `docs/TODO.md`).
+2. Sign in at developer.apple.com, open the reader-apps page above and follow its link to the
+   **External Link Account Entitlement** request form.
+3. Choose the app `de.iphoneblog.app`. Paste the answers below. Where the form asks something
+   they do not cover, write it down and send it to Thorsten before answering.
+4. Read the terms before agreeing: **the clauses on commission, reporting and storefronts.**
+   Send Thorsten a copy or a screenshot of them.
+5. Apple answers by mail. If granted, tell Thorsten: he adds the entitlement to the app id and
+   the provisioning profile, and the app gets the link (below) in the next build, with
+   screenshots of link and sheet in the review notes.
 
-**Unverified:** the form's exact questions. The texts to paste:
+### The request text (English, to paste)
 
-> **App description.** iPhoneBlog is the app of iPhoneBlog.de, a German publication about Apple,
-> the iPhone and the App Store, published since [YEAR, Alex fills in]. The app's main content is the publication
-> itself: every article, readable without an account. Each article has a discussion section
-> where readers comment on it. iPhoneBlog's membership, #one, adds weekly videos, a private video
-> feed and a members' community; it is sold only on our website, and the app offers no In-App
-> Purchase.
+> **About the app.** iPhoneBlog is the app of iPhoneBlog.de, an independent German news
+> publication about Apple, the iPhone and the App Store, published since [YEAR, Alex fills in].
+> The app's primary functionality is the publication itself: every article, readable without an
+> account, as on the website. Each article has a discussion section where readers comment on it.
 >
-> **Content type.** Newspapers and magazines (a news publication).
+> **Content type.** Newspapers and magazines: a news publication.
 >
-> **The link.** One link, "#one auf iphoneblog.de", to https://www.iphoneblog.de/one/, where people
-> create and manage their #one membership. Shown on #one-Chat's "Nur für #one-Mitglieder" screen.
+> **What is bought outside the app.** #one, the publication's paid membership: weekly videos, a
+> private video feed and the members' area with its members' chat. Readers buy and manage #one
+> only on our website, iphoneblog.de, paid through Stripe. Members sign in to the app with the
+> same iphoneblog.de account to reach what they bought. The app offers no In-App Purchase and
+> will not.
+>
+> **Accounts.** Readers sign in with their iphoneblog.de account. Accounts can be deleted inside
+> the app.
+>
+> **The link.** One link, on the screen a signed-in reader without #one sees in the members'
+> area: "Gehe zu iphoneblog.de, um #one abzuschließen oder zu verwalten." It opens
+> https://www.iphoneblog.de/one/ in the default browser, after Apple's sheet. The page is ours,
+> with no redirect.
+
+### The link in the app, once granted (code only after the grant)
+
+- **Where:** #one-Chat's "Nur für #one-Mitglieder" screen (`OneMembersOnly` in
+  `OneChatTab.swift`), under the sentence, above "Abmelden" and "Konto löschen". Nowhere else:
+  not in Ich, not on the signed-out screen, not in the blog's web view.
+- **Text:** "Gehe zu iphoneblog.de, um #one abzuschließen oder zu verwalten." in link style;
+  no price, no "jetzt", no button look.
+- **Action:** `ExternalLinkAccount.canOpen`, then `ExternalLinkAccount.open()` (Apple's sheet,
+  then Safari). Hidden when `canOpen` is false.
+- **Plist:** `SKExternalLinkAccount` = `{"*": "https://www.iphoneblog.de/one/"}`.
+  `/one/` answered 200 with no redirect on 2026-11-17; keep it so (iphoneblog-wordpress smoke
+  test checks `/one/`).
+- **Tests:** a unit test that the link is shown only for a signed-in non-member when `canOpen`
+  is true; a UI test that it is on that screen and nowhere else.
+- **Review notes:** replace "the app does not mention or link to any purchase" with the
+  paragraph on the link, and attach screenshots of link and sheet.
+
+## Store listing
+
+`fastlane/metadata/{de-DE,en-US}/`, `fastlane/metadata/{primary,secondary}_category.txt`. The
+listing presents the app as the publication's app: articles first, the community second.
+**Name and category are open** with Thorsten and Alex; the files hold variant A.
+
+| | A (in the files) | B |
+|---|---|---|
+| Name | iPhoneBlog | iPhoneBlog Chat |
+| Subtitle, de | Apple-News, Diskussion, #one | Apple-News und Diskussion |
+| Subtitle, en | Apple news, comments and #one | Apple news and discussion |
+| Primary category | News | News |
+| Secondary category | Magazines & Newspapers | Social Networking |
+
+Subtitles are at most 30 characters. B puts "Chat" in the name, which works against the reader-app
+case; its subtitle and categories keep the news first. Switching to B changes `name.txt`,
+`subtitle.txt` in both languages and `secondary_category.txt`.
+
+**Screenshots** (6.9" iPhone, German, the demo account, no prices anywhere):
+
+1. Blog: the article list. "Alle Artikel von iPhoneBlog.de"
+2. One article, open. "Lesen ohne Anmeldung"
+3. The discussion under that article. "Unter jedem Artikel: die Diskussion"
+4. #one-Chat: the members' channel with a thread. "#one: der Bereich der Mitglieder"
+5. @Mentions. "Antworten und Erwähnungen im Blick"
+6. Ich: notifications, blocked users, report. "Melden, blockieren, selbst entscheiden"
 
 ## Review notes and demo account
 

@@ -1,1 +1,1 @@
-iphoneblog,iphone,apple,ios,mac,blog,news,community,chat,diskussion,podcast,one
+iphoneblog,iphone,apple,ios,mac,news,blog,magazin,diskussion,kommentare,community,podcast,one

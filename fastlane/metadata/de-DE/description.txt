@@ -1,13 +1,13 @@
-iPhoneBlog.de als App: die Artikel des Blogs, die Diskussion unter jedem Artikel und der Chat der #one-Mitglieder.
+iPhoneBlog.de als App: das unabhängige Magazin über Apple, das iPhone und den App Store. Alle Artikel, die Diskussion unter jedem Artikel und der Bereich der #one-Mitglieder.
 
-BLOG
-Alle Artikel von iPhoneBlog.de, so wie auf der Website, ohne Anmeldung. Unter jedem Artikel öffnet „Diskussion“ die Antworten der Leserinnen und Leser.
+ARTIKEL
+Alle Artikel von iPhoneBlog.de, so wie auf der Website, ohne Anmeldung.
 
 DISKUSSION
-Lesen kann jeder. Wer angemeldet ist, antwortet direkt in der App, mit Bildern, Reaktionen und Erwähnungen.
+Unter jedem Artikel öffnet „Diskussion“ die Antworten der Leserinnen und Leser. Lesen kann jeder. Wer angemeldet ist, antwortet direkt in der App, mit Bildern, Reaktionen und Erwähnungen.
 
-#ONE-CHAT
-Der Kanal der #one-Mitglieder, mit Threads wie in einem Messenger, Bildern, Sprachnachrichten und Mitteilungen bei neuen Antworten und @Mentions.
+#ONE
+Der Bereich der #one-Mitglieder: ihr Kanal mit Threads, Bildern, Sprachnachrichten und Mitteilungen bei neuen Antworten und @Mentions.
 
 ANMELDEN
 Mit dem Konto von iphoneblog.de. Ein eigenes Passwort für die App gibt es nicht.
@@ -15,4 +15,4 @@ Mit dem Konto von iphoneblog.de. Ein eigenes Passwort für die App gibt es nicht
 RESPEKTVOLL
 Jede Nachricht und jede Person lässt sich melden und blockieren. Die Moderation von iPhoneBlog.de kümmert sich um jede Meldung.
 
-Keine Werbung, keine Analyse, kein Tracking. Der Chat läuft auf unserem eigenen Server in Deutschland.
+Keine Werbung, keine Analyse, kein Tracking. Alles läuft auf unserem eigenen Server in Deutschland.
