@@ -51,6 +51,7 @@ struct OneMembersOnly: View {
     @ObservedObject var session: ChatSession
     @ObservedObject var router: Router
     @State private var confirmSignOut = false
+    @State private var deleting = false
 
     var body: some View {
         VStack(spacing: 16) {
@@ -69,10 +70,7 @@ struct OneMembersOnly: View {
                 }
                 .buttonStyle(OutlineButton(stroke: Theme.line, text: Theme.coralText))
                 .accessibilityIdentifier("one.signOut")
-                Button {
-                    // The account page of the sign-in service, where the account can be deleted.
-                    Task { if let url = await session.accountURL() { router.presentedURL = url } }
-                } label: {
+                Button { deleting = true } label: {
                     Text("Konto löschen").frame(maxWidth: .infinity, minHeight: Theme.Size.smallButtonHeight)
                 }
                 .buttonStyle(OutlineButton(stroke: Theme.line, text: Theme.ink2))
@@ -86,6 +84,7 @@ struct OneMembersOnly: View {
         .confirmationDialog("Auf diesem Gerät abmelden?", isPresented: $confirmSignOut, titleVisibility: .visible) {
             Button("Abmelden", role: .destructive) { Task { await model.signOut() } }
         }
+        .sheet(isPresented: $deleting) { AccountDeletionSheet(model: model, router: router) }
     }
 }
 
@@ -120,6 +119,7 @@ struct OneChatTab: View {
     var body: some View {
         NavigationStack(path: $router.chatPath) {
             OneRoomsList(session: session, router: router)
+                .safeAreaInset(edge: .top) { PushPrimerSlot() }
                 .navigationDestination(for: Router.ChatRoute.self) { route in
                     destination(route)
                 }

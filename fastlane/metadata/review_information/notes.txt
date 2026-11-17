@@ -1,0 +1,26 @@
+iPhoneBlog is the app of iPhoneBlog.de, an independent German news publication about Apple, the iPhone and the App Store. The app's primary function is the publication: every article, readable without an account, with a discussion (comment section) under each one. #one is the publication's paid content: #one articles, videos and the podcast; members can also talk about the news in a members' room that comes with it. The app is free; there is nothing to buy in it, and it does not mention or link to any purchase. #one is sold on the website only, and the app works the same for people without it (articles and discussions), as guideline 3.1.3(f) describes for a free stand-alone app beside a paid web service.
+
+HOW TO REVIEW (the demo account is a #one member, so every part is unlocked)
+1. Ich → "Mit iphoneblog.de anmelden" → sign in with the demo account below on the website's page.
+2. Blog: the articles; tap "Diskussion" under one. The discussion is native, not web: reply, react, add a picture.
+3. #one-Chat: the members' channel with threads, pictures and voice messages (native, built on Matrix).
+4. @Mentions: messages that name you.
+5. Ich: notification settings, blocked users, "Konto löschen".
+
+NATIVE FUNCTIONALITY (4.2)
+Only the Blog tab's article pages are a web view, restricted to iphoneblog.de; links elsewhere open in Safari. The discussions, the #one community, threads, mentions, notifications, report and block are native SwiftUI on the Matrix SDK.
+
+USER-GENERATED CONTENT (1.2)
+- Report: long-press a message → "Melden", or tap a person → "Melden". Each report reaches our moderator by mail within minutes, with the reported content, the reason and both accounts.
+- The moderator removes content and blocks users on the server.
+- Block: tap a person → "Blockieren"; their messages disappear for this account on all devices. Ich → "Blockiert" undoes it.
+- Only #one members may write in the chat. Every member is a known account tied to iphoneblog.de with a paid membership; there are no anonymous accounts.
+- Moderation contact, also in the app under Ich: ao@iphoneblog.de (reports reach this address by mail).
+
+ACCOUNT DELETION (5.1.1(v))
+Ich → "Konto löschen" explains what is deleted and opens the website's deletion page, signed in. Confirming deletes the account at once, ends a running #one subscription at the end of its paid period without further charges, and deletes the chat account the next night.
+
+ENCRYPTION
+The connection is TLS. Messages are not end-to-end encrypted; the Matrix SDK contains its own standard cryptography (vodozemac), declared in export compliance.
+
+Contact for this review: CONTACT_NAME, CONTACT_PHONE.

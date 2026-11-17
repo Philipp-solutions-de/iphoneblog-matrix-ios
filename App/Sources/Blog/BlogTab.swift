@@ -272,10 +272,18 @@ final class BlogWebModel: NSObject, ObservableObject, WKNavigationDelegate, WKUI
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
                  decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
         guard let url = action.request.url else { return decisionHandler(.cancel) }
-        // Only taps are routed. Redirects, reloads and the page's own loads (a sign-in gate,
-        // an embedded player) go where the server sends them.
+        // Taps are routed below. Everything else (redirects, a page's script, reloads, frames) may
+        // show only the blog in the main frame; anything off it opens in Safari, so the app does
+        // not count as unrestricted web access in the age rating (BlogURLPolicy).
         guard action.navigationType == .linkActivated || url.scheme == "iphoneblog-chat" else {
-            return decisionHandler(url.scheme == "http" || url.scheme == "https" || url.scheme == "about" ? .allow : .cancel)
+            switch BlogURLPolicy.decide(url, mainFrame: action.targetFrame?.isMainFrame ?? true, blogHost: start.host()) {
+            case .allow: return decisionHandler(.allow)
+            case .cancel: return decisionHandler(.cancel)
+            case .openOutside:
+                decisionHandler(.cancel)
+                UIApplication.shared.open(url)
+                return
+            }
         }
         switch BlogLinks.classify(url, blogHost: start.host()) {
         case .discussion(let article):
