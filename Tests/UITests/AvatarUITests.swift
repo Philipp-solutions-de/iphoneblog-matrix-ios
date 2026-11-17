@@ -43,6 +43,34 @@ final class AvatarUITests: XCTestCase {
         XCTAssertTrue(try avatarURL(server: server, user: user).isEmpty, "the server still has a picture")
     }
 
+    /// Another member's picture in @Mentions (Thorsten, 2026-11-17: only letters showed).
+    func testMentionsShowTheSendersPicture() throws {
+        let other = try TestServer.signIn(2)
+        let me = try TestServer.signIn(1)
+        defer { try? other.setAvatar(colored: nil); other.signOut(); me.signOut() }
+        let room = try XCTUnwrap(env["IPHONEBLOG_TEST_CHANNEL_ROOM"])
+        try other.setAvatar(colored: .systemPink)
+        let stamp = Int(Date().timeIntervalSince1970)
+        try other.send("Bildtest \(stamp)", in: room, mention: me.userID)
+
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "IPHONEBLOG_NO_PUSH_PROMPT": "1", "IPHONEBLOG_START_TAB": "mentions", "IPHONEBLOG_EXPOSE_AVATARS": "1",
+            "IPHONEBLOG_HOMESERVER": env["IPHONEBLOG_TEST_HOMESERVER"] ?? "",
+            "IPHONEBLOG_DEV_USER": env["IPHONEBLOG_TEST_USER"] ?? "", "IPHONEBLOG_DEV_PASSWORD": env["IPHONEBLOG_TEST_PASSWORD"] ?? "",
+            "IPHONEBLOG_ONE_ALIAS": env["IPHONEBLOG_ONE_ALIAS"] ?? "", "IPHONEBLOG_BLOG_ALIAS": env["IPHONEBLOG_BLOG_ALIAS"] ?? "",
+            "IPHONEBLOG_CHANNEL_ALIAS": env["IPHONEBLOG_CHANNEL_ALIAS"] ?? "",
+        ]
+        app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE"]
+        app.launch()
+        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Bildtest \(stamp)")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 120), "the mention is not in @Mentions")
+        XCTAssertTrue(row.descendants(matching: .any)["avatar-image"].waitForExistence(timeout: 30)
+                      || app.descendants(matching: .any)["avatar-image"].exists,
+                      "@Mentions shows letters, not the sender's picture")
+        attach(app, "mentions-avatar")
+    }
+
     private func avatarURL(server: String, user: String) throws -> String {
         let url = try XCTUnwrap(URL(string: "\(server)/_matrix/client/v3/profile/%40\(user)%3Alocalhost/avatar_url"))
         var result: Data?

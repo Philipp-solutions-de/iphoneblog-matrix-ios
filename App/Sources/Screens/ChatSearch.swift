@@ -204,7 +204,8 @@ struct SearchHitRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Theme.Space.rowGap) {
-            InitialsAvatar(name: hit.senderName, size: Theme.Size.chatAvatar, corner: Theme.Size.chatAvatarCorner)
+            MemberAvatar(userID: hit.senderID, name: hit.senderName, roomID: hit.roomID,
+                         size: Theme.Size.chatAvatar, corner: Theme.Size.chatAvatarCorner)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(hit.senderName).font(Theme.Font.name).foregroundStyle(Theme.ink)

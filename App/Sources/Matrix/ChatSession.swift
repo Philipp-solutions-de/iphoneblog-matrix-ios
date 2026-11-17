@@ -60,6 +60,7 @@ final class ChatSession: ObservableObject, ChatHost {
         self.client = client
         self.router = router
         userID = try client.userId()
+        AvatarStore.shared.client = client
         refreshWatch = NotificationCenter.default.addObserver(forName: KeychainSessionDelegate.didSave, object: nil,
                                                               queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.authGuard.noteRefresh() }

@@ -18,7 +18,7 @@ struct ProfileSheet: View {
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 14) {
-                InitialsAvatar(name: displayName, size: 84)
+                MemberAvatar(userID: person.userID, name: displayName, size: 84)
                     .padding(.top, 24)
                 Text(displayName)
                     .font(.title2.weight(.semibold))
