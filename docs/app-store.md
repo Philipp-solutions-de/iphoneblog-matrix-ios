@@ -118,10 +118,10 @@ to #one without In-App Purchase. Until Apple grants it the app shows no link and
 
 **Our case for it:** iPhoneBlog.de is a news publication about Apple. The app opens on its
 articles, readable without an account; every article has a discussion, which is its comment
-section; #one is the publication's paid membership (weekly videos, a private video feed, the
-members' area), sold on the website. There are no direct messages (Thorsten, 2026-11-16).
-**The risk** is #one-Chat, a live members' room: Apple may count it as real-time
-person-to-person. If Apple refuses, the app stays as it is (3.1.3(f), no link).
+section; #one is the publication's paid content (#one articles, videos, the podcast), sold on
+the website. The members' room exists to talk about that news, a side effect of the content,
+not a product of its own (Thorsten, 2026-11-17). There are no direct messages (2026-11-16).
+**The risk** is still that room: Apple may count it as real-time person-to-person. If Apple refuses, the app stays as it is (3.1.3(f), no link).
 
 ### Alex's steps (Account Holder)
 
@@ -146,8 +146,9 @@ person-to-person. If Apple refuses, the app stays as it is (3.1.3(f), no link).
 >
 > **Content type.** Newspapers and magazines: a news publication.
 >
-> **What is bought outside the app.** #one, the publication's paid membership: weekly videos, a
-> private video feed and the members' community. Readers buy and manage #one
+> **What is bought outside the app.** #one, the publication's paid content: #one articles,
+> videos and the podcast. Members can also talk about the news in a members' discussion room
+> that comes with it. Readers buy and manage #one
 > only on our website, iphoneblog.de, paid through Stripe. Members sign in to the app with the
 > same iphoneblog.de account to reach what they bought. The app offers no In-App Purchase and
 > will not.
@@ -180,16 +181,17 @@ person-to-person. If Apple refuses, the app stays as it is (3.1.3(f), no link).
 ## Store listing
 
 `fastlane/metadata/{de-DE,en-US}/`, `fastlane/metadata/primary_category.txt`. The listing
-presents the app as the publication's app: articles first, the members' community second.
+presents the app as a news app: free articles and #one, the paid content, are the product; the
+discussions exist to talk about the news (Thorsten, 2026-11-17).
 **No "Chat"** in name, subtitle, screenshots or the entitlement request (Thorsten, 2026-11-17);
 the words are #one, Community, #one-connect. **The name is open** with Thorsten and Alex; the
 files hold option 1.
 
 | | Name | Subtitle de | Subtitle en | Verdict |
 |---|---|---|---|---|
-| 1 | iPhoneBlog (10) | News und #one-Community (23) | News and the #one community (27) | **Recommended.** The publication's own name, which readers search for; the subtitle carries the rest. Strongest for the reader-app case. |
-| 2 | iPhoneBlog Connect (18) | Apple-News und #one-Community (29) | Apple news and #one community (29) | Possible. "Connect" reads as a social or messaging app, which the entitlement case argues against, and readers do not search for it. |
-| 3 | iPhoneBlog #one (15) | Apple-News und Community (24) | Apple news and community (24) | Possible. Puts the paid membership in the name, though most of the app is free to read; non-members may think it is members only. |
+| 1 | iPhoneBlog (10) | Apple-News, #one, Diskussion (28) | Apple news, #one, discussion (28) | **Recommended.** The publication's own name, which readers search for; the subtitle names the content first. Strongest for the reader-app case. |
+| 2 | iPhoneBlog Connect (18) | Apple-News, #one, Diskussion (28) | Apple news, #one, discussion (28) | Not recommended. "Connect" names the side effect, the talking, not the news, and reads as a social or messaging app; readers do not search for it. | |
+| 3 | iPhoneBlog #one (15) | Apple-News und Diskussion (25) | Apple news and discussion (25) | Possible. Names the paid content, which fits the reader-app case, but most articles are free; non-members may think the app is members only. |
 
 All within Apple's 30 characters (counted with spaces). Category: **primary News, no secondary.**
 Social Networking would invite the reviewer to judge the app as a social network first, and
@@ -200,11 +202,11 @@ the reader-app case rests on it being a publication.
 1. Blog: the article list. "Alle Artikel von iPhoneBlog.de"
 2. One article, open. "Lesen ohne Anmeldung"
 3. The discussion under that article. "Unter jedem Artikel: die Diskussion"
-4. #one: the members' channel with a thread. "#one: die Community der Mitglieder"
-5. @Mentions. "Antworten und Erwähnungen im Blick"
-6. Ich: notifications, blocked users, report. "Melden, blockieren, selbst entscheiden"
+4. A #one article, open for a member. "#one: die Inhalte für Mitglieder"
+5. The members' room with a thread about an article. "Mit anderen Mitgliedern über die News reden"
+6. Ich: notifications, blocked users, report. "Mitteilungen, Melden und Blockieren"
 
-**The tab label shows in shot 4:** the app calls the tab "#one-Chat". To keep "Chat" out of the
+**The tab label shows in shot 5:** the app calls the tab "#one-Chat". To keep "Chat" out of the
 screenshots the tab becomes "#one" (or "#one-connect") in the app itself; the app session owns
 that label.
 
