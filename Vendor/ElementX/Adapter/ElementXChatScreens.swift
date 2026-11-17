@@ -27,6 +27,9 @@ final class ElementXChatScreens: ChatScreenProviding {
         session = try ChatKitSession(client: host.client, roomListService: host.roomListService)
         sessionUserID = host.userID
         hosts = [:]
+        ChatKitReads.seen = { [weak host] roomID, threadRoot, eventID in
+            host?.didSee(roomID: roomID, threadRootEventID: threadRoot, eventID: eventID)
+        }
     }
 
     func roomScreen(roomID: String, host: ChatHost) -> AnyView {

@@ -30,6 +30,9 @@ protocol ChatHost: AnyObject {
     func openURL(_ url: URL)
     /// Shows a short notice (sent, copied, failed) the app's way.
     func showMessage(_ text: String)
+    /// A timeline showed the reader up to `eventID` (in a thread when `threadRootEventID` is set)
+    /// and sent its read receipt.
+    func didSee(roomID: String, threadRootEventID: String?, eventID: String)
 }
 
 /// What the conversation views give the app. Implemented once in Vendor/ (today Element X's

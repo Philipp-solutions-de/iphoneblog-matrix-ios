@@ -182,3 +182,11 @@ public enum ChatKitLinks {
     /// (room ID, canonical alias, event ID). The link names no thread: the opener finds it.
     public static var message: ((String, String?, String) -> URL?)?
 }
+
+/// What the reader has seen: called after a timeline sent its read receipt, with the room, the
+/// thread root (nil for the room's own timeline) and the newest visible event. The app keeps
+/// @Mentions in step: Synapse does not count the room timeline's receipt (thread "main") for its
+/// notification list, and a thread's receipt changes no room count the list watches.
+public enum ChatKitReads {
+    public static var seen: ((String, String?, String) -> Void)?
+}

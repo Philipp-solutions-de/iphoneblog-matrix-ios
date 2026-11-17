@@ -134,6 +134,13 @@ and refusals counted before it, never count. The app restores its session once p
 second restore after iOS rebuilt the scene ran two clients that refreshed the same token 45 ms
 apart, which MAS treats as reuse and answers by revoking the session (Alex's logouts,
 2026-11-17).
+**Mentions turn read when seen.** Opening a mention's thread or room marks it read, without
+"Alle als gelesen". A thread's read receipt does that on the server. A room's own timeline sends
+its receipt for thread "main", which Synapse 1.165 ignores for its notification list; an
+unthreaded receipt would count, but would also clear thread mentions not yet opened. So
+`MentionsModel` records room mentions it has shown as seen, up to the newest message on
+screen, in account data (`de.iphoneblog.mentions_seen`) for every device of the account
+(`ChatKitReads` reports each receipt). The web chat reads the server's flag only.
 
 **Message links on our own domain.** "Link kopieren" copies
 `https://chat.iphoneblog.de/#/<room>/$<event>`, where `<room>` is the room alias's localpart

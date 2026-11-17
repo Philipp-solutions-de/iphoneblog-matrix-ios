@@ -26,7 +26,10 @@ final class MentionsModel: ObservableObject {
         var senderName: String
         let body: String
         let date: Date
-        let unread: Bool
+        /// The thread it was said in, if any.
+        let threadRoot: String?
+        /// Unread on the server and not seen in the app (`seen`).
+        var unread: Bool
     }
 
     @Published private(set) var items: [Mention] = []
@@ -34,6 +37,13 @@ final class MentionsModel: ObservableObject {
     var unreadCount: Int { items.filter(\.unread).count }
 
     private weak var session: ChatSession?
+    /// Mentions in a room's own timeline that were on screen. Synapse marks those read for its
+    /// notification list only on an unthreaded private receipt; the room timeline's receipt
+    /// (thread "main") does not count, and an unthreaded one would also clear unopened thread
+    /// mentions. So the app keeps them itself, in account data, for every device of the account.
+    private var seen: Set<String> = []
+    private var seenLoaded = false
+    private static let seenType = "de.iphoneblog.mentions_seen"
     private var names: [String: String] = [:]
     private var watch: AnyCancellable?
     private var loading: Task<Void, Never>?
@@ -56,10 +66,77 @@ final class MentionsModel: ObservableObject {
     /// newest message, so the mentions, the badges and the rooms' counts clear.
     func markAllRead() async {
         guard let session else { return }
-        for roomID in Set(items.filter(\.unread).map(\.roomID)) {
+        let unread = items.filter(\.unread)
+        for roomID in Set(unread.map(\.roomID)) {
             try? await session.client.getRoom(roomId: roomID)?.markAsRead(receiptType: .read)
         }
+        // The server may keep some unread (see `seen`); here they are read.
+        seen.formUnion(unread.map(\.id))
+        await saveSeen(session: session)
         reload()
+    }
+
+    /// A timeline sent a read receipt for `eventID` (ChatKitReads): in a thread, the server
+    /// marks its mentions read, so the list reloads; in a room's own timeline, every mention of
+    /// that room up to the event counts as seen here.
+    func didSee(roomID: String, threadRoot: String?, eventID: String) async {
+        guard threadRoot == nil else {
+            try? await Task.sleep(for: .seconds(1))
+            reload()
+            return
+        }
+        let candidates = items.filter { $0.unread && $0.roomID == roomID && $0.threadRoot == nil }
+        guard !candidates.isEmpty, let session else { return }
+        let upTo: Date
+        if let known = items.first(where: { $0.id == eventID }) {
+            upTo = known.date
+        } else if let date = await eventDate(eventID, in: roomID, session: session) {
+            upTo = date
+        } else {
+            return
+        }
+        let newlySeen = candidates.filter { $0.date <= upTo }.map(\.id)
+        guard !newlySeen.isEmpty else { return }
+        seen.formUnion(newlySeen)
+        items = items.map { mention in
+            var mention = mention
+            if seen.contains(mention.id) { mention.unread = false }
+            return mention
+        }
+        await saveSeen(session: session)
+    }
+
+    private func eventDate(_ eventID: String, in roomID: String, session: ChatSession) async -> Date? {
+        let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/?#"))
+        guard let room = roomID.addingPercentEncoding(withAllowedCharacters: allowed),
+              let event = eventID.addingPercentEncoding(withAllowedCharacters: allowed),
+              let data = try? await session.api("GET", "/_matrix/client/v3/rooms/\(room)/event/\(event)"),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let ts = json["origin_server_ts"] as? Double else { return nil }
+        return Date(timeIntervalSince1970: ts / 1000)
+    }
+
+    private func seenPath(_ session: ChatSession) -> String? {
+        guard let user = session.userID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "@:/"))) else { return nil }
+        return "/_matrix/client/v3/user/\(user)/account_data/\(Self.seenType)"
+    }
+
+    private func loadSeen(session: ChatSession) async {
+        guard !seenLoaded, let path = seenPath(session) else { return }
+        if let data = try? await session.api("GET", path),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            seen = Set(json["ids"] as? [String] ?? [])
+        }
+        seenLoaded = true
+    }
+
+    /// Keeps the IDs of mentions still in the list, so the set stays as small as the list.
+    private func saveSeen(session: ChatSession) async {
+        guard let path = seenPath(session) else { return }
+        let listed = Set(items.map(\.id))
+        let kept = seen.filter { listed.contains($0) }
+        guard let body = try? JSONSerialization.data(withJSONObject: ["ids": Array(kept).sorted()]) else { return }
+        _ = try? await session.api("PUT", path, body: body)
     }
 
     func reload() {
@@ -72,6 +149,7 @@ final class MentionsModel: ObservableObject {
         do {
             let data = try await session.api("GET", "/_matrix/client/v3/notifications?only=highlight&limit=50")
             let page = try JSONDecoder().decode(NotificationPage.self, from: data)
+            await loadSeen(session: session)
             var result: [Mention] = []
             for entry in page.notifications {
                 guard let mention = await mention(from: entry, session: session) else { continue }
@@ -107,7 +185,7 @@ final class MentionsModel: ObservableObject {
         return Mention(id: event.eventId, roomID: entry.roomId, place: place, senderID: event.sender,
                        senderName: await name(of: event.sender, session: session),
                        body: body, date: Date(milliseconds: event.originServerTs ?? entry.ts),
-                       unread: !entry.read)
+                       threadRoot: thread, unread: !entry.read && !seen.contains(event.eventId))
     }
 
     /// An article's title by its thread root, fetched once per app run.

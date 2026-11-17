@@ -358,6 +358,10 @@ final class ChatSession: ObservableObject, ChatHost {
         return relates["event_id"] as? String
     }
 
+    func didSee(roomID: String, threadRootEventID: String?, eventID: String) {
+        Task { await mentions.didSee(roomID: roomID, threadRoot: threadRootEventID, eventID: eventID) }
+    }
+
     func showMessage(_ text: String) {
         router.notice = text
     }

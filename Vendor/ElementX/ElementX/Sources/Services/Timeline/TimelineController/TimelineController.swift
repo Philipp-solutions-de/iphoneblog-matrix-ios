@@ -136,7 +136,13 @@ class TimelineController: TimelineControllerProtocol {
             return
         }
         
-        _ = await activeTimeline.sendReadReceipt(for: eventID, type: receiptType)
+        let result = await activeTimeline.sendReadReceipt(for: eventID, type: receiptType)
+        // iphoneblog: tell the app what was seen, so @Mentions follows (ChatKitReads).
+        if case .success = result {
+            var threadRootEventID: String?
+            if case let .thread(rootEventID) = timelineKind { threadRootEventID = rootEventID }
+            ChatKitReads.seen?(roomProxy.id, threadRootEventID, eventID)
+        }
     }
     
     func processItemAppearance(_ itemID: TimelineItemIdentifier) async {
