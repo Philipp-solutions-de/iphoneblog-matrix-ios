@@ -44,7 +44,11 @@ final class ChatSession: ObservableObject, ChatHost {
     /// Called once AuthGuard is sure the session is over (AppModel signs out).
     var onAuthLost: (() -> Void)?
     /// Checks every token error before anyone signs out (AuthGuard).
-    private(set) lazy var authGuard = AuthGuard(probes: authProbes) { [weak self] in self?.onAuthLost?() }
+    private(set) lazy var authGuard = AuthGuard(probes: authProbes,
+                                                report: { MetricsReporter.shared.breadcrumb($0) }) { [weak self] reason in
+        self?.log.error("session over: \(reason, privacy: .public)")
+        self?.onAuthLost?()
+    }
     private var membershipRetry: Task<Void, Never>?
 
     private var syncService: SyncService?
@@ -400,7 +404,7 @@ final class ChatSession: ObservableObject, ChatHost {
                 data = try await apiCall(method, path, body: body)
             } catch TokenRefused.unknownToken {
                 // Our calls take the token as it is; the SDK refreshes it. Check, then once more.
-                guard await authGuard.confirmValid() else { throw URLError(.userAuthenticationRequired) }
+                guard await authGuard.confirmValid(path: path) else { throw URLError(.userAuthenticationRequired) }
                 data = try await apiCall(method, path, body: body)
             }
             apiFailures = 0

@@ -34,15 +34,21 @@ final class AuthGuard {
     }
 
     private let probes: Probes
-    private let signOut: () -> Void
+    /// Ends the session; the argument says why ("invalid_grant" or "refused").
+    private let signOut: (String) -> Void
+    /// Tells home what happened, without anything about the person (MetricsReporter).
+    private let report: ([String: String]) -> Void
+    /// Where the suspicion came from: "sdk" or the shape of our own call's path, and its errcode.
+    private var trigger = ("", "")
     private var checking: Task<Void, Never>?
     /// Seconds between checks while the server is away: 2, 4, 8 … 60.
     static let backoff: [Int] = [2, 4, 8, 16, 32, 60]
     /// How many refusals in a row, with MAS answering, end the session.
     static let refusalsToSignOut = 3
 
-    init(probes: Probes, signOut: @escaping () -> Void) {
+    init(probes: Probes, report: @escaping ([String: String]) -> Void = { _ in }, signOut: @escaping (String) -> Void) {
         self.probes = probes
+        self.report = report
         self.signOut = signOut
     }
 
@@ -58,8 +64,9 @@ final class AuthGuard {
 
     /// Something reported a token error: check, and keep checking with backoff until the
     /// token works or the session is definitely over. One check at a time.
-    func suspect() {
+    func suspect(from source: String = "sdk", errcode: String = "M_UNKNOWN_TOKEN") {
         guard checking == nil else { return }
+        trigger = (source, errcode)
         checking = Task { [weak self] in
             await self?.run()
             self?.checking = nil
@@ -67,10 +74,18 @@ final class AuthGuard {
     }
 
     /// For our own calls: true when the token works now (refreshed), so the call may be retried.
-    func confirmValid() async -> Bool {
+    func confirmValid(path: String) async -> Bool {
         if await check() == .valid { return true }
-        suspect()
+        suspect(from: Self.shape(of: path))
         return false
+    }
+
+    /// A path with every ID replaced: "/_matrix/client/v3/rooms/*/event/*".
+    nonisolated static func shape(of path: String) -> String {
+        let bare = path.split(separator: "?").first.map(String.init) ?? path
+        return bare.split(separator: "/", omittingEmptySubsequences: false).map { segment in
+            segment.contains(where: { "@!$#%:".contains($0) }) ? "*" : String(segment)
+        }.joined(separator: "/")
     }
 
     /// The check loop behind `suspect()`; internal for the tests.
@@ -80,14 +95,18 @@ final class AuthGuard {
         while !Task.isCancelled {
             switch await check() {
             case .valid:
+                // Only worth a line when it took more than the first check.
+                if attempt > 0 { breadcrumb("kept", checks: attempt + 1) }
                 return
             case .invalid:
-                signOut()
+                breadcrumb("signout_invalid_grant", checks: attempt + 1)
+                signOut("invalid_grant")
                 return
             case .refused:
                 refusals += 1
                 if refusals >= Self.refusalsToSignOut {
-                    signOut()
+                    breadcrumb("signout_refused", checks: attempt + 1)
+                    signOut("refused")
                     return
                 }
             case .unreachable:
@@ -96,6 +115,10 @@ final class AuthGuard {
             await probes.sleep(.seconds(Self.backoff[min(attempt, Self.backoff.count - 1)]))
             attempt += 1
         }
+    }
+
+    private func breadcrumb(_ outcome: String, checks: Int) {
+        report(["ev": "auth", "out": outcome, "from": trigger.0, "err": trigger.1, "n": "\(checks)"])
     }
 
     func cancel() {

@@ -244,8 +244,9 @@ final class AppModel: ObservableObject {
         session.onAuthLost = { [weak self] in Task { await self?.sessionLost() } }
         // The SDK reports the same "unknown token" when its refresh merely hit a restarting MAS;
         // AuthGuard checks before anything ends (Alex's logouts on deploy days).
-        let delegate = AuthErrorDelegate { [weak session] _ in
-            Task { @MainActor in session?.authGuard.suspect() }
+        let delegate = AuthErrorDelegate { [weak session] isSoftLogout in
+            // A soft logout never wipes anything: AuthGuard keeps checking until the refresh works.
+            Task { @MainActor in session?.authGuard.suspect(from: "sdk", errcode: isSoftLogout ? "M_UNKNOWN_TOKEN_soft" : "M_UNKNOWN_TOKEN") }
         }
         authErrorDelegate = delegate
         authErrorHandle = try? client.setDelegate(delegate: delegate)

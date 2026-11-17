@@ -16,6 +16,8 @@ final class AuthGuardTests: XCTestCase {
         var issuer: [Bool]
         var sleeps: [Duration] = []
         var signedOut = false
+        var reasons: [String] = []
+        var reports: [[String: String]] = []
         init(sdk: [String?], whoami: [(Int, Data)?] = [nil], issuer: [Bool] = [true]) {
             self.sdk = sdk; self.whoami = whoami; self.issuer = issuer
         }
@@ -27,7 +29,8 @@ final class AuthGuardTests: XCTestCase {
                                 whoami: { script.next(&script.whoami).map { (status: $0.0, body: $0.1) } },
                                 issuerUp: { script.next(&script.issuer) },
                                 sleep: { script.sleeps.append($0) }),
-                  signOut: { script.signedOut = true })
+                  report: { script.reports.append($0) },
+                  signOut: { script.signedOut = true; script.reasons.append($0) })
     }
 
     func testA502DuringRefreshKeepsTheSessionAndRetries() async {
@@ -66,9 +69,38 @@ final class AuthGuardTests: XCTestCase {
 
     func testInvalidGrantSignsOutAtOnce() async {
         let script = Script(sdk: [#"RefreshToken(ServerResponse(error: invalid_grant))"#])
-        await guardFor(script).run()
+        let guardian = guardFor(script)
+        guardian.suspect(from: "/_matrix/client/v3/notifications", errcode: "M_UNKNOWN_TOKEN")
+        await guardian.run()
         XCTAssertTrue(script.signedOut)
+        XCTAssertEqual(script.reasons.last, "invalid_grant")
         XCTAssertEqual(script.sleeps, [])
+        // The server hears why, before the session ends.
+        XCTAssertEqual(script.reports.last?["out"], "signout_invalid_grant")
+        XCTAssertEqual(script.reports.last?["from"], "/_matrix/client/v3/notifications")
+        XCTAssertEqual(script.reports.last?["err"], "M_UNKNOWN_TOKEN")
+    }
+
+    /// Our own call with an expired token: the SDK refreshes, the call may go again, no logout.
+    func testAnExpiredTokenOnOurOwnCallRefreshesAndRetries() async {
+        let script = Script(sdk: [nil])
+        let ok = await guardFor(script).confirmValid(path: "/_matrix/client/v3/pushrules/global/override/x")
+        XCTAssertTrue(ok)
+        XCTAssertFalse(script.signedOut)
+    }
+
+    func testSoftLogoutNeverSignsOut() async {
+        let script = Script(sdk: [refresh502, refresh502, refresh502, refresh502, nil], whoami: [(401, soft401)])
+        await guardFor(script).run()
+        XCTAssertFalse(script.signedOut, "a soft logout signed out")
+        XCTAssertEqual(script.reports.last?["out"], "kept")
+    }
+
+    func testPathsAreReportedWithoutIDs() {
+        XCTAssertEqual(AuthGuard.shape(of: "/_matrix/client/v3/rooms/!abc:iphoneblog.de/event/$ev?x=1"),
+                       "/_matrix/client/v3/rooms/*/event/*")
+        XCTAssertEqual(AuthGuard.shape(of: "/_matrix/client/v3/user/%40tim%3Aiphoneblog.de/account_data/x"),
+                       "/_matrix/client/v3/user/*/account_data/x")
     }
 
     func testARefusalWhileMASAnswersSignsOutOnTheThirdTime() async {
