@@ -1,9 +1,8 @@
 import XCTest
 
 /// Threads in #one-Chat, Slack's way: the row under a message with replies, a tap on a message
-/// opens its thread, and "Threads" at the top lists yours. scripts/test-homeserver.sh seeds the
-/// thread under "Hat jemand schon das neue iPad mini im Alltag?" with six replies from three
-/// people, one of them the tester.
+/// opens its thread, and "Threads" at the top lists yours. The tests write their own threads
+/// just before, so the messages other tests add never bury them.
 final class ThreadsUITests: XCTestCase {
     private var env: [String: String] { ProcessInfo.processInfo.environment }
 
@@ -55,19 +54,38 @@ final class ThreadsUITests: XCTestCase {
         }
     }
 
+    /// A thread with six replies from three people, the tester among them: the row under the
+    /// root reads "6 Antworten" and opens the thread, with the count under the root. Its own
+    /// thread, written just before, so the messages other tests add never bury it.
     func testThreadRowShowsCountAndOpensTheThread() throws {
+        let (root, stamp) = try makeBusyThread()
+        _ = root
         let app = try openChannel()
-        // Six seeded replies; RichMessagesUITests may have added a photo before this runs.
-        let row = app.buttons.matching(NSPredicate(format: "identifier == 'thread-row' AND label MATCHES '.*[67] Antworten.*'")).firstMatch
-        scrollTo(row, in: app)
-        XCTAssertTrue(row.exists, "no thread row with 6 or 7 Antworten")
+        let row = app.buttons.matching(NSPredicate(format: "identifier == 'thread-row' AND label CONTAINS '6 Antworten'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 30), "no thread row with 6 Antworten")
         sleep(2) // repliers load
         attach(app, "channel-thread-row")
         row.tap()
         XCTAssertTrue(app.textViews["Antworten…"].waitForExistence(timeout: 30), "thread did not open")
-        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label MATCHES '[67] Antworten'")).firstMatch.exists,
+        XCTAssertTrue(element(app, containing: "Viel los \(stamp)").waitForExistence(timeout: 15), "the root is not on top")
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label MATCHES '6 Antworten'")).firstMatch.exists,
                       "no count under the root")
         attach(app, "thread-view")
+    }
+
+    /// Six replies from three people, the tester's among them, under a root by Anna.
+    private func makeBusyThread() throws -> (String, Int) {
+        let me = try TestServer.signIn(1)
+        let other = try TestServer.signIn(2)
+        let third = try TestServer.signIn(3)
+        defer { me.signOut(); other.signOut(); third.signOut() }
+        let room = try XCTUnwrap(env["IPHONEBLOG_TEST_CHANNEL_ROOM"])
+        let stamp = Int(Date().timeIntervalSince1970)
+        let root = try other.send("Viel los \(stamp)", in: room)
+        for (n, writer) in [third, me, other, third, me, other].enumerated() {
+            try writer.send("Antwort \(n + 1)", in: room, thread: root)
+        }
+        return (root, stamp)
     }
 
     /// A thread that already has replies when the room opens reads "3 Antworten", never
@@ -108,13 +126,17 @@ final class ThreadsUITests: XCTestCase {
     }
 
     func testThreadsRowListsYourThreads() throws {
+        let (_, stamp) = try makeBusyThread()
         let app = try openChannel(inRoom: false)
         let entry = app.buttons["threads-entry"]
         XCTAssertTrue(entry.waitForExistence(timeout: 120), "no Threads row")
         entry.tap()
-        XCTAssertTrue(element(app, containing: "iPad mini").waitForExistence(timeout: 30), "your thread is not listed")
-        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label MATCHES '[67] Antworten'")).firstMatch
-            .waitForExistence(timeout: 15), "the list shows the wrong count")
+        // Newest activity first, so the thread just written is on top.
+        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Viel los \(stamp)")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 30), "your thread is not listed")
+        let count = NSPredicate(format: "label CONTAINS '6 Antworten'")
+        XCTAssertEqual(XCTWaiter.wait(for: [expectation(for: count, evaluatedWith: row)], timeout: 15), .completed,
+                       "the list shows the wrong count: \(row.label)")
         attach(app, "threads-list")
     }
 

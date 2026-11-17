@@ -107,6 +107,53 @@ struct TestServer {
         return (reasons(events), reasons(users))
     }
 
+    /// A read receipt from this account, as another client would send it (thread "main" or a root).
+    func readReceipt(_ eventID: String, in room: String, thread: String?) throws {
+        _ = try Self.call(base, "/_matrix/client/v3/rooms/\(Self.encode(room))/receipt/m.read/\(Self.encode(eventID))",
+                          method: "POST", token: token, body: thread.map { ["thread_id": $0] } ?? [:])
+    }
+
+    /// Sends a message with any content (an article root, a formatted body). Returns its ID.
+    @discardableResult
+    func sendContent(_ content: [String: Any], in room: String) throws -> String {
+        let path = "/_matrix/client/v3/rooms/\(Self.encode(room))/send/m.room.message/c\(UInt64(Date().timeIntervalSince1970 * 1000))\(Int.random(in: 0..<1000))"
+        let result = try Self.call(base, path, method: "PUT", token: token, body: content)
+        return try XCTUnwrap(result["event_id"] as? String, "send failed")
+    }
+
+    /// Joins a public room by ID.
+    func join(_ room: String) throws {
+        _ = try Self.call(base, "/_matrix/client/v3/join/\(Self.encode(room))", method: "POST", token: token, body: [:])
+    }
+
+    /// Whether this account's own receipts mark the event read, as the web chat and the app judge
+    /// it (MentionsModel.withReadState): a receipt of the event's thread ("main" for the room's
+    /// timeline) or an unthreaded one, at an event no older than it.
+    func receiptsCover(_ eventID: String, in room: String, thread: String?) throws -> Bool {
+        let filter = #"{"room":{"rooms":["\#(room)"],"timeline":{"limit":1},"state":{"lazy_load_members":true}},"presence":{"not_types":["*"]},"account_data":{"not_types":["*"]}}"#
+        let sync = try Self.call(base, "/_matrix/client/v3/sync?filter=\(filter.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "")",
+                                 method: "GET", token: token, body: nil)
+        let joined = ((sync["rooms"] as? [String: Any])?["join"] as? [String: Any])?[room] as? [String: Any]
+        let events = (joined?["ephemeral"] as? [String: Any])?["events"] as? [[String: Any]] ?? []
+        func time(_ id: String) throws -> Double {
+            let event = try Self.call(base, "/_matrix/client/v3/rooms/\(Self.encode(room))/event/\(Self.encode(id))",
+                                      method: "GET", token: token, body: nil)
+            return event["origin_server_ts"] as? Double ?? 0
+        }
+        let target = try time(eventID)
+        for event in events where event["type"] as? String == "m.receipt" {
+            for (receipted, types) in event["content"] as? [String: [String: Any]] ?? [:] {
+                for (type, users) in types where type == "m.read" || type == "m.read.private" {
+                    guard let mine = (users as? [String: Any])?[userID] as? [String: Any] else { continue }
+                    let receiptThread = mine["thread_id"] as? String
+                    guard receiptThread == nil || receiptThread == (thread ?? "main") else { continue }
+                    if try time(receipted) >= target { return true }
+                }
+            }
+        }
+        return false
+    }
+
     func signOut() {
         _ = try? Self.call(base, "/_matrix/client/v3/logout", method: "POST", token: token, body: [:])
     }
