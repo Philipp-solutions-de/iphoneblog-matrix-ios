@@ -28,7 +28,6 @@ final class MetricsReporter: NSObject, MXMetricManagerSubscriber, @unchecked Sen
 
     /// Whether this copy may report. Off until StoreKit has answered.
     private let allowed = OSAllocatedUnfairLock(initialState: false)
-    static let gateMarker = "rum-gate-v1"
 
     /// The rule: TestFlight and Xcode builds report, the App Store never, and unknown never.
     static func mayReport(_ environment: AppStore.Environment?) -> Bool {
@@ -63,9 +62,11 @@ final class MetricsReporter: NSObject, MXMetricManagerSubscriber, @unchecked Sen
             case .verified(let app)?: app.environment
             default: nil
             }
-            // The marker string stays in the binary through this log line; the release check looks for it.
+            // The marker sits in the log's format string, which the compiler keeps as a C string;
+            // the release check looks for it there. A short Swift string constant would not do:
+            // Swift keeps strings up to 15 bytes inside the code, where grep cannot see them.
             guard Self.mayReport(environment) else {
-                Logger(subsystem: Brand.bundleID, category: "metrics").info("\(Self.gateMarker, privacy: .public): off in this build")
+                Logger(subsystem: Brand.bundleID, category: "metrics").info("rum-gate-v1: speed reports off in this build")
                 return
             }
             allowed.withLock { $0 = true }
