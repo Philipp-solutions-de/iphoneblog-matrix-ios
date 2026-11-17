@@ -147,8 +147,10 @@ final class PerformanceTests: XCTestCase {
         let web = app.webViews.firstMatch
         XCTAssertTrue(web.waitForExistence(timeout: 20), "no blog web view")
         // The page has loaded when its scroll bar counts more than one page. Not the page's own
-        // text: a CI runner's simulator hides WebKit's content from XCUITest.
-        let pages = web.otherElements.matching(NSPredicate(format: "label MATCHES %@", "Vertical scroll bar, ([2-9]|[1-9][0-9]+) pages")).firstMatch
+        // text: a CI runner's simulator hides WebKit's content from XCUITest. The app is German
+        // only (CFBundleLocalizations), so WebKit says "Vertikaler Rollbalken, 7 Seiten".
+        let pages = web.otherElements.matching(NSPredicate(format: "label MATCHES %@",
+            "(Vertical scroll bar|Vertikaler Rollbalken), ([2-9]|[1-9][0-9]+) (pages|Seiten)")).firstMatch
         if !pages.waitForExistence(timeout: 60) {
             print("PERF-HIERARCHY-BEGIN\n\(app.debugDescription)\nPERF-HIERARCHY-END")
             XCTFail("blog page not loaded")
