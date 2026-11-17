@@ -122,6 +122,15 @@ both a thread reply and a channel message; it would take two events), push for r
 threads you are in without a mention (Synapse sends none), and thread rows in the Blog tab,
 which shows the website.
 
+**A token error is checked before it signs anyone out.** MAS's access tokens live minutes;
+the SDK refreshes them, our own HTTP calls do not, and when the SDK's refresh hits a restarting
+MAS (502, 503, reset, timeout) it reports the same "unknown token" as a revoked session. So
+`AuthGuard` checks every such report: one SDK request (refreshing on the way), then whoami. The
+session ends only when MAS refuses the refresh token (invalid_grant) or the server refuses the
+token three times in a row while MAS answers; anything else keeps the session and checks again
+after 2, 4, 8 … 60 s. Our own calls retry once after a successful check (Alex's logouts on
+deploy days, 2026-11-17).
+
 **Message links on our own domain.** "Link kopieren" copies
 `https://chat.iphoneblog.de/#/<room>/$<event>`, where `<room>` is the room alias's localpart
 (`one-chat`), else the percent-encoded room ID (`ChatLink`). The web chat at that address

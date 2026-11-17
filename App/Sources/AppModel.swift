@@ -178,9 +178,9 @@ final class AppModel: ObservableObject {
     }
 
     /// The server no longer knows this session (revoked in the sign-in service, or the server
-    /// was reset): every call answers 401 M_UNKNOWN_TOKEN. Before, the app stayed "signed in"
-    /// with #one-Chat locked and nothing working. Now it signs out on this device, without
-    /// calling the server, and says why.
+    /// was reset), as AuthGuard established: MAS refused the refresh token, or the token kept
+    /// being refused while MAS answered. Signs out on this device, without calling the server,
+    /// and says why.
     func sessionLost() async {
         guard case .signedIn(let session) = state else { return }
         log.error("session lost: the server refused the token")
@@ -242,8 +242,10 @@ final class AppModel: ObservableObject {
     private func begin(_ client: Client) async throws {
         let session = try ChatSession(client: client, router: router)
         session.onAuthLost = { [weak self] in Task { await self?.sessionLost() } }
-        let delegate = AuthErrorDelegate { [weak self] _ in
-            Task { @MainActor in await self?.sessionLost() }
+        // The SDK reports the same "unknown token" when its refresh merely hit a restarting MAS;
+        // AuthGuard checks before anything ends (Alex's logouts on deploy days).
+        let delegate = AuthErrorDelegate { [weak session] _ in
+            Task { @MainActor in session?.authGuard.suspect() }
         }
         authErrorDelegate = delegate
         authErrorHandle = try? client.setDelegate(delegate: delegate)
@@ -273,8 +275,8 @@ enum AuthError: Error {
     case badURL
 }
 
-/// The SDK's "unknown token" callback (sync and its own calls). Soft logouts are not used by our
-/// server, so both kinds end the session here.
+/// The SDK's "unknown token" callback (sync and its own calls). It also fires when the refresh
+/// itself failed for a reason that says nothing about the session, so it only starts a check.
 private final class AuthErrorDelegate: ClientDelegate, @unchecked Sendable {
     let onError: (Bool) -> Void
     init(_ onError: @escaping (Bool) -> Void) { self.onError = onError }

@@ -41,8 +41,10 @@ final class ChatSession: ObservableObject, ChatHost {
     private var membershipWatch: AnyCancellable?
     private var membershipTimer: Task<Void, Never>?
     private var badgeWatch: AnyCancellable?
-    /// Called when the server refuses the token on one of our own calls (AppModel signs out).
+    /// Called once AuthGuard is sure the session is over (AppModel signs out).
     var onAuthLost: (() -> Void)?
+    /// Checks every token error before anyone signs out (AuthGuard).
+    private(set) lazy var authGuard = AuthGuard(probes: authProbes) { [weak self] in self?.onAuthLost?() }
     private var membershipRetry: Task<Void, Never>?
 
     private var syncService: SyncService?
@@ -282,6 +284,7 @@ final class ChatSession: ObservableObject, ChatHost {
     }
 
     func stop() async {
+        authGuard.cancel()
         await syncService?.stop()
     }
 
@@ -392,7 +395,14 @@ final class ChatSession: ObservableObject, ChatHost {
     func api(_ method: String, _ path: String, body: Data? = nil) async throws -> Data {
         if Date() < apiPausedUntil { throw URLError(.cannotConnectToHost) }
         do {
-            let data = try await apiCall(method, path, body: body)
+            let data: Data
+            do {
+                data = try await apiCall(method, path, body: body)
+            } catch TokenRefused.unknownToken {
+                // Our calls take the token as it is; the SDK refreshes it. Check, then once more.
+                guard await authGuard.confirmValid() else { throw URLError(.userAuthenticationRequired) }
+                data = try await apiCall(method, path, body: body)
+            }
             apiFailures = 0
             return data
         } catch let error as URLError where error.code != .badServerResponse || lastStatus >= 500 {
@@ -403,6 +413,39 @@ final class ChatSession: ObservableObject, ChatHost {
     }
 
     private var lastStatus = 0
+
+    private enum TokenRefused: Error { case unknownToken }
+
+    /// What AuthGuard asks: one SDK request that refreshes the token when due (the user
+    /// directory needs a token), whoami with the token as it is now, and whether MAS answers.
+    private var authProbes: AuthGuard.Probes {
+        AuthGuard.Probes(
+            sdkRequest: { [client, userID] in
+                do {
+                    _ = try await client.searchUsers(searchTerm: MentionsModel.localpart(userID), limit: 1)
+                    return nil
+                } catch {
+                    return String(describing: error)
+                }
+            },
+            whoami: { [client] in
+                let base = client.homeserver().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                guard let url = URL(string: base + "/_matrix/client/v3/account/whoami"),
+                      let token = try? client.session().accessToken else { return nil }
+                var request = URLRequest(url: url, timeoutInterval: 15)
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                guard let (data, response) = try? await URLSession.shared.data(for: request),
+                      let status = (response as? HTTPURLResponse)?.statusCode else { return nil }
+                return (status, data)
+            },
+            issuerUp: {
+                let issuer = Brand.oauthIssuerURL.hasSuffix("/") ? Brand.oauthIssuerURL : Brand.oauthIssuerURL + "/"
+                guard let url = URL(string: issuer + ".well-known/openid-configuration") else { return false }
+                let request = URLRequest(url: url, timeoutInterval: 15)
+                guard let (_, response) = try? await URLSession.shared.data(for: request) else { return false }
+                return (response as? HTTPURLResponse)?.statusCode == 200
+            })
+    }
 
     private func apiCall(_ method: String, _ path: String, body: Data? = nil) async throws -> Data {
         let base = client.homeserver().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
@@ -419,7 +462,7 @@ final class ChatSession: ObservableObject, ChatHost {
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             if (response as? HTTPURLResponse)?.statusCode == 401,
                String(data: data.prefix(300), encoding: .utf8)?.contains("M_UNKNOWN_TOKEN") == true {
-                onAuthLost?()
+                throw TokenRefused.unknownToken
             }
             throw URLError(.badServerResponse)
         }
