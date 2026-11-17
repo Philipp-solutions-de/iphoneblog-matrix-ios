@@ -1,0 +1,20 @@
+--- a/ElementX/Resources/Localizations/de.lproj/Localizable.strings
++++ b/ElementX/Resources/Localizations/de.lproj/Localizable.strings
+@@ -96,7 +96,7 @@
+ "action_copy" = "Kopieren";
+ "action_copy_caption" = "Bildunterschrift kopieren";
+ "action_copy_link" = "Link kopieren";
+-"action_copy_link_to_message" = "Link zur Nachricht kopieren";
++"action_copy_link_to_message" = "Link kopieren";
+ "action_copy_text" = "Text kopieren";
+ "action_copy_to_clipboard" = "Copy to clipboard";
+ "action_create" = "Erstellen";
+@@ -164,7 +164,7 @@
+ "action_reply" = "Antworten";
+ "action_reply_in_thread" = "Im Thread antworten";
+ "action_report" = "Melden";
+-"action_report_content" = "Inhalt melden";
++"action_report_content" = "Melden";
+ "action_report_dm" = "Chat melden";
+ "action_report_room" = "Chat melden";
+ "action_reset" = "Zurücksetzen";

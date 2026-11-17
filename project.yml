@@ -101,7 +101,7 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDevelopmentRegion: de
-        CFBundleLocalizations: [de, en]
+        CFBundleLocalizations: [de]
         UILaunchScreen:
           UIColorName: LaunchBackground
         UIApplicationSceneManifest:

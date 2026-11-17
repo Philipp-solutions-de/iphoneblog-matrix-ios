@@ -228,6 +228,9 @@ class TimelineInteractionHandler {
         case .translate:
             guard let messageTimelineItem = timelineItem as? EventBasedMessageTimelineItemProtocol else { return }
             actionsSubject.send(.showTranslation(text: messageTimelineItem.body))
+        case .selectText:
+            guard let messageTimelineItem = timelineItem as? EventBasedMessageTimelineItemProtocol else { return }
+            ChatTextSelection.present(text: messageTimelineItem.body)
         }
         
         if action.switchToDefaultComposer {
