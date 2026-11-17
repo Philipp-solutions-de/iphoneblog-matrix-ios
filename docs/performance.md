@@ -73,8 +73,9 @@ minute. So the baselines are medians of a CI run, written from the `perf` artifa
 `perf.log`. Five tests get their own slack (`per_test`): launch, gated on its clock time
 because the runner's simulator does not always report Apple's launch metric, 10 s; opening the
 thread, 7.6 s in one run and 12.1 s in the next with the same app, 8 s; the Blog's hitch ratio,
-21 to 128 ms/s within one run, 40 ms/s; the chat's and the thread's hitch ratios, 141 to 227
-ms/s from run to run, 100 ms/s. The gate on this runner catches a screen that gets
+21 to 128 ms/s within one run, 40 ms/s; the chat's and the thread's hitch ratios, 92 to 245
+ms/s from run to run, 150 ms/s. A failed test runs once more (`-retry-tests-on-failure`), because
+the loaded runner's XCUITest now and then times out reading the screen. The gate on this runner catches a screen that gets
 twice as slow; the device run is what measures fluidity. The simulator also hides WebKit's
 content from XCUITest there, so the Blog test waits for the web view's scroll bar, not a word
 on the page. Xcode's

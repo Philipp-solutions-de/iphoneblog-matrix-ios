@@ -160,7 +160,10 @@ run() {
     [[ -n "${PERF_ONLY:-}" ]] && only=(-only-testing "PerfTests/PerformanceTests/$PERF_ONLY")
     rm -rf "$result"
     set +e
-    xcodebuild "${common[@]}" -resultBundlePath "$result" ${only[@]+"${only[@]}"} test-without-building 2>&1 \
+    # One retry for a failed test: a loaded CI runner's XCUITest times out reading the screen now
+    # and then. perf-gate.py takes the last numbers a test printed, which are the retry's.
+    xcodebuild "${common[@]}" -resultBundlePath "$result" ${only[@]+"${only[@]}"} \
+        -retry-tests-on-failure -test-iterations 2 test-without-building 2>&1 \
         | tee build/perf.log | grep -E 'error:|Test Case .*(passed|failed|skipped)|measured \[|\*\* TEST '
     set -e
 }

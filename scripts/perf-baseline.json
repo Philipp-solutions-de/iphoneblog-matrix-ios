@@ -22,10 +22,10 @@
         "Hitch time ratio": 40.0
       },
       "testScrollOneChat": {
-        "Hitch time ratio": 100.0
+        "Hitch time ratio": 150.0
       },
       "testScrollThread": {
-        "Hitch time ratio": 100.0
+        "Hitch time ratio": 150.0
       }
     }
   },
