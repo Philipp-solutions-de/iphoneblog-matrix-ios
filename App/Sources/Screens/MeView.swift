@@ -136,8 +136,20 @@ struct MeView: View {
                 Task {
                     avatarBusy = true
                     defer { avatarBusy = false; pickedPhoto = nil }
-                    guard let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) else { return }
-                    do { try await session.setAvatar(image) } catch { router.notice = "Das Profilbild ließ sich nicht setzen." }
+                    guard let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) else {
+                        router.notice = "Dieses Bild lässt sich nicht öffnen. Wähl ein anderes."
+                        return
+                    }
+                    // The old picture stays until the new one is on the server (Alex: the web gave
+                    // no feedback at all).
+                    do {
+                        try await session.setAvatar(image)
+                        router.notice = "Profilbild gespeichert."
+                    } catch let error as URLError where [.notConnectedToInternet, .networkConnectionLost, .timedOut].contains(error.code) {
+                        router.notice = "Keine Verbindung. Dein altes Profilbild bleibt."
+                    } catch {
+                        router.notice = "Das Profilbild ließ sich nicht speichern. Dein altes bleibt."
+                    }
                 }
             }
             VStack(alignment: .leading, spacing: 2) {
