@@ -70,6 +70,29 @@ final class ThreadsUITests: XCTestCase {
         attach(app, "thread-view")
     }
 
+    /// A thread that already has replies when the room opens reads "3 Antworten", never
+    /// "Noch keine Antworten" (Thorsten, 2026-11-17: three repliers over "Noch keine Antworten").
+    func testExistingThreadShowsItsCount() throws {
+        let other = try TestServer.signIn(2)
+        let third = try TestServer.signIn(3)
+        defer { other.signOut(); third.signOut() }
+        let room = try XCTUnwrap(env["IPHONEBLOG_TEST_CHANNEL_ROOM"])
+        let stamp = Int(Date().timeIntervalSince1970)
+        let root = try other.send("Zähltest \(stamp)", in: room)
+        try third.send("Antwort eins", in: room, thread: root)
+        try other.send("Antwort zwei", in: room, thread: root)
+        try third.send("Antwort drei", in: room, thread: root)
+
+        let app = try openChannel()
+        let row = app.buttons.matching(NSPredicate(format: "identifier == 'thread-row' AND label CONTAINS '3 Antworten'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 30), "no thread row reading 3 Antworten")
+        sleep(3) // the repliers' fetch lands; the count must stay
+        XCTAssertTrue(row.exists, "the count changed after the repliers loaded")
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier == 'thread-row' AND label CONTAINS 'Noch keine Antworten'")).firstMatch.exists,
+                       "a thread row reads Noch keine Antworten")
+        attach(app, "thread-count")
+    }
+
     func testTapOnMessageOpensItsThread() throws {
         let app = try openChannel()
         let message = app.otherElements.matching(NSPredicate(format: "label == 'Nachricht 5 im vollen Kanal'")).firstMatch

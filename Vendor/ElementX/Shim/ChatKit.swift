@@ -203,3 +203,12 @@ public enum ChatKitContacts {
 public enum ChatKitText {
     public static var preview: ((String, String?) -> String)?
 }
+
+/// How many replies a thread row shows: the server's count, else the timeline's; never fewer
+/// than the repliers shown beside it, so "Noch keine Antworten" appears only for a thread with
+/// no replies and no repliers.
+public enum ChatThreadCount {
+    public static func replies(server: Int?, timeline: Int, repliers: Int) -> Int {
+        max(server ?? timeline, repliers)
+    }
+}

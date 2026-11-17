@@ -20,3 +20,18 @@ final class ContactWarningTests: XCTestCase {
         }
     }
 }
+
+/// A thread row's count (ChatThreadCount): "Noch keine Antworten" only without replies and repliers.
+@MainActor
+final class ThreadCountTests: XCTestCase {
+    func testTheServersCountWins() {
+        XCTAssertEqual(ChatThreadCount.replies(server: 7, timeline: 3, repliers: 3), 7)
+        XCTAssertEqual(ChatThreadCount.replies(server: nil, timeline: 4, repliers: 2), 4)
+    }
+
+    /// Thorsten's screenshot: three repliers, "Noch keine Antworten" (a failed fetch had stored 0).
+    func testRepliersNeverShowZero() {
+        XCTAssertEqual(ChatThreadCount.replies(server: 0, timeline: 0, repliers: 3), 3)
+        XCTAssertEqual(ChatThreadCount.replies(server: nil, timeline: 0, repliers: 0), 0)
+    }
+}

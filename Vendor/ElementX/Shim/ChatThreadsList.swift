@@ -34,7 +34,9 @@ final class ChatThreadActivity: ObservableObject {
     /// Threads you take part in that have news for you; the Threads row's count.
     @Published private(set) var unreadInvolved = 0
     /// Fetches the newest repliers of one thread (room, root) from the server.
-    var fetchRepliers: ((String, String) async -> (senders: [TimelineItemSender], count: Int))?
+    /// Nil when the server did not answer: then nothing changes (a failed fetch once stored 0,
+    /// and the row read "Noch keine Antworten" under three repliers, Thorsten 2026-11-17).
+    var fetchRepliers: ((String, String) async -> (senders: [TimelineItemSender], count: Int)?)?
     private var fetched: [String: Int] = [:]
 
     static func key(_ roomID: String, _ rootEventID: String) -> String { "\(roomID)|\(rootEventID)" }
@@ -64,7 +66,10 @@ final class ChatThreadActivity: ObservableObject {
         guard fetched[key] != hint, let fetchRepliers else { return }
         fetched[key] = hint
         Task {
-            let result = await fetchRepliers(roomID, rootEventID)
+            guard let result = await fetchRepliers(roomID, rootEventID) else {
+                fetched[key] = nil // try again when the row next appears
+                return
+            }
             var thread = threads[key] ?? Thread(replies: result.count, lastReply: nil, latestIsOwn: false)
             if !result.senders.isEmpty { thread.repliers = result.senders }
             thread.serverReplies = result.count
@@ -120,7 +125,7 @@ final class ChatThreadsListModel: ObservableObject {
     /// Loads the threads of every joined room and keeps them live. Safe to call again.
     func start() async {
         ChatThreadActivity.shared.fetchRepliers = { [weak self] room, root in
-            await self?.repliers(roomID: room, rootEventID: root) ?? ([], 0)
+            await self?.repliers(roomID: room, rootEventID: root)
         }
         let rooms = client.rooms().filter { $0.membership() == .joined }
         for room in rooms {
@@ -206,18 +211,18 @@ final class ChatThreadsListModel: ObservableObject {
     }
 
     /// The newest distinct repliers of a thread, at most three, from the server's thread relations.
-    func repliers(roomID: String, rootEventID: String) async -> (senders: [TimelineItemSender], count: Int) {
+    func repliers(roomID: String, rootEventID: String) async -> (senders: [TimelineItemSender], count: Int)? {
         guard let session = try? client.session(),
               let room = roomID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "!:"))),
               let root = rootEventID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "$:"))),
               let url = URL(string: "\(client.homeserver().trimmingCharacters(in: CharacterSet(charactersIn: "/")))/_matrix/client/v1/rooms/\(room)/relations/\(root)/m.thread?limit=100&dir=b") else {
-            return ([], 0)
+            return nil
         }
         var request = URLRequest(url: url)
         request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               (response as? HTTPURLResponse)?.statusCode == 200,
-              let body = try? JSONDecoder().decode(RelationsResponse.self, from: data) else { return ([], 0) }
+              let body = try? JSONDecoder().decode(RelationsResponse.self, from: data) else { return nil }
         // The count is the server's own (the root's bundled thread relation); the page above holds
         // at most 100 replies and only serves the repliers.
         var count = body.chunk.count
@@ -418,7 +423,8 @@ struct ChatThreadRow: View {
 
     /// The server's count once fetched; the SDK's thread list count can be off.
     private var replies: Int {
-        activity.thread(roomID: entry.roomID, rootEventID: entry.rootEventID)?.serverReplies ?? entry.replies
+        let thread = activity.thread(roomID: entry.roomID, rootEventID: entry.rootEventID)
+        return ChatThreadCount.replies(server: thread?.serverReplies, timeline: entry.replies, repliers: thread?.repliers.count ?? 0)
     }
 
     private var style: ChatKitStyle { ChatKitStyle.current }

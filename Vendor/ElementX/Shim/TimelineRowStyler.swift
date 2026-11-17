@@ -328,7 +328,7 @@ struct ChatThreadSummary: View {
 
     private var thread: ChatThreadActivity.Thread? { activity.thread(roomID: roomID, rootEventID: rootEventID) }
     /// The server's count once fetched; the timeline's summary and the thread list can be off.
-    private var count: Int { thread?.serverReplies ?? numberOfReplies }
+    private var count: Int { ChatThreadCount.replies(server: thread?.serverReplies, timeline: numberOfReplies, repliers: thread?.repliers.count ?? 0) }
     private var isUnread: Bool { activity.isUnread(roomID: roomID, rootEventID: rootEventID) }
     private var repliers: [TimelineItemSender] {
         let known = thread?.repliers ?? []
