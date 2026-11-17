@@ -95,6 +95,19 @@ curl -fs -X PUT "$url/_matrix/client/v3/rooms/$one/state/m.space.child/$raum2" \
     -H "Authorization: Bearer $token" -d '{"via":["localhost"],"order":"b"}' >/dev/null
 
 curl -fs -X POST "$url/_matrix/client/v3/join/$allgemein" -H "Authorization: Bearer $writer" -d '{}' >/dev/null
+# The tester has read the posting notice (ChatPostingNotice), so the tests that send are not
+# stopped by it; Ben, a #one member, has not, for PostingNoticeUITests.
+curl -fs -X PUT "$url/_matrix/client/v3/user/%40$user%3Alocalhost/account_data/de.iphoneblog.posting_notice" \
+    -H "Authorization: Bearer $token" -d '{"acknowledged":true}' >/dev/null
+ben_password="$(openssl rand -hex 16)"
+run register_new_matrix_user -c homeserver.yaml -u ben -p "$ben_password" --no-admin "$url" >/dev/null
+ben="$(login ben "$ben_password")"
+for room in "$one" "$allgemein"; do
+    curl -fs -X POST "$url/_matrix/client/v3/rooms/$room/invite" -H "Authorization: Bearer $token" \
+        -d '{"user_id":"@ben:localhost"}' >/dev/null || true
+    curl -fs -X POST "$url/_matrix/client/v3/join/$room" -H "Authorization: Bearer $ben" -d '{}' >/dev/null
+done
+curl -fs -X POST "$url/_matrix/client/v3/logout" -H "Authorization: Bearer $ben" >/dev/null
 send() { # room, txn, json
     curl -fs -X PUT "$url/_matrix/client/v3/rooms/$1/send/m.room.message/$2" -H "Authorization: Bearer $writer" -d "$3" \
         | python3 -c 'import json,sys; print(json.load(sys.stdin)["event_id"])'
@@ -137,19 +150,28 @@ send "$blog" a2 "{\"msgtype\":\"m.text\",\"body\":\"Erste Antwort\",\"m.relates_
 # The same set in the article's thread (Tests/UITests/RichMessagesUITests.swift).
 python3 "$here/scripts/test-rich-messages.py" "$url" "$writer" "$blog" "$root"
 curl -fs -X POST "$url/_matrix/client/v3/logout" -H "Authorization: Bearer $token" >/dev/null
+# A server admin who reads the reports Synapse received (Tests/UITests: "Melden" reaches the server).
+moderator_password="$(openssl rand -hex 16)"
+run register_new_matrix_user -c homeserver.yaml -u moderator -p "$moderator_password" --admin "$url" >/dev/null
 
 cat > "$here/build/test-homeserver.env" <<EOF
 IPHONEBLOG_TEST_HOMESERVER=$url
 IPHONEBLOG_TEST_USER=$user
 IPHONEBLOG_TEST_PASSWORD=$password
 IPHONEBLOG_TEST_USER2=anna
+IPHONEBLOG_TEST_USER3=ben
+IPHONEBLOG_TEST_PASSWORD3=$ben_password
 IPHONEBLOG_TEST_PASSWORD2=$reader_password
+IPHONEBLOG_TEST_ADMIN=moderator
+IPHONEBLOG_TEST_ADMIN_PASSWORD=$moderator_password
 IPHONEBLOG_TEST_ROOMS='$(IFS=,; echo "${rooms[*]}")'
 IPHONEBLOG_TEST_MENTION_ROOM=Allgemein
 IPHONEBLOG_ONE_ALIAS=#one:localhost
 IPHONEBLOG_BLOG_ALIAS=#blog:localhost
 IPHONEBLOG_CHANNEL_ALIAS=#allgemein:localhost
 IPHONEBLOG_TEST_CHANNEL_ROOM=$allgemein
+IPHONEBLOG_TEST_ROOM2=$raum2
+IPHONEBLOG_TEST_BLOG_ROOM=$blog
 IPHONEBLOG_TEST_CHANNEL_THREAD='$hello'
 IPHONEBLOG_TEST_ARTICLE_ROOT='$root'
 EOF

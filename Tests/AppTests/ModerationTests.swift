@@ -62,8 +62,7 @@ final class ModerationTests: XCTestCase {
     func testModerationRequestsAreDistinct() {
         let a = ModerationRequest.reportMessage(roomID: "!abc:iphoneblog.de", eventID: "$e1")
         let b = ModerationRequest.reportMessage(roomID: "!abc:iphoneblog.de", eventID: "$e2")
-        let c = ModerationRequest.profile(userID: "@anna.mueller:iphoneblog.de")
         XCTAssertNotEqual(a.id, b.id)
-        XCTAssertNotEqual(a.id, c.id)
+        XCTAssertEqual(a.id, ModerationRequest.reportMessage(roomID: "!abc:iphoneblog.de", eventID: "$e1").id)
     }
 }

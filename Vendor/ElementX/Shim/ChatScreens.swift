@@ -273,7 +273,9 @@ final class ChatRoomCoordinator: ChatScreenCoordinator {
                                       timelineContext: timelineViewModel.context,
                                       composerToolbar: ComposerToolbar(context: composerViewModel.context),
                                       title: title,
-                                      subtitle: info.isDirect ? nil : ChatKitStrings.members(info.joinedMembersCount))
+                                      // The room's topic if it has one; no member count, which is the same
+                                      // everywhere (Thorsten).
+                                      subtitle: info.topic.flatMap { $0.isEmpty ? nil : $0 })
             .environment(\.chatComposerPlaceholder, ChatKitStrings.messageTo(title))
             .environment(\.chatShowsEncryptionNote, info.isDirect))
     }
@@ -521,8 +523,6 @@ enum ChatKitStrings {
     static let noThreadsTitle = "Noch keine Threads"
     static let noThreadsText = "Wenn du in einem Thread schreibst oder einen beginnst, steht er hier."
 
-    /// Under the room's name: "148 Mitglieder".
-    static func members(_ count: Int) -> String { count == 1 ? "1 Mitglied" : "\(count) Mitglieder" }
 }
 
 extension EnvironmentValues {

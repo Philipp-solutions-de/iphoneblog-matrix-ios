@@ -20,6 +20,8 @@ final class ChatSession: ObservableObject, ChatHost {
 
     @Published private(set) var syncState: SyncServiceState = .idle
     @Published private(set) var displayName: String?
+    /// The profile picture, small, for Ich; nil without one.
+    @Published private(set) var avatar: UIImage?
 
     /// #one-Chat's first room ("Allgemein"); the push-rule mode is read from it.
     @Published private(set) var oneChannelID: String?
@@ -39,8 +41,14 @@ final class ChatSession: ObservableObject, ChatHost {
     private var membershipWatch: AnyCancellable?
     private var membershipTimer: Task<Void, Never>?
     private var badgeWatch: AnyCancellable?
-    /// Called when the server refuses the token on one of our own calls (AppModel signs out).
+    /// Called once AuthGuard is sure the session is over (AppModel signs out).
     var onAuthLost: (() -> Void)?
+    /// Checks every token error before anyone signs out (AuthGuard).
+    private(set) lazy var authGuard = AuthGuard(probes: authProbes,
+                                                report: { MetricsReporter.shared.breadcrumb($0) }) { [weak self] reason in
+        self?.log.error("session over: \(reason, privacy: .public)")
+        self?.onAuthLost?()
+    }
     private var membershipRetry: Task<Void, Never>?
 
     private var syncService: SyncService?
@@ -52,7 +60,14 @@ final class ChatSession: ObservableObject, ChatHost {
         self.client = client
         self.router = router
         userID = try client.userId()
+        AvatarStore.shared.client = client
+        refreshWatch = NotificationCenter.default.addObserver(forName: KeychainSessionDelegate.didSave, object: nil,
+                                                              queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.authGuard.noteRefresh() }
+        }
     }
+
+    private var refreshWatch: NSObjectProtocol?
 
     var roomListService: RoomListService {
         // Only read after start(); the views exist only once sync runs.
@@ -64,15 +79,13 @@ final class ChatSession: ObservableObject, ChatHost {
         if syncService == nil {
             // The send queue reports how far an upload is; the message row shows it as a bar.
             client.enableSendQueueUploadProgress(enable: true)
-            let service = try await client.syncService().finish()
+            // Offline mode: on a network error or a server that is down, the SDK waits and
+            // reconnects by itself, with backoff, instead of stopping for good (testers: "die App
+            // aktualisiert sich nicht, ich muss sie abschiessen").
+            let service = try await client.syncService().withOfflineMode().finish()
             syncService = service
             stateHandle = service.state(listener: SyncStateObserver { [weak self] state in
-                Task { @MainActor in
-                    self?.syncState = state
-                    // A sync that fails may have lost its token: ask the server who we are; a
-                    // 401 M_UNKNOWN_TOKEN there ends the session (api(), onAuthLost).
-                    if case .error = state { _ = try? await self?.api("GET", "/_matrix/client/v3/account/whoami") }
-                }
+                Task { @MainActor in self?.syncStateChanged(state) }
             })
             try await rooms.attach(to: service.roomListService())
         }
@@ -82,7 +95,57 @@ final class ChatSession: ObservableObject, ChatHost {
         mentions.attach(to: self)
         notificationPrefs.attach(to: self)
         displayName = try? await client.displayName()
+        await loadAvatar()
         log.info("sync started")
+    }
+
+    // MARK: Keeping sync alive
+
+    private var restartTask: Task<Void, Never>?
+    private var restartAttempt = 0
+    private var inForeground = true
+
+    /// Sync ended in an error: if the token was lost, the session ends (whoami → api(),
+    /// onAuthLost); otherwise it starts again after 1, 2, 4 … 60 s with jitter, while the app is
+    /// in front. A running sync resets the count.
+    private func syncStateChanged(_ state: SyncServiceState) {
+        syncState = state
+        switch state {
+        case .running:
+            restartAttempt = 0
+            restartTask?.cancel()
+        case .error, .terminated:
+            guard inForeground, restartTask == nil || restartTask?.isCancelled == true else { return }
+            let delay = min(60, pow(2, Double(restartAttempt))) * Double.random(in: 0.8...1.2)
+            restartAttempt += 1
+            log.info("sync stopped; restart in \(delay, format: .fixed(precision: 1)) s")
+            restartTask = Task { [weak self] in
+                if case .error = state { _ = try? await self?.api("GET", "/_matrix/client/v3/account/whoami") }
+                try? await Task.sleep(for: .seconds(delay))
+                guard let self, !Task.isCancelled, self.inForeground else { return }
+                self.restartTask = nil
+                await self.syncService?.start()
+            }
+        default:
+            break
+        }
+    }
+
+    /// The app went to the background: stop syncing, as Element X does (iOS cuts the connection
+    /// anyway, and a dead long-poll is what left the app without updates).
+    func enterBackground() async {
+        inForeground = false
+        restartTask?.cancel()
+        restartTask = nil
+        await syncService?.stop()
+    }
+
+    /// The app is in front again: sync at once, and look at what changed meanwhile.
+    func enterForeground() async {
+        inForeground = true
+        restartAttempt = 0
+        await syncService?.start()
+        mentions.reload()
     }
 
     /// Finds the Blog room (joining it if needed, it is open to everyone) and the #one room,
@@ -232,6 +295,7 @@ final class ChatSession: ObservableObject, ChatHost {
     }
 
     func stop() async {
+        authGuard.cancel()
         await syncService?.stop()
     }
 
@@ -242,8 +306,12 @@ final class ChatSession: ObservableObject, ChatHost {
     }
 
     func openUser(userID: String) {
-        // Profiles come with the conversation views; until then a mention opens nothing.
-        log.info("open user requested")
+        router.profile = Router.Person(userID: userID, shareNow: false)
+    }
+
+    func shareContact(userID: String) {
+        guard router.isMember, ContactShare.canShare(with: userID, me: self.userID) else { return }
+        router.profile = Router.Person(userID: userID, shareNow: true)
     }
 
     func openRoom(roomID: String) {
@@ -251,7 +319,56 @@ final class ChatSession: ObservableObject, ChatHost {
     }
 
     func openURL(_ url: URL) {
+        if let link = ChatLink.parse(url) {
+            Task { await open(link) }
+            return
+        }
         router.presentedURL = url
+    }
+
+    /// A chat link: a thread reply opens its thread, any other message its room, scrolled to and
+    /// highlighted; a room link the room. The link names no thread, so the event says (as the
+    /// web chat does). The thread screen does not scroll to a reply yet.
+    func open(_ link: ChatLink) async {
+        let roomID: String
+        if link.room.hasPrefix("#") {
+            guard let resolved = await resolve(link.room) else {
+                router.notice = "Diesen Raum gibt es nicht."
+                return
+            }
+            roomID = resolved.roomId
+        } else {
+            roomID = link.room
+        }
+        guard let eventID = link.eventID else {
+            router.openRoom(roomID)
+            return
+        }
+        if let root = await threadRoot(of: eventID, in: roomID) {
+            router.openThread(roomID: roomID, rootEventID: root)
+        } else {
+            router.openMessage(roomID: roomID, eventID: eventID)
+        }
+    }
+
+    /// The thread an event replies in, from the event itself (GET /rooms/{id}/event/{id}).
+    private func threadRoot(of eventID: String, in roomID: String) async -> String? {
+        let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/?#"))
+        guard let room = roomID.addingPercentEncoding(withAllowedCharacters: allowed),
+              let event = eventID.addingPercentEncoding(withAllowedCharacters: allowed),
+              let data = try? await api("GET", "/_matrix/client/v3/rooms/\(room)/event/\(event)"),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let relates = (json["content"] as? [String: Any])?["m.relates_to"] as? [String: Any],
+              relates["rel_type"] as? String == "m.thread" else { return nil }
+        return relates["event_id"] as? String
+    }
+
+    func isOnScreen(roomID: String, threadRootEventID: String?) -> Bool {
+        router.isOnScreen(roomID: roomID, threadRootEventID: threadRootEventID)
+    }
+
+    func didSee(roomID: String, threadRootEventID: String?, eventID: String) {
+        Task { await mentions.didSee(roomID: roomID, threadRoot: threadRootEventID, eventID: eventID) }
     }
 
     func showMessage(_ text: String) {
@@ -292,7 +409,92 @@ final class ChatSession: ObservableObject, ChatHost {
     }
 
     /// A client-server API call the SDK has no method for, with this session's token.
+    /// After a 5xx answer or a network error the app's own calls hold back, 1 s doubling to 60 s
+    /// with jitter, so a restarting server is not hit by every model at once (68 calls in one
+    /// minute during a Synapse restart).
+    private var apiPausedUntil = Date.distantPast
+    private var apiFailures = 0
+
     func api(_ method: String, _ path: String, body: Data? = nil) async throws -> Data {
+        if Date() < apiPausedUntil { throw URLError(.cannotConnectToHost) }
+        do {
+            let data: Data
+            let sent = Date()
+            do {
+                data = try await apiCall(method, path, body: body)
+            } catch TokenRefused.unknownToken {
+                // Our calls take the token as it is; the SDK refreshes it. Check, then once more.
+                guard await authGuard.confirmValid(path: path, requestSent: sent) else { throw URLError(.userAuthenticationRequired) }
+                data = try await apiCall(method, path, body: body)
+            }
+            apiFailures = 0
+            return data
+        } catch let error as URLError where Self.countsAsOutage(error.code, status: lastStatus) {
+            apiFailures += 1
+            apiPausedUntil = Date().addingTimeInterval(min(60, pow(2, Double(apiFailures - 1))) * Double.random(in: 0.8...1.2))
+            throw error
+        }
+    }
+
+    private var lastStatus = 0
+
+    /// What pauses our calls (the backoff): the server or the network failing, not a request
+    /// the app itself cancelled (search cancels one per keystroke: "Comics" typed letter by
+    /// letter paused every call for up to a minute, "Die Suche ist gerade nicht erreichbar"),
+    /// not a token check, and not a 4xx answer.
+    nonisolated static func countsAsOutage(_ code: URLError.Code, status: Int) -> Bool {
+        switch code {
+        case .cancelled, .userAuthenticationRequired: return false
+        case .badServerResponse: return status >= 500
+        default: return true
+        }
+    }
+
+    private enum TokenRefused: Error { case unknownToken }
+
+    /// What AuthGuard asks: one SDK request that refreshes the token when due (the user
+    /// directory needs a token), whoami with the token as it is now, and whether MAS answers.
+    private var authProbes: AuthGuard.Probes {
+        AuthGuard.Probes(
+            sdkRequest: { [client, userID] in
+                do {
+                    _ = try await client.searchUsers(searchTerm: MentionsModel.localpart(userID), limit: 1)
+                    return nil
+                } catch {
+                    return String(describing: error)
+                }
+            },
+            whoami: { [client] in
+                let base = client.homeserver().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                guard let url = URL(string: base + "/_matrix/client/v3/account/whoami"),
+                      let token = try? client.session().accessToken else { return nil }
+                var request = URLRequest(url: url, timeoutInterval: 15)
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                guard let (data, response) = try? await URLSession.shared.data(for: request),
+                      let status = (response as? HTTPURLResponse)?.statusCode else { return nil }
+                return (status, data)
+            },
+            issuerUp: {
+                let issuer = Brand.oauthIssuerURL.hasSuffix("/") ? Brand.oauthIssuerURL : Brand.oauthIssuerURL + "/"
+                guard let url = URL(string: issuer + ".well-known/openid-configuration") else { return false }
+                let request = URLRequest(url: url, timeoutInterval: 15)
+                guard let (_, response) = try? await URLSession.shared.data(for: request) else { return false }
+                return (response as? HTTPURLResponse)?.statusCode == 200
+            })
+    }
+
+    /// One call to our own endpoints, with the HTTP status for the caller to read (no backoff):
+    /// "Kontaktdaten teilen" tells each refusal apart.
+    func call(_ method: String, _ path: String, body: Data? = nil) async throws -> (Data, Int) {
+        let sent = Date()
+        let answer = try await callOnce(method, path, body: body)
+        // A stale token: AuthGuard checks (the SDK refreshes), then one more try (as api()).
+        guard answer.1 == 401, String(data: answer.0.prefix(300), encoding: .utf8)?.contains("M_UNKNOWN_TOKEN") == true,
+              await authGuard.confirmValid(path: path, requestSent: sent) else { return answer }
+        return try await callOnce(method, path, body: body)
+    }
+
+    private func callOnce(_ method: String, _ path: String, body: Data?) async throws -> (Data, Int) {
         let base = client.homeserver().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard let url = URL(string: base + path) else { throw URLError(.badURL) }
         var request = URLRequest(url: url)
@@ -303,14 +505,61 @@ final class ChatSession: ObservableObject, ChatHost {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
         let (data, response) = try await URLSession.shared.data(for: request)
+        return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
+    }
+
+    private func apiCall(_ method: String, _ path: String, body: Data? = nil) async throws -> Data {
+        let base = client.homeserver().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard let url = URL(string: base + path) else { throw URLError(.badURL) }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("Bearer \(try client.session().accessToken)", forHTTPHeaderField: "Authorization")
+        if let body {
+            request.httpBody = body
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        lastStatus = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             if (response as? HTTPURLResponse)?.statusCode == 401,
                String(data: data.prefix(300), encoding: .utf8)?.contains("M_UNKNOWN_TOKEN") == true {
-                onAuthLost?()
+                throw TokenRefused.unknownToken
             }
             throw URLError(.badServerResponse)
         }
         return data
+    }
+
+    // MARK: Profile picture
+
+    /// The picture behind the account's avatar URL, as a thumbnail.
+    func loadAvatar() async {
+        guard let url = try? await client.avatarUrl(), let source = try? MediaSource.fromUrl(url: url),
+              let data = try? await client.getMediaThumbnail(mediaSource: source, width: 240, height: 240) else {
+            avatar = nil
+            return
+        }
+        avatar = UIImage(data: data)
+    }
+
+    /// Sets the profile picture: square, at most 512 points, JPEG. The display name stays the
+    /// blog's; only the picture is the person's own choice.
+    func setAvatar(_ image: UIImage) async throws {
+        let side = min(image.size.width, image.size.height)
+        let crop = CGRect(x: (image.size.width - side) / 2, y: (image.size.height - side) / 2, width: side, height: side)
+        let target = CGSize(width: min(side, 512), height: min(side, 512))
+        let square = UIGraphicsImageRenderer(size: target).image { _ in
+            image.draw(in: CGRect(x: -crop.minX * target.width / side, y: -crop.minY * target.height / side,
+                                  width: image.size.width * target.width / side, height: image.size.height * target.height / side))
+        }
+        guard let data = square.jpegData(compressionQuality: 0.85) else { return }
+        try await client.uploadAvatar(mimeType: "image/jpeg", data: data)
+        avatar = square
+    }
+
+    func removeAvatar() async throws {
+        try await client.removeAvatar()
+        avatar = nil
     }
 
     /// The account page on the sign-in service (name, password, devices).

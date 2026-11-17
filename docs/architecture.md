@@ -122,6 +122,56 @@ both a thread reply and a channel message; it would take two events), push for r
 threads you are in without a mention (Synapse sends none), and thread rows in the Blog tab,
 which shows the website.
 
+**A token error is checked before it signs anyone out.** MAS's access tokens live minutes;
+the SDK refreshes them, our own HTTP calls do not, and when the SDK's refresh hits a restarting
+MAS (502, 503, reset, timeout) it reports the same "unknown token" as a revoked session. So
+`AuthGuard` checks every such report: one SDK request (refreshing on the way), then whoami. The
+session ends only when MAS refuses the refresh token (invalid_grant) or the server refuses the
+token three times in a row while MAS answers; anything else keeps the session and checks again
+after 2, 4, 8 … 60 s. Our own calls retry once after a successful check. Concurrent errors
+share one check, so at most one refresh; a 401 for a request sent before the latest refresh,
+and refusals counted before it, never count. The app restores its session once per process: a
+second restore after iOS rebuilt the scene ran two clients that refreshed the same token 45 ms
+apart, which MAS treats as reuse and answers by revoking the session (Alex's logouts,
+2026-11-17).
+**Mentions turn read when seen, "read up to here".** Opening a mention's thread or room marks
+it read, without "Alle als gelesen": the timeline sends a read receipt for the newest message
+on screen (Element X), and every mention up to it counts as read, in rooms and in threads
+(Thorsten's decision A, 2026-11-17, as Element and the web chat do). Read or not comes from the
+account's own receipts (`MentionsModel.withReadState`): a receipt of the mention's thread, or of
+the room's timeline for a room message, or an unthreaded one, at an event no older than it.
+Synapse's own `read` flag in /notifications is not used: it takes one receipt row per room,
+whichever the database returns last, of any thread. "Alle als gelesen" sends one receipt per
+thread and per room timeline on the newest listed mention, says when one fails, and reloads.
+
+**Contact details go by mail, not into the chat.** A tap on a name, an avatar or a mention
+opens the person's profile; a long press on a name or avatar opens "Kontaktdaten teilen" at
+once. Members choose their email address (the blog account's, held by the server) and/or a phone
+number typed each time, see who gets it and a warning, and confirm by name; the chat server
+mails the recipient (`ContactShare`; contract in infra's docs/matrix.md, "Sharing contact
+details"). Not offered with oneself or the room bot. A message with an email address or a
+phone number asks first (`ChatContactWarning`); the server stores email addresses in messages
+masked.
+
+**Message links on our own domain.** "Link kopieren" copies
+`https://chat.iphoneblog.de/#/<room>/$<event>`, where `<room>` is the room alias's localpart
+(`one-chat`), else the percent-encoded room ID (`ChatLink`). The web chat at that address
+copies and routes the same single form, so a link works without the app; with the app
+installed, iOS hands it over as a universal link (`applinks:chat.iphoneblog.de`; the chat
+server's apple-app-site-association names the app for `/` with a fragment). The link names no
+thread: the opener reads the event and opens its thread if it replies in one, else the room
+scrolled to the message, so a link stays right when a message moves into a thread. Signed out,
+the web chat opens in a sheet. matrix.to links to rooms and messages open the same way. The
+thread screen does not yet scroll to the reply.
+
+**Pushes for mentions, not for every message.** At an account's first sign-in the app turns the
+default underride `.m.rule.message` off, once, marked in account data
+(`de.iphoneblog.push_defaults`) so a later choice stays: every message then only counts towards
+the badge, while @mentions (a reply to one's own message carries one) and new articles push.
+Under Ich each #one room has "Alle / Nur Erwähnungen / Aus" as a room rule on top. Later: pushes
+for replies in threads one takes part in need thread subscriptions (MSC4306), experimental and
+off on the server.
+
 **No direct messages.** The app offers no way to start one (a tap on a person opens nothing),
 and direct rooms stay out of #one-Chat, Threads and @Mentions; the server refuses to create
 them (Thorsten, 2026-11-16).

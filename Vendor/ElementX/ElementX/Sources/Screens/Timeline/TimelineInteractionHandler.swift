@@ -176,14 +176,12 @@ class TimelineInteractionHandler {
                 return
             }
             
-            Task {
-                guard case let .success(permalinkURL) = await roomProxy.matrixToEventPermalink(eventID) else {
-                    actionsSubject.send(.displayErrorToast(L10n.errorFailedCreatingThePermalink))
-                    return
-                }
-                
-                UIPasteboard.general.url = permalinkURL
+            // iphoneblog: the app's readable link on its own domain, not matrix.to with room ID and via.
+            guard let url = ChatKitLinks.message?(roomProxy.id, roomProxy.infoPublisher.value.canonicalAlias, eventID) else {
+                actionsSubject.send(.displayErrorToast(L10n.errorFailedCreatingThePermalink))
+                return
             }
+            UIPasteboard.general.url = url
         case .redact:
             break // Handled above, before the timeline item is looked up.
         case .reply:
@@ -228,6 +226,9 @@ class TimelineInteractionHandler {
         case .translate:
             guard let messageTimelineItem = timelineItem as? EventBasedMessageTimelineItemProtocol else { return }
             actionsSubject.send(.showTranslation(text: messageTimelineItem.body))
+        case .selectText:
+            guard let messageTimelineItem = timelineItem as? EventBasedMessageTimelineItemProtocol else { return }
+            ChatTextSelection.present(text: messageTimelineItem.body)
         }
         
         if action.switchToDefaultComposer {

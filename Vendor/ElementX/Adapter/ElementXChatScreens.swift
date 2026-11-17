@@ -17,13 +17,24 @@ final class ElementXChatScreens: ChatScreenProviding {
 
     init() {
         ChatKitTheme.apply(.app)
+        ChatKitText.preview = { body, html in PushText.plain(body: body, formattedBody: html) }
+        // "Link kopieren": the app's readable link (ChatLink), not matrix.to.
+        ChatKitLinks.message = { roomID, alias, eventID in ChatLink.url(roomID: roomID, alias: alias, eventID: eventID) }
     }
 
     func start(host: ChatHost) async throws {
         guard sessionUserID != host.userID || session == nil else { return }
+        ChatPostingNotice.shared.privacyURL = URL(string: Brand.oauthPolicyURI)
         session = try ChatKitSession(client: host.client, roomListService: host.roomListService)
         sessionUserID = host.userID
         hosts = [:]
+        ChatKitContacts.share = { [weak host] userID in host?.shareContact(userID: userID) }
+        ChatKitReads.isOnScreen = { [weak host] roomID, threadRoot in
+            host?.isOnScreen(roomID: roomID, threadRootEventID: threadRoot) ?? false
+        }
+        ChatKitReads.seen = { [weak host] roomID, threadRoot, eventID in
+            host?.didSee(roomID: roomID, threadRootEventID: threadRoot, eventID: eventID)
+        }
     }
 
     func roomScreen(roomID: String, host: ChatHost) -> AnyView {
@@ -74,9 +85,8 @@ private final class HostAdapter: ChatKitHost {
 
     func openThread(roomID: String, rootEventID: String) { host?.openThread(roomID: roomID, rootEventID: rootEventID) }
     func openRoom(roomID: String) { host?.openRoom(roomID: roomID) }
-    // A sender's name or avatar opens the profile with "Melden" and "Blockieren" (Moderation/).
-    func openUser(userID: String) { host?.showProfile(userID: userID) }
-    func reportMessage(roomID: String, eventID: String) { host?.reportMessage(roomID: roomID, eventID: eventID) }
+    func openUser(userID: String) { host?.openUser(userID: userID) }
     func openURL(_ url: URL) { host?.openURL(url) }
     func showMessage(_ text: String) { host?.showMessage(text) }
+    func reportMessage(roomID: String, eventID: String) { host?.reportMessage(roomID: roomID, eventID: eventID) }
 }

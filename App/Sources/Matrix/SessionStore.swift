@@ -102,5 +102,9 @@ final class KeychainSessionDelegate: ClientSessionDelegate, @unchecked Sendable 
 
     func saveSessionInKeychain(session: Session) {
         try? store.save(StoredSession(session, storeID: storeID))
+        // The app's AuthGuard: errors from before this moment concern the old token.
+        NotificationCenter.default.post(name: Self.didSave, object: nil)
     }
+
+    static let didSave = Notification.Name("iphoneblog.sessionRefreshed")
 }

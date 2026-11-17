@@ -11,6 +11,11 @@ struct IphoneblogApp: App {
                 .environmentObject(model)
                 .tint(Theme.teal)
                 .task { await model.restore() }
+                // Chat links on chat.iphoneblog.de (universal links) open the message in the app.
+                .onOpenURL { model.open($0) }
+                // The frame-rate readout and the device metrics (docs/performance.md).
+                .background(PerfInstrumentsHook().frame(width: 0, height: 0))
+                .onAppear { MetricsReporter.shared.start() }
         }
     }
 }

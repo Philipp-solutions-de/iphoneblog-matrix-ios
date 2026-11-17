@@ -22,18 +22,23 @@ protocol ChatHost: AnyObject {
 
     /// Opens a thread of this room as its own screen (iPhone) or column (iPad).
     func openThread(roomID: String, rootEventID: String)
-    /// Opens a person's profile (or starts a direct message from there).
+    /// Opens a person's profile sheet, with "Kontaktdaten teilen".
     func openUser(userID: String)
+    /// Opens "Kontaktdaten teilen" with this person straight away (a long press on the name).
+    func shareContact(userID: String)
     /// Opens a room by ID, for example a room link inside a message.
     func openRoom(roomID: String)
     /// Opens a web address the way the app wants (in-app Safari).
     func openURL(_ url: URL)
     /// Shows a short notice (sent, copied, failed) the app's way.
     func showMessage(_ text: String)
-    /// A person's profile with "Melden" and "Blockieren" (App/Sources/Moderation).
-    func showProfile(userID: String)
     /// Asks why, then reports the message to the moderators (App/Sources/Moderation).
     func reportMessage(roomID: String, eventID: String)
+    /// A timeline showed the reader up to `eventID` (in a thread when `threadRootEventID` is set)
+    /// and sent its read receipt.
+    func didSee(roomID: String, threadRootEventID: String?, eventID: String)
+    /// Whether this room's timeline (or this thread) is the screen on top right now.
+    func isOnScreen(roomID: String, threadRootEventID: String?) -> Bool
 }
 
 /// What the conversation views give the app. Implemented once in Vendor/ (today Element X's

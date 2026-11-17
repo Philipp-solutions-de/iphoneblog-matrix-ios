@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Fails when an App Store build carries the simulator-only test-gate path (BlogTab.swift,
-# testGateCookie): its marker strings must not be anywhere in the app. fastlane's beta lane
+# testGateCookie): its marker strings must not be anywhere in the app. Fails too when the
+# TestFlight-only gate for speed reports (MetricsReporter, "rum-gate-v1") is missing. fastlane's beta lane
 # runs this between archive and upload.
 #   scripts/check-release-clean.sh <path to .ipa or .app>
 set -euo pipefail
@@ -22,5 +23,11 @@ for marker in SIMULATOR_HOST_HOME test-gate-beta test_gate; do
         found=1
     fi
 done
-[[ $found == 0 ]] && echo "check-release-clean: no test-gate path in $(basename "$app")"
+# The speed reports may only leave TestFlight builds (GDPR): the gate in MetricsReporter must be
+# compiled in, or an App Store copy of this binary would report.
+if ! grep -r -a -q "rum-gate-v1" "$app"; then
+    echo "check-release-clean: the TestFlight-only gate for speed reports (rum-gate-v1) is missing" >&2
+    found=1
+fi
+[[ $found == 0 ]] && echo "check-release-clean: no test-gate path, speed-report gate present in $(basename "$app")"
 exit $found

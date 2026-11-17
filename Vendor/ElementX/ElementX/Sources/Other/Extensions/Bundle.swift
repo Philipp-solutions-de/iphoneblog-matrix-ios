@@ -33,7 +33,9 @@ public nonisolated extension Bundle {
     
     /// Overrides `Bundle.app.preferredLocalizations` for testing translations since this is
     /// only for testing, and is changed at runtime only in tests, it's fine to keep as `nonisolated(unsafe)`
-    nonisolated(unsafe) static var overrideLocalizations: [String]?
+    /// iphoneblog: German whatever the device's language, as the rest of the app; an English
+    /// iPhone showed Element X's English menus (Alex, 2026-11-16).
+    nonisolated(unsafe) static var overrideLocalizations: [String]? = ["de"]
     
     private static let cachedBundles = Mutex<[String: Bundle]>([:])
     

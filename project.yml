@@ -10,6 +10,15 @@ options:
   createIntermediateGroups: true
   developmentLanguage: de
 
+# **Perf**: Release's optimisation, for the performance tests only (docs/performance.md). The
+# app target adds the DEBUG condition so the tests can point it at the test homeserver and sign
+# in by themselves, which Release refuses; everything else, ChatKit and the packages included,
+# builds exactly as Release.
+configs:
+  Debug: debug
+  Release: release
+  Perf: release
+
 settings:
   base:
     DEVELOPMENT_TEAM: ${TEAM_ID}
@@ -92,7 +101,7 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDevelopmentRegion: de
-        CFBundleLocalizations: [de, en]
+        CFBundleLocalizations: [de]
         UILaunchScreen:
           UIColorName: LaunchBackground
         UIApplicationSceneManifest:
@@ -114,6 +123,9 @@ targets:
         # The + menu in a conversation offers the camera.
         NSCameraUsageDescription: Damit du Fotos direkt im Chat aufnehmen kannst.
         UIBackgroundModes: [remote-notification]
+        # **120 Hz on ProMotion iPhones.** Without this key iOS caps every iPhone app at 60 Hz,
+        # whatever the views ask for; iPads do not need it. docs/performance.md.
+        CADisableMinimumFrameDurationOnPhone: true
         # Plain http only to this device and the local network: test servers and sample data in
         # debug runs. Everything on the internet stays https.
         NSAppTransportSecurity:
@@ -151,8 +163,11 @@ targets:
         # auth.phso.de, and WebKit offers a passkey there only to an app that domain names in
         # its apple-app-site-association (infra, moon). Fastfile `register` turns the
         # capability on for the App ID.
+        # applinks: chat links on chat.iphoneblog.de open the message in the app (ChatLink); the
+        # chat server's apple-app-site-association names the app for "/" with a fragment.
         com.apple.developer.associated-domains:
           - webcredentials:auth.phso.de
+          - applinks:chat.iphoneblog.de
     settings:
       base:
         PRODUCT_NAME: iphoneblog
@@ -163,6 +178,9 @@ targets:
         SUPPORTS_MACCATALYST: NO
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: YES
         CODE_SIGN_STYLE: Automatic
+      configs:
+        Perf:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
 
   NotificationExtension:
     type: app-extension
@@ -284,6 +302,21 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TEST_TARGET_NAME: App
 
+  # Scroll, open and launch timings with hitch ratios, against the test homeserver and its
+  # seeded history (scripts/perf.sh; docs/performance.md). A UI-testing bundle, because the
+  # hitch metrics come from the app's own signposts while XCUITest drives it.
+  PerfTests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [Tests/PerfTests]
+    dependencies:
+      - target: App
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ${BUNDLE_ID}.perftests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: App
+
 schemes:
   ChatKit:
     build:
@@ -308,3 +341,12 @@ schemes:
         App: all
     test:
       targets: [UITests]
+  PerfTests:
+    build:
+      targets:
+        App: all
+    test:
+      # Release's optimisation, as the App Store builds it: a debug build's hitches measure the
+      # unoptimised code. `Perf` adds only the test switches (configs, above).
+      config: Perf
+      targets: [PerfTests]

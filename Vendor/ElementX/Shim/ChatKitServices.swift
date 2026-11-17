@@ -94,7 +94,8 @@ final class ChatUserSession: UserSessionProtocol, @unchecked Sendable {
         let mediaProvider = MediaProvider(mediaLoader: clientProxy.mediaLoader,
                                           imageCache: .onlyInMemory,
                                           homeserverReachabilityPublisher: clientProxy.homeserverReachabilityPublisher)
-        self.mediaProvider = mediaProvider
+        // Images decoded and scaled off the main thread (PreparedMediaProvider.swift).
+        self.mediaProvider = PreparedMediaProvider(base: mediaProvider)
         voiceMessageMediaManager = VoiceMessageMediaManager(mediaProvider: mediaProvider)
     }
 }

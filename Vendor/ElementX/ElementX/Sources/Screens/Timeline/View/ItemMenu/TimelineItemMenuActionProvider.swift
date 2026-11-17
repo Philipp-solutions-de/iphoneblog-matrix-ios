@@ -53,13 +53,8 @@ struct TimelineItemMenuActionProvider {
                 actions.append(.replyInThread)
             }
             
-            if let messageItem = item as? EventBasedMessageTimelineItemProtocol {
-                // If threads are enabled we will have the dedicated `replyInThread` action
-                // so there is no need to make the normal reply use the thread.
-                actions.append(.reply(isThread: areThreadsEnabled ? false : messageItem.properties.isThreaded))
-            } else {
-                actions.append(.reply(isThread: false))
-            }
+            // iphoneblog: no plain quote reply; threads are how people answer here. Replies from
+            // other clients still show with their quote.
         }
         
         // iphoneblog: no forwarding and no pinned messages.
@@ -86,12 +81,8 @@ struct TimelineItemMenuActionProvider {
         
         if item.isCopyable {
             actions.append(.copy)
-            
-            if !ProcessInfo.processInfo.isiOSAppOnMac {
-                // As of macOS 26.2, the sheet isn't presented, but it is easy enough
-                // to select some text and right click on Mac anyway so hide this one.
-                actions.append(.translate)
-            }
+            // iphoneblog: no "Translate"; "Text auswählen" for part of a message instead.
+            actions.append(.selectText)
         } else if item.hasMediaCaption {
             actions.append(.copyCaption)
         }

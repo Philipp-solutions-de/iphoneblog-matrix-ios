@@ -20,6 +20,7 @@ struct MainView: View {
     }
 
     @EnvironmentObject private var model: AppModel
+    @Environment(\.scenePhase) private var scenePhase
     @ObservedObject var router: Router
     /// Nil while signed out.
     let session: ChatSession?
@@ -48,11 +49,27 @@ struct MainView: View {
                     .tag(Router.Tab.me)
             }
         }
+        // Sync stops in the background and starts again in front (ChatSession).
+        .onChange(of: scenePhase) { _, phase in
+            guard let session else { return }
+            switch phase {
+            case .background: Task { await session.enterBackground() }
+            case .active: Task { await session.enterForeground() }
+            default: break
+            }
+        }
         .onChange(of: session == nil) { _, signedOut in
             if signedOut, router.tab == .mentions { router.tab = .blog }
         }
+        // A chat link tapped anywhere in the app (a message, the blog) opens in the app, not in
+        // Safari; anything else as before.
+        .environment(\.openURL, OpenURLAction { url in model.open(url) ? .handled : .systemAction })
         .sheet(item: $router.presentedURL) { url in
             SafariView(url: url).ignoresSafeArea()
+        }
+        // A person: from a tap on a name, an avatar or a mention; a long press shares at once.
+        .sheet(item: $router.profile) { person in
+            if let session { ProfileSheet(person: person, session: session, router: router) }
         }
         .sheet(item: $router.moderation) { request in
             if let session { ModerationSheet(request: request, session: session) }
@@ -77,6 +94,17 @@ struct MainView: View {
             }
         }
         .animation(.default, value: router.notice)
+        #if DEBUG
+        // UI tests read the tab badges here: iOS 26's tab bar does not expose them
+        // (IPHONEBLOG_EXPOSE_BADGES=1; debug builds only).
+        .overlay(alignment: .topLeading) {
+            if ProcessInfo.processInfo.environment["IPHONEBLOG_EXPOSE_BADGES"] == "1" {
+                Text("mentions=\(router.mentionsBadge) chat=\(router.chatBadge)")
+                    .font(.system(size: 1)).opacity(0.02)
+                    .accessibilityIdentifier("debug.badges")
+            }
+        }
+        #endif
     }
 
     /// #one-Chat counts unread messages in the channel, for members.

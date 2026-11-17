@@ -1,25 +1,24 @@
 --- a/ElementX/Sources/Screens/Timeline/View/ItemMenu/TimelineItemMenuActionProvider.swift
 +++ b/ElementX/Sources/Screens/Timeline/View/ItemMenu/TimelineItemMenuActionProvider.swift
-@@ -48,6 +48,11 @@
+@@ -48,22 +48,16 @@
          }
          
          if item.canBeRepliedTo, canCurrentUserSendMessage {
-+            // iphoneblog: "Im Thread antworten" comes first, as in Slack.
-+            if areThreadsEnabled, !timelineKind.isThread {
-+                actions.append(.replyInThread)
-+            }
-+            
-             if let messageItem = item as? EventBasedMessageTimelineItemProtocol {
-                 // If threads are enabled we will have the dedicated `replyInThread` action
-                 // so there is no need to make the normal reply use the thread.
-@@ -55,15 +60,9 @@
-             } else {
-                 actions.append(.reply(isThread: false))
-             }
--            
--            if areThreadsEnabled, !timelineKind.isThread {
--                actions.append(.replyInThread)
+-            if let messageItem = item as? EventBasedMessageTimelineItemProtocol {
+-                // If threads are enabled we will have the dedicated `replyInThread` action
+-                // so there is no need to make the normal reply use the thread.
+-                actions.append(.reply(isThread: areThreadsEnabled ? false : messageItem.properties.isThreaded))
+-            } else {
+-                actions.append(.reply(isThread: false))
 -            }
+-            
++            // iphoneblog: "Im Thread antworten" comes first, as in Slack.
+             if areThreadsEnabled, !timelineKind.isThread {
+                 actions.append(.replyInThread)
+             }
++            
++            // iphoneblog: no plain quote reply; threads are how people answer here. Replies from
++            // other clients still show with their quote.
          }
          
 -        if item.isForwardable {
@@ -29,7 +28,7 @@
          
          if item.isEditable, canCurrentUserSendMessage {
              if item.supportsMediaCaption {
-@@ -83,9 +82,7 @@
+@@ -83,18 +77,12 @@
              actions.append(.copyPermalink)
          }
          
@@ -40,3 +39,14 @@
          
          if item.isCopyable {
              actions.append(.copy)
+-            
+-            if !ProcessInfo.processInfo.isiOSAppOnMac {
+-                // As of macOS 26.2, the sheet isn't presented, but it is easy enough
+-                // to select some text and right click on Mac anyway so hide this one.
+-                actions.append(.translate)
+-            }
++            // iphoneblog: no "Translate"; "Text auswählen" for part of a message instead.
++            actions.append(.selectText)
+         } else if item.hasMediaCaption {
+             actions.append(.copyCaption)
+         }

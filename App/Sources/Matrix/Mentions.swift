@@ -2,6 +2,7 @@ import Combine
 import Foundation
 import MatrixRustSDK
 import OSLog
+import UIKit
 
 /// @Mentions (preview 4): every event that mentions me, newest first, from the server's
 /// notification list (`GET /notifications?only=highlight`). The server keeps it across devices
@@ -26,7 +27,11 @@ final class MentionsModel: ObservableObject {
         var senderName: String
         let body: String
         let date: Date
-        let unread: Bool
+        /// The thread it was said in, if any.
+        let threadRoot: String?
+        /// No receipt of this account at or after it ("read up to here", Thorsten's decision A,
+        /// 2026-11-17); see `withReadState`.
+        var unread: Bool
     }
 
     @Published private(set) var items: [Mention] = []
@@ -52,6 +57,136 @@ final class MentionsModel: ObservableObject {
         reload()
     }
 
+    /// "Alle als gelesen" (Thorsten, 2026-11-17: in build 133 it did nothing for thread replies).
+    /// Receipts for exactly what the list shows, under "read up to here": per thread a threaded
+    /// receipt on its newest unread mention, per room's own timeline a "main" one on its newest
+    /// unread mention, as the web chat sends them. Failures are said, and the list reloads.
+    func markAllRead() async {
+        guard let session else { return }
+        let unread = items.filter(\.unread)
+        guard !unread.isEmpty else { return }
+        let receipts = Self.receipts(for: unread)
+        items = items.map { var mention = $0; mention.unread = false; return mention }
+        let background = UIApplication.shared.beginBackgroundTask(withName: "mentions-read")
+        var failed = 0
+        for receipt in receipts {
+            do {
+                _ = try await session.api("POST", receipt.path, body: receipt.body)
+            } catch {
+                failed += 1
+            }
+        }
+        UIApplication.shared.endBackgroundTask(background)
+        if failed > 0 {
+            session.router.notice = "Nicht alles ließ sich als gelesen markieren. Versuch es gleich noch einmal."
+            log.error("mark all read: \(failed, privacy: .public) of \(receipts.count, privacy: .public) receipts failed")
+        }
+        try? await Task.sleep(for: .seconds(1))
+        reload()
+    }
+
+    struct Receipt: Equatable {
+        let path: String
+        let body: Data
+    }
+
+    /// The receipts that mark these mentions read: newest per thread, newest per room timeline.
+    nonisolated static func receipts(for mentions: [Mention]) -> [Receipt] {
+        let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/?#"))
+        func path(_ room: String, _ event: String) -> String? {
+            guard let room = room.addingPercentEncoding(withAllowedCharacters: allowed),
+                  let event = event.addingPercentEncoding(withAllowedCharacters: allowed) else { return nil }
+            return "/_matrix/client/v3/rooms/\(room)/receipt/m.read/\(event)"
+        }
+        func body(_ thread: String?) -> Data {
+            (try? JSONSerialization.data(withJSONObject: thread.map { ["thread_id": $0] } ?? [:])) ?? Data("{}".utf8)
+        }
+        var newest: [String: Mention] = [:] // key: room + thread ("main" for the timeline)
+        for mention in mentions {
+            let key = mention.roomID + "|" + (mention.threadRoot ?? "main")
+            if let known = newest[key], known.date >= mention.date { continue }
+            newest[key] = mention
+        }
+        var result: [Receipt] = []
+        for (_, mention) in newest.sorted(by: { $0.key < $1.key }) {
+            guard let path = path(mention.roomID, mention.id) else { continue }
+            if let root = mention.threadRoot {
+                result.append(Receipt(path: path, body: body(root)))
+            } else {
+                result.append(Receipt(path: path, body: body("main")))
+            }
+        }
+        return result
+    }
+
+    /// A timeline sent a read receipt (ChatKitReads.seen). The server marks the mentions up to
+    /// it read, in a room and in a thread; the list reloads, once soon and once when the receipt
+    /// has surely landed, so the badge follows without waiting for a room count to move.
+    func didSee(roomID: String, threadRoot: String?, eventID: String) async {
+        for delay in [1.0, 3.0] {
+            try? await Task.sleep(for: .seconds(delay))
+            reload()
+        }
+    }
+
+    // MARK: Read state
+
+    /// Read or not, from the account's own receipts, as the web chat does. Synapse's own read flag
+    /// in /notifications is not usable: it takes one receipt row per room, whichever the database
+    /// returns last, of any thread (receipts.py, _get_receipts_for_user_with_orderings; measured by
+    /// the web session, 2026-11-17). A mention is read once a receipt of this account (public or
+    /// private, any device) is at or after it: the thread's or the unthreaded one for a thread
+    /// reply, the main timeline's or the unthreaded one for a room message. "At or after" compares
+    /// the server times of the two events.
+    private var eventTimes: [String: Date] = [:]
+
+    private func withReadState(_ mentions: [Mention], session: ChatSession) async -> [Mention] {
+        var newest: [String: Date] = [:] // "room|thread" → time of the newest receipted event
+        func receiptTime(room: Room, roomID: String, thread: ReceiptThread, key: String) async -> Date? {
+            if let known = newest[key] { return known == .distantPast ? nil : known }
+            var best: Date?
+            for type in [ReceiptType.read, .readPrivate] {
+                guard let receipt = try? await room.loadUserReceipt(receiptType: type, thread: thread, userId: session.userID),
+                      let time = await eventTime(receipt.eventId, roomID: roomID, session: session) else { continue }
+                best = max(best ?? time, time)
+            }
+            newest[key] = best ?? .distantPast
+            return best
+        }
+        var result: [Mention] = []
+        for var mention in mentions {
+            guard let room = try? session.client.getRoom(roomId: mention.roomID) else {
+                result.append(mention)
+                continue
+            }
+            let own: (ReceiptThread, String) = mention.threadRoot.map { (.thread(threadRootEventId: $0), $0) } ?? (.main, "main")
+            var read = false
+            for (thread, name) in [own, (.unthreaded, "unthreaded")] where !read {
+                if let time = await receiptTime(room: room, roomID: mention.roomID, thread: thread, key: mention.roomID + "|" + name) {
+                    read = time >= mention.date
+                }
+            }
+            mention.unread = !read
+            result.append(mention)
+        }
+        return result
+    }
+
+    /// An event's server time, from @Mentions itself or the server, kept for the app's run.
+    private func eventTime(_ eventID: String, roomID: String, session: ChatSession) async -> Date? {
+        if let known = eventTimes[eventID] { return known }
+        if let listed = items.first(where: { $0.id == eventID }) { return listed.date }
+        let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/?#"))
+        guard let room = roomID.addingPercentEncoding(withAllowedCharacters: allowed),
+              let event = eventID.addingPercentEncoding(withAllowedCharacters: allowed),
+              let data = try? await session.api("GET", "/_matrix/client/v3/rooms/\(room)/event/\(event)"),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let ts = json["origin_server_ts"] as? Double else { return nil }
+        let date = Date(timeIntervalSince1970: ts / 1000)
+        eventTimes[eventID] = date
+        return date
+    }
+
     func reload() {
         loading?.cancel()
         loading = Task { await load() }
@@ -67,6 +202,7 @@ final class MentionsModel: ObservableObject {
                 guard let mention = await mention(from: entry, session: session) else { continue }
                 result.append(mention)
             }
+            result = await withReadState(result, session: session)
             guard !Task.isCancelled else { return }
             if result != items { items = result }
             hasLoaded = true
@@ -78,7 +214,9 @@ final class MentionsModel: ObservableObject {
 
     private func mention(from entry: NotificationPage.Entry, session: ChatSession) async -> Mention? {
         let event = entry.event
-        guard event.sender != session.userID, let body = event.content?.body else { return nil }
+        guard event.sender != session.userID, let raw = event.content?.body else { return nil }
+        // Any client's message as plain text, mentions as "@Name" (PushText, the one preview helper).
+        let body = PushText.plain(body: raw, formattedBody: event.content?.formattedBody)
         // No direct messages in this app (Thorsten, 2026-11-16): a mention in one stays out.
         if session.rooms.rooms.first(where: { $0.id == entry.roomId })?.isDirect == true { return nil }
         let thread = event.content?.relatesTo?.relType == "m.thread" ? event.content?.relatesTo?.eventId : nil
@@ -97,7 +235,7 @@ final class MentionsModel: ObservableObject {
         return Mention(id: event.eventId, roomID: entry.roomId, place: place, senderID: event.sender,
                        senderName: await name(of: event.sender, session: session),
                        body: body, date: Date(milliseconds: event.originServerTs ?? entry.ts),
-                       unread: !entry.read)
+                       threadRoot: thread, unread: !entry.read)
     }
 
     /// An article's title by its thread root, fetched once per app run.
@@ -143,9 +281,10 @@ final class MentionsModel: ObservableObject {
 
         struct Content: Decodable {
             let body: String?
+            let formattedBody: String?
             let relatesTo: Relation?
 
-            enum CodingKeys: String, CodingKey { case body, relatesTo = "m.relates_to" }
+            enum CodingKeys: String, CodingKey { case body, formattedBody = "formatted_body", relatesTo = "m.relates_to" }
         }
 
         struct Relation: Decodable {
@@ -164,15 +303,16 @@ final class MentionsModel: ObservableObject {
 @MainActor
 final class NotificationPrefs: ObservableObject {
     enum ChannelMode: String, CaseIterable, Identifiable {
-        case all = "Alle Nachrichten"
-        case mentions = "Nur @Mentions"
-        case mute = "Stumm"
+        case all = "Alle"
+        case mentions = "Nur Erwähnungen"
+        case mute = "Aus"
         var id: String { rawValue }
     }
 
     @Published private(set) var newArticles = true
     @Published private(set) var mentions = true
-    @Published private(set) var channel: ChannelMode = .all
+    /// Each #one room's push mode; "Nur Erwähnungen" unless someone chose otherwise.
+    @Published private(set) var roomModes: [String: ChannelMode] = [:]
     @Published private(set) var hasLoaded = false
 
     /// An override rule: in the Blog room, an event that carries an article (only the bot posts
@@ -212,16 +352,32 @@ final class NotificationPrefs: ObservableObject {
                 }
             }
         }
+        // Push only for @mentions of me (replies to me carry one) and new articles; every other
+        // message is silent and counts towards the badge (testers: "Pusht die ganze Zeit").
+        // One account rule, as the server session advised: the default underride for messages
+        // goes off, so rooms added later need nothing; a room set to "Alle" gets its own rule.
+        // Once per account, marked in its account data (de.iphoneblog.push_defaults), so a choice
+        // made later, here or in the web app, is never overwritten.
+        if let user = session.userID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "@:"))) {
+            let marker = "/_matrix/client/v3/user/\(user)/account_data/de.iphoneblog.push_defaults"
+            if (try? await session.api("GET", marker)) == nil,
+               (try? await session.api("PUT", "/_matrix/client/v3/pushrules/global/underride/.m.rule.message/enabled",
+                                       body: Data(#"{"enabled":false}"#.utf8))) != nil {
+                _ = try? await session.api("PUT", marker, body: Data(#"{"messages_quiet":true}"#.utf8))
+            }
+        }
         newArticles = (try? await session.api("GET", "/_matrix/client/v3/pushrules/global/override/\(Self.articleRuleID)")) != nil
         mentions = (try? await settings.isUserMentionEnabled()) ?? true
-        if let channelID = session.oneChannelID,
-           let current = try? await settings.getRoomNotificationSettings(roomId: channelID, isEncrypted: false, isOneToOne: false) {
-            channel = switch current.mode {
+        var modes: [String: ChannelMode] = [:]
+        for roomID in session.rooms.channelIDs {
+            guard let current = try? await settings.getRoomNotificationSettings(roomId: roomID, isEncrypted: false, isOneToOne: false) else { continue }
+            modes[roomID] = switch current.mode {
             case .allMessages: .all
             case .mentionsAndKeywordsOnly: .mentions
             case .mute: .mute
             }
         }
+        roomModes = modes
         hasLoaded = true
     }
 
@@ -257,11 +413,10 @@ final class NotificationPrefs: ObservableObject {
         }
     }
 
-    func setChannel(_ mode: ChannelMode) {
-        // One switch for the whole #one-Chat area: every #one room gets the mode.
-        guard let session, !session.rooms.channelIDs.isEmpty else { return }
-        let channelIDs = session.rooms.channelIDs
-        channel = mode
+    /// One room's push mode: Alle (its own rule), Nur Erwähnungen, Aus.
+    func setMode(_ mode: ChannelMode, roomID: String) {
+        guard let session else { return }
+        roomModes[roomID] = mode
         Task {
             let settings = await session.client.getNotificationSettings()
             let sdkMode: RoomNotificationMode = switch mode {
@@ -270,15 +425,14 @@ final class NotificationPrefs: ObservableObject {
             case .mute: .mute
             }
             do {
-                for channelID in channelIDs {
-                    try await settings.setRoomNotificationMode(roomId: channelID, mode: sdkMode)
-                }
+                try await settings.setRoomNotificationMode(roomId: roomID, mode: sdkMode)
             } catch {
-                log.error("channel mode failed: \(error.localizedDescription, privacy: .public)")
+                log.error("room mode failed: \(error.localizedDescription, privacy: .public)")
                 await load()
             }
         }
     }
+
 
     private func putArticleRule(blogRoomID: String, session: ChatSession) async throws {
         let rule: [String: Any] = [

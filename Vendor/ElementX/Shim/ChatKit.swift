@@ -101,6 +101,7 @@ public final class ChatKitSession {
     ///   - roomListService: the room list service of the app's running sync service.
     public init(client: Client, roomListService: RoomListService) throws {
         let settings = UserSettings()
+        ChatPostingNotice.shared.client = client
         clientProxy = try ChatClientProxy(client: client)
         userSession = ChatUserSession(clientProxy: clientProxy, userSettings: settings)
         self.roomListService = roomListService
@@ -175,4 +176,44 @@ public final class ChatKitSession {
 enum ChatKitError: Error {
     case sessionEnded
     case threadUnavailable
+}
+
+/// The link "Link kopieren" copies. The app sets it: its readable links on its own domain
+/// (App/Sources/Navigation/ChatLink.swift). Nil keeps no link and shows Element X's error toast.
+public enum ChatKitLinks {
+    /// (room ID, canonical alias, event ID). The link names no thread: the opener finds it.
+    public static var message: ((String, String?, String) -> URL?)?
+}
+
+/// What the reader has seen: called after a timeline sent its read receipt, with the room, the
+/// thread root (nil for the room's own timeline) and the newest visible event. The app keeps
+/// @Mentions in step: the server marks mentions up to the receipt read, but a thread's receipt
+/// changes no room count the list would otherwise follow.
+public enum ChatKitReads {
+    public static var seen: ((String, String?, String) -> Void)?
+    /// Whether this timeline (room, thread root or nil) is the screen the reader sees now: a
+    /// timeline kept alive behind another tab or screen sends no read receipt.
+    public static var isOnScreen: ((String, String?) -> Bool)?
+}
+
+/// "Kontaktdaten teilen" from a long press on a sender's name or avatar. The app sets it and
+/// shows its own sheet (and nothing for the reader's own name).
+public enum ChatKitContacts {
+    public static var share: ((String) -> Void)?
+}
+
+/// A message as one line of plain text for our lists (thread summaries): the app's own helper
+/// (PushText.plain), so pushes, @Mentions, search and threads read the same. Gets `body` and,
+/// when there is one, `formatted_body`.
+public enum ChatKitText {
+    public static var preview: ((String, String?) -> String)?
+}
+
+/// How many replies a thread row shows: the server's count, else the timeline's; never fewer
+/// than the repliers shown beside it, so "Noch keine Antworten" appears only for a thread with
+/// no replies and no repliers.
+public enum ChatThreadCount {
+    public static func replies(server: Int?, timeline: Int, repliers: Int) -> Int {
+        max(server ?? timeline, repliers)
+    }
 }

@@ -20,7 +20,16 @@ struct MentionsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ScreenTitle("@Mentions")
+            HStack(alignment: .firstTextBaseline) {
+                ScreenTitle("@Mentions")
+                if mentions.unreadCount > 0 {
+                    Button("Alle als gelesen") { Task { await mentions.markAllRead() } }
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.teal)
+                        .padding(.trailing, Theme.Space.page)
+                        .accessibilityIdentifier("mentions.markAllRead")
+                }
+            }
             if !mentions.items.isEmpty {
                 SearchField(text: $filter, prompt: "@Mentions durchsuchen")
                     .padding(.horizontal, Theme.Space.page)
@@ -65,12 +74,13 @@ struct MentionsView: View {
         case .channel(let roomID, let root?, _):
             router.openThread(roomID: roomID, rootEventID: root)
         case .channel(let roomID, nil, _):
-            router.openRoom(roomID)
+            // Scrolled to the mention, so it is on screen (and read, "up to here").
+            router.openMessage(roomID: roomID, eventID: mention.id)
         case .discussion(let root, _):
             router.tab = .blog
             router.blogPath = [.thread(rootEventID: root)]
         case .room(let roomID, _):
-            router.openRoom(roomID)
+            router.openMessage(roomID: roomID, eventID: mention.id)
         }
     }
 }
@@ -81,7 +91,8 @@ struct MentionRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            InitialsAvatar(name: mention.senderName, size: Theme.Size.chatAvatar, corner: Theme.Size.chatAvatarCorner)
+            MemberAvatar(userID: mention.senderID, name: mention.senderName, roomID: mention.roomID,
+                         size: Theme.Size.chatAvatar, corner: Theme.Size.chatAvatarCorner)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(context.text)
