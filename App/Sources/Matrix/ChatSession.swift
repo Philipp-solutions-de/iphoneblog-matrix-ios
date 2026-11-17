@@ -96,6 +96,7 @@ final class ChatSession: ObservableObject, ChatHost {
         try await ChatScreens.provider.start(host: self)
         mentions.attach(to: self)
         forYou.attach(to: self)
+        await loadBots()
         notificationPrefs.attach(to: self)
         displayName = try? await client.displayName()
         await loadAvatar()
@@ -389,6 +390,26 @@ final class ChatSession: ObservableObject, ChatHost {
 
     func showMessage(_ text: String) {
         router.notice = text
+    }
+
+    // MARK: - Bots
+
+    /// The accounts the chat server lists as bots (GET /_iphoneblog/v1/bots): marked "Bot" in the
+    /// timeline. Debug runs against a test server may name them (IPHONEBLOG_BOTS).
+    func loadBots() async {
+        #if DEBUG
+        if let list = ProcessInfo.processInfo.environment["IPHONEBLOG_BOTS"], !list.isEmpty {
+            ChatScreens.provider.setBots(Set(list.split(separator: ",").map(String.init)))
+            return
+        }
+        #endif
+        let base = client.homeserver().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard let url = URL(string: base + "/_iphoneblog/v1/bots"),
+              let (data, response) = try? await URLSession.shared.data(from: url),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let bots = json["bots"] as? [String] else { return }
+        ChatScreens.provider.setBots(Set(bots))
     }
 
     // MARK: - Push

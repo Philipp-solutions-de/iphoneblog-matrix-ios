@@ -49,6 +49,20 @@ struct MainView: View {
                     .tag(Router.Tab.me)
             }
         }
+        // A long press on "Für dich": everything read, while there is something (haptic).
+        .background {
+            if let session, router.isMember {
+                TabLongPress(index: 2) {
+                    guard router.forYouBadge > 0 else { return }
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    Task {
+                        await session.forYou.markAllRead(.all)
+                        router.notice = "Alles als gelesen markiert."
+                    }
+                }
+                .frame(width: 0, height: 0)
+            }
+        }
         // Sync stops in the background and starts again in front (ChatSession).
         .onChange(of: scenePhase) { _, phase in
             guard let session else { return }

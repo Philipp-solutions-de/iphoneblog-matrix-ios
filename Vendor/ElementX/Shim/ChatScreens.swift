@@ -271,6 +271,7 @@ final class ChatRoomCoordinator: ChatScreenCoordinator {
         let title = info.isDirect ? info.displayNameOrID : ChatKitStrings.channel(info.displayNameOrID)
         return AnyView(ChatRoomScreen(context: screenViewModel.context,
                                       timelineContext: timelineViewModel.context,
+                                      unread: info.unreadMessagesCount,
                                       composerToolbar: ComposerToolbar(context: composerViewModel.context),
                                       title: title,
                                       // The room's topic if it has one; no member count, which is the same
@@ -318,6 +319,8 @@ final class ChatRoomCoordinator: ChatScreenCoordinator {
 private struct ChatRoomScreen: View {
     @ObservedObject var context: ThreadTimelineScreenViewModelType.Context
     @ObservedObject var timelineContext: TimelineViewModelType.Context
+    /// Unread when the room opened, for the jump pill ("137 neue · zur ersten springen").
+    let unread: UInt
     let composerToolbar: ComposerToolbar
     let title: String
     let subtitle: String?
@@ -348,10 +351,26 @@ private struct ChatRoomScreen: View {
             .toolbarBackground(style.colors.background, for: .navigationBar)
             .timelineMediaPreview(viewModel: $context.mediaPreviewViewModel)
             .overlay(alignment: .top) {
-                FloatingDateBadge(dateText: timelineContext.floatingDate?.formattedDateSeparator()) {
-                    timelineContext.send(viewAction: .scrollToFirstItemForCurrentDate)
+                if timelineContext.viewState.shouldShowJumpToReadMarker {
+                    // The web's pill (v0.6.5): the first unread message is above, out of sight.
+                    Button { timelineContext.send(viewAction: .scrollToReadMarker) } label: {
+                        Label(ChatKitStrings.jumpToUnread(unread), systemImage: "arrow.up")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .frame(minHeight: 34)
+                            .background(style.colors.accent, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 10)
+                    .accessibilityLabel(ChatKitStrings.jumpToUnread(unread))
+                    .accessibilityIdentifier("room.jumpToUnread")
+                } else {
+                    FloatingDateBadge(dateText: timelineContext.floatingDate?.formattedDateSeparator()) {
+                        timelineContext.send(viewAction: .scrollToFirstItemForCurrentDate)
+                    }
+                    .padding(.top, 13)
                 }
-                .padding(.top, 13)
             }
             .overlay(alignment: .bottomTrailing) {
                 TimelineScrollButton(isHidden: !timelineContext.viewState.shouldShowScrollToBottomButton) {
@@ -492,6 +511,11 @@ enum ChatComposer {
 enum ChatKitStrings {
 
     /// "Noch keine Antworten", "1 Antwort", "5 Antworten".
+    /// "137 neue · zur ersten springen"; without a count, "Neue Nachrichten · zur ersten springen".
+    static func jumpToUnread(_ count: UInt) -> String {
+        count > 0 ? "\(count > 999 ? "999+" : "\(count)") neue · zur ersten springen" : "Neue Nachrichten · zur ersten springen"
+    }
+
     static func replies(_ count: Int) -> String {
         count == 0 ? "Noch keine Antworten" : count == 1 ? "1 Antwort" : "\(count) Antworten"
     }

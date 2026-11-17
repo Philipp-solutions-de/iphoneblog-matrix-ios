@@ -158,6 +158,25 @@ struct TestServer {
         return try XCTUnwrap(result["event_id"] as? String, "send failed")
     }
 
+    /// A public room by name; returns its ID.
+    func createRoom(_ name: String) throws -> String {
+        let result = try Self.call(base, "/_matrix/client/v3/createRoom", method: "POST", token: token,
+                                   body: ["name": name, "preset": "public_chat"])
+        return try XCTUnwrap(result["room_id"] as? String, "createRoom failed")
+    }
+
+    /// Makes a room a child of a space (as the #one space lists its rooms).
+    func addChild(_ room: String, toSpace space: String, order: String) throws {
+        _ = try Self.call(base, "/_matrix/client/v3/rooms/\(Self.encode(space))/state/m.space.child/\(Self.encode(room))",
+                          method: "PUT", token: token, body: ["via": [String(userID.split(separator: ":").last ?? "localhost")], "order": order])
+    }
+
+    /// A room's ID by alias ("#one:localhost").
+    func resolve(_ alias: String) throws -> String {
+        let result = try Self.call(base, "/_matrix/client/v3/directory/room/\(Self.encode(alias))", method: "GET", token: token, body: nil)
+        return try XCTUnwrap(result["room_id"] as? String, "no room \(alias)")
+    }
+
     /// Joins a public room by ID.
     func join(_ room: String) throws {
         _ = try Self.call(base, "/_matrix/client/v3/join/\(Self.encode(room))", method: "POST", token: token, body: [:])

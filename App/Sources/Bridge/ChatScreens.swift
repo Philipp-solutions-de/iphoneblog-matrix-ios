@@ -82,6 +82,8 @@ protocol ChatScreenProviding: AnyObject {
     func involvedThreads() -> AnyPublisher<[InvolvedThread], Never>
     /// These threads count as seen now (on this device).
     func markThreadsSeen(_ threads: [InvolvedThread])
+    /// The accounts the chat server lists as bots, marked "Bot" in the conversation views.
+    func setBots(_ ids: Set<String>)
     /// An article's thread under the app's own discussion header: the thread screen without
     /// its "Thread" title.
     func discussionScreen(roomID: String, rootEventID: String, host: ChatHost) -> AnyView

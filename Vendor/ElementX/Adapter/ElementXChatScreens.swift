@@ -77,6 +77,8 @@ final class ElementXChatScreens: ChatScreenProviding {
             .eraseToAnyPublisher()
     }
 
+    func setBots(_ ids: Set<String>) { ChatKitBots.ids = ids }
+
     func markThreadsSeen(_ threads: [InvolvedThread]) {
         session?.markThreadsSeen(threads.map { (roomID: $0.roomID, rootEventID: $0.rootEventID) })
     }

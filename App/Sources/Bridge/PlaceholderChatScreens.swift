@@ -27,6 +27,7 @@ extension ChatScreenProviding {
 
     func involvedThreads() -> AnyPublisher<[InvolvedThread], Never> { Just([]).eraseToAnyPublisher() }
     func markThreadsSeen(_ threads: [InvolvedThread]) {}
+    func setBots(_ ids: Set<String>) {}
 
     /// Until the conversation views bring their thread list, the Threads tab says what comes.
     func threadsScreen(host: ChatHost) -> AnyView {
