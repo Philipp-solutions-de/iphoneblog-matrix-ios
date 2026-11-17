@@ -83,6 +83,10 @@ final class SignInAndRoomListTests: XCTestCase {
             while Date() < until, !session.notificationPrefs.hasLoaded { try await Task.sleep(for: .milliseconds(250)) }
             await session.notificationPrefs.load()
             XCTAssertTrue(session.notificationPrefs.newArticles, "article push rule missing")
+            // Messages are silent by default (only mentions and new articles push).
+            let rule = try await session.api("GET", "/_matrix/client/v3/pushrules/global/underride/.m.rule.message")
+            let enabled = (try JSONSerialization.jsonObject(with: rule) as? [String: Any])?["enabled"] as? Bool
+            XCTAssertEqual(enabled, false, "messages still push by default")
             session.notificationPrefs.setNewArticles(false)
             try await Task.sleep(for: .seconds(2))
             await session.notificationPrefs.load()

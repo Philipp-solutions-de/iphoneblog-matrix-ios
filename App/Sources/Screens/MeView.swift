@@ -1,3 +1,4 @@
+import PhotosUI
 import SwiftUI
 
 /// Ich, signed in (preview 5a): profile, the notification switches, the account, sign out.
@@ -8,6 +9,8 @@ struct MeView: View {
     @ObservedObject var router: Router
     @ObservedObject private var push = PushCenter.shared
     @State private var confirmSignOut = false
+    @State private var pickedPhoto: PhotosPickerItem?
+    @State private var avatarBusy = false
 
     var body: some View {
         ScrollView {
@@ -27,19 +30,25 @@ struct MeView: View {
                     SettingsRow(label: "@Mentions") {
                         Toggle("", isOn: Binding(get: { prefs.mentions }, set: prefs.setMentions)).labelsHidden()
                     }
+                    // One row per #one room (testers: too many pushes). "Nur Erwähnungen" is the
+                    // default; "Alle" pushes every message there, "Aus" not even mentions.
                     if session.isOneMember {
-                        SettingsRow(label: "#one-Chat") {
-                            Menu {
-                                Picker("#one-Chat", selection: Binding(get: { prefs.channel }, set: prefs.setChannel)) {
-                                    ForEach(NotificationPrefs.ChannelMode.allCases) { Text($0.rawValue).tag($0) }
+                        ForEach(session.oneRooms) { room in
+                            SettingsRow(label: "#one-Chat · \(room.name)") {
+                                Menu {
+                                    Picker(room.name, selection: Binding(get: { prefs.roomModes[room.id] ?? .mentions },
+                                                                         set: { prefs.setMode($0, roomID: room.id) })) {
+                                        ForEach(NotificationPrefs.ChannelMode.allCases) { Text($0.rawValue).tag($0) }
+                                    }
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Text((prefs.roomModes[room.id] ?? .mentions).rawValue)
+                                        Image(systemName: "chevron.up.chevron.down").font(.system(size: 12))
+                                    }
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(Theme.ink3)
                                 }
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Text(prefs.channel.rawValue)
-                                    Image(systemName: "chevron.up.chevron.down").font(.system(size: 12))
-                                }
-                                .font(.system(size: 16))
-                                .foregroundStyle(Theme.ink3)
+                                .accessibilityIdentifier("me.roomMode.\(room.name)")
                             }
                         }
                     }
@@ -85,7 +94,7 @@ struct MeView: View {
         }
         .background(Theme.group)
         .task { await push.refreshAuthorization() }
-        .task(id: session.oneChannelID) { await prefs.load() }
+        .task(id: session.oneRooms.map(\.id)) { await prefs.load() }
         .confirmationDialog("Auf diesem Gerät abmelden?", isPresented: $confirmSignOut, titleVisibility: .visible) {
             Button("Abmelden", role: .destructive) { Task { await model.signOut() } }
         } message: {
@@ -95,7 +104,42 @@ struct MeView: View {
 
     private var profile: some View {
         HStack(spacing: 14) {
-            InitialsAvatar(name: session.displayName ?? MentionsModel.localpart(session.userID), size: Theme.Size.profileAvatar)
+            // The picture is the person's own (testers: "Profilbilder lassen sich nicht setzen");
+            // the name stays the blog's.
+            PhotosPicker(selection: $pickedPhoto, matching: .images) {
+                ZStack {
+                    if let avatar = session.avatar {
+                        Image(uiImage: avatar).resizable().scaledToFill()
+                            .frame(width: Theme.Size.profileAvatar, height: Theme.Size.profileAvatar)
+                            .clipShape(Circle())
+                    } else {
+                        InitialsAvatar(name: session.displayName ?? MentionsModel.localpart(session.userID), size: Theme.Size.profileAvatar)
+                    }
+                    if avatarBusy { ProgressView() }
+                }
+            }
+            .accessibilityLabel("Profilbild wählen")
+            .accessibilityIdentifier("me.avatar")
+            .contextMenu {
+                if session.avatar != nil {
+                    Button("Profilbild entfernen", role: .destructive) {
+                        Task {
+                            avatarBusy = true
+                            try? await session.removeAvatar()
+                            avatarBusy = false
+                        }
+                    }
+                }
+            }
+            .onChange(of: pickedPhoto) { _, item in
+                guard let item else { return }
+                Task {
+                    avatarBusy = true
+                    defer { avatarBusy = false; pickedPhoto = nil }
+                    guard let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) else { return }
+                    do { try await session.setAvatar(image) } catch { router.notice = "Das Profilbild ließ sich nicht setzen." }
+                }
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(session.displayName ?? MentionsModel.localpart(session.userID))
                     .font(.system(size: 20, weight: .semibold))
@@ -103,6 +147,22 @@ struct MeView: View {
                 Text(session.userID)
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.ink3)
+                HStack(spacing: 12) {
+                    PhotosPicker(selection: $pickedPhoto, matching: .images) { Text(session.avatar == nil ? "Bild wählen" : "Bild ändern") }
+                    if session.avatar != nil {
+                        Button("Bild entfernen") {
+                            Task {
+                                avatarBusy = true
+                                try? await session.removeAvatar()
+                                avatarBusy = false
+                            }
+                        }
+                        .accessibilityIdentifier("me.avatarRemove")
+                    }
+                }
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Theme.teal)
+                .padding(.top, 2)
                 if session.isOneMember {
                     Text("#one-Mitglied")
                         .font(.system(size: 12, weight: .semibold))

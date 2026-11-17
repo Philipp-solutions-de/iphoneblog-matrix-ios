@@ -101,7 +101,7 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDevelopmentRegion: de
-        CFBundleLocalizations: [de, en]
+        CFBundleLocalizations: [de]
         UILaunchScreen:
           UIColorName: LaunchBackground
         UIApplicationSceneManifest:
@@ -163,8 +163,11 @@ targets:
         # auth.phso.de, and WebKit offers a passkey there only to an app that domain names in
         # its apple-app-site-association (infra, moon). Fastfile `register` turns the
         # capability on for the App ID.
+        # applinks: chat links on chat.iphoneblog.de open the message in the app (ChatLink); the
+        # chat server's apple-app-site-association names the app for "/" with a fragment.
         com.apple.developer.associated-domains:
           - webcredentials:auth.phso.de
+          - applinks:chat.iphoneblog.de
     settings:
       base:
         PRODUCT_NAME: iphoneblog

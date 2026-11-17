@@ -11,7 +11,9 @@ import UIKit
 ///
 /// **What it sends, and nothing else:** app version and build, device model, iOS version, the
 /// screen's maximum frame rate (once per build, and with every report), the scroll hitch time ratio, launch time to first frame (median),
-/// and the number and longest duration of hangs. No message, no room, no user ID, no call stack.
+/// and the number and longest duration of hangs; and why a session ended or survived a token
+/// error (AuthGuard: outcome, the path's shape with IDs blanked, the errcode, the number of
+/// checks). No message, no room, no user ID, no call stack.
 /// The request carries no cookie and no token.
 final class MetricsReporter: NSObject, MXMetricManagerSubscriber, @unchecked Sendable {
     static let shared = MetricsReporter()
@@ -127,6 +129,13 @@ final class MetricsReporter: NSObject, MXMetricManagerSubscriber, @unchecked Sen
     }
 
     // MARK: Sending
+
+    /// One line for an event worth seeing on the server, such as why a session ended
+    /// (AuthGuard): the same POST, the same rules (no user, no token, nothing from a simulator).
+    func breadcrumb(_ fields: [String: String]) {
+        guard !ProcessInfo.processInfo.isRunningPerfTests else { return }
+        send(fields)
+    }
 
     private func send(_ fields: [String: String]) {
         guard let endpoint, var parts = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else { return }

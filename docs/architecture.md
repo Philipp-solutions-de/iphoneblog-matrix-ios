@@ -122,6 +122,38 @@ both a thread reply and a channel message; it would take two events), push for r
 threads you are in without a mention (Synapse sends none), and thread rows in the Blog tab,
 which shows the website.
 
+**A token error is checked before it signs anyone out.** MAS's access tokens live minutes;
+the SDK refreshes them, our own HTTP calls do not, and when the SDK's refresh hits a restarting
+MAS (502, 503, reset, timeout) it reports the same "unknown token" as a revoked session. So
+`AuthGuard` checks every such report: one SDK request (refreshing on the way), then whoami. The
+session ends only when MAS refuses the refresh token (invalid_grant) or the server refuses the
+token three times in a row while MAS answers; anything else keeps the session and checks again
+after 2, 4, 8 … 60 s. Our own calls retry once after a successful check. Concurrent errors
+share one check, so at most one refresh; a 401 for a request sent before the latest refresh,
+and refusals counted before it, never count. The app restores its session once per process: a
+second restore after iOS rebuilt the scene ran two clients that refreshed the same token 45 ms
+apart, which MAS treats as reuse and answers by revoking the session (Alex's logouts,
+2026-11-17).
+
+**Message links on our own domain.** "Link kopieren" copies
+`https://chat.iphoneblog.de/#/<room>/$<event>`, where `<room>` is the room alias's localpart
+(`one-chat`), else the percent-encoded room ID (`ChatLink`). The web chat at that address
+copies and routes the same single form, so a link works without the app; with the app
+installed, iOS hands it over as a universal link (`applinks:chat.iphoneblog.de`; the chat
+server's apple-app-site-association names the app for `/` with a fragment). The link names no
+thread: the opener reads the event and opens its thread if it replies in one, else the room
+scrolled to the message, so a link stays right when a message moves into a thread. Signed out,
+the web chat opens in a sheet. matrix.to links to rooms and messages open the same way. The
+thread screen does not yet scroll to the reply.
+
+**Pushes for mentions, not for every message.** At an account's first sign-in the app turns the
+default underride `.m.rule.message` off, once, marked in account data
+(`de.iphoneblog.push_defaults`) so a later choice stays: every message then only counts towards
+the badge, while @mentions (a reply to one's own message carries one) and new articles push.
+Under Ich each #one room has "Alle / Nur Erwähnungen / Aus" as a room rule on top. Later: pushes
+for replies in threads one takes part in need thread subscriptions (MSC4306), experimental and
+off on the server.
+
 **No direct messages.** The app offers no way to start one (a tap on a person opens nothing),
 and direct rooms stay out of #one-Chat, Threads and @Mentions; the server refuses to create
 them (Thorsten, 2026-11-16).

@@ -99,6 +99,7 @@ public final class ChatKitSession {
     ///   - roomListService: the room list service of the app's running sync service.
     public init(client: Client, roomListService: RoomListService) throws {
         let settings = UserSettings()
+        ChatPostingNotice.shared.client = client
         clientProxy = try ChatClientProxy(client: client)
         userSession = ChatUserSession(clientProxy: clientProxy, userSettings: settings)
         self.roomListService = roomListService
@@ -173,4 +174,11 @@ public final class ChatKitSession {
 enum ChatKitError: Error {
     case sessionEnded
     case threadUnavailable
+}
+
+/// The link "Link kopieren" copies. The app sets it: its readable links on its own domain
+/// (App/Sources/Navigation/ChatLink.swift). Nil keeps no link and shows Element X's error toast.
+public enum ChatKitLinks {
+    /// (room ID, canonical alias, event ID). The link names no thread: the opener finds it.
+    public static var message: ((String, String?, String) -> URL?)?
 }

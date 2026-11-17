@@ -20,6 +20,7 @@ struct MainView: View {
     }
 
     @EnvironmentObject private var model: AppModel
+    @Environment(\.scenePhase) private var scenePhase
     @ObservedObject var router: Router
     /// Nil while signed out.
     let session: ChatSession?
@@ -48,9 +49,21 @@ struct MainView: View {
                     .tag(Router.Tab.me)
             }
         }
+        // Sync stops in the background and starts again in front (ChatSession).
+        .onChange(of: scenePhase) { _, phase in
+            guard let session else { return }
+            switch phase {
+            case .background: Task { await session.enterBackground() }
+            case .active: Task { await session.enterForeground() }
+            default: break
+            }
+        }
         .onChange(of: session == nil) { _, signedOut in
             if signedOut, router.tab == .mentions { router.tab = .blog }
         }
+        // A chat link tapped anywhere in the app (a message, the blog) opens in the app, not in
+        // Safari; anything else as before.
+        .environment(\.openURL, OpenURLAction { url in model.open(url) ? .handled : .systemAction })
         .sheet(item: $router.presentedURL) { url in
             SafariView(url: url).ignoresSafeArea()
         }

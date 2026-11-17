@@ -106,12 +106,27 @@ struct TimelineItemRowStylerView<Content: View>: View {
                 .font(style.fonts.senderName)
                 .foregroundStyle(style.colors.ink)
                 .lineLimit(1)
+                .accessibilityHidden(true) // read by the accessibility modifier below
+                .onTapGesture { context.send(viewAction: .tappedOnSenderDetails(sender: timelineItem.sender)) }
             Text(ChatTimeLabel.short(timelineItem.timestamp))
                 .font(style.fonts.time)
                 .foregroundStyle(style.colors.ink3)
+                .accessibilityHidden(true)
+            Spacer(minLength: 8)
+            // A visible way to react (testers: reactions were "mega versteckt" behind the long
+            // press, which stays); next to existing reactions Element X has its own + button.
+            if timelineItem.canBeRepliedTo, !isMessageSelectionActive {
+                Button { context.send(viewAction: .displayEmojiPicker(itemID: timelineItem.id)) } label: {
+                    CompoundIcon(\.reactionAdd, size: .xSmall, relativeTo: .compound.bodySM)
+                        .foregroundStyle(style.colors.ink3.opacity(0.7))
+                        .frame(width: 32, height: 24, alignment: .trailing)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L10n.actionReact)
+                .accessibilityIdentifier("row-react")
+            }
         }
-        .accessibilityHidden(true) // read by the accessibility modifier below
-        .onTapGesture { context.send(viewAction: .tappedOnSenderDetails(sender: timelineItem.sender)) }
     }
 
     private var messageWithActions: some View {
@@ -154,15 +169,22 @@ struct TimelineItemRowStylerView<Content: View>: View {
         .longPressWithFeedback(isEnabled: !isMessageSelectionActive) {
             context.send(viewAction: .displayTimelineItemMenu(itemID: timelineItem.id))
         }
-        .swipeRightAction {
-            CompoundIcon(\.reply)
+        // Right: answer in the thread; left: the message's menu with its reaction bar (Alex's
+        // request). Not inside a thread, where right would only reopen it. MessageSwipe keeps
+        // the screen's left edge free for swipe-back.
+        .messageSwipe(isEnabled: { !isMessageSelectionActive && timelineItem.canBeRepliedTo }) {
+            CompoundIcon(\.threads)
+                .foregroundColor(style.colors.accent)
+                .accessibilityHidden(true)
+        } trailing: {
+            CompoundIcon(\.reactionAdd)
                 .foregroundColor(style.colors.ink2)
                 .accessibilityHidden(true)
-        } shouldStartAction: {
-            !isMessageSelectionActive && timelineItem.canBeRepliedTo
-        } action: {
-            context.send(viewAction: .handleTimelineItemMenuAction(itemID: timelineItem.id,
-                                                                   action: .reply(isThread: timelineItem.properties.isThreaded)))
+        } swipedRight: {
+            guard !context.viewState.timelineKind.isThread else { return }
+            context.send(viewAction: .displayThread(itemID: timelineItem.id))
+        } swipedLeft: {
+            context.send(viewAction: .displayTimelineItemMenu(itemID: timelineItem.id))
         }
     }
 

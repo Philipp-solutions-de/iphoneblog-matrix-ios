@@ -1,0 +1,20 @@
+--- a/ElementX/Sources/Screens/Timeline/View/ItemMenu/TimelineItemMenuAction.swift
++++ b/ElementX/Sources/Screens/Timeline/View/ItemMenu/TimelineItemMenuAction.swift
+@@ -57,6 +57,8 @@
+ enum TimelineItemMenuAction: Identifiable, Hashable {
+     case copy
+     case translate
++    /// iphoneblog: part of a message's text, selected in a sheet (ChatTextSelection).
++    case selectText
+     case copyCaption
+     case edit
+     case addCaption
+@@ -148,6 +150,8 @@
+             Label(L10n.actionCopyText, icon: \.copy)
+         case .translate:
+             Label(L10n.actionTranslate, icon: \.translate)
++        case .selectText:
++            Label("Text auswählen", icon: \.textFormatting)
+         case .copyCaption:
+             Label(L10n.actionCopyCaption, icon: \.copy)
+         case .edit:
