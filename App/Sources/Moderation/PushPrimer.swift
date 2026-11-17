@@ -47,15 +47,22 @@ struct PushPrimerCard: View {
 struct PushPrimerSlot: View {
     @ObservedObject private var push = PushCenter.shared
     @AppStorage(PushPrimer.askedKey) private var shown = false
+    /// Gone at the tap, whatever the stored flag reads: a launch argument can mask the defaults
+    /// (the UI test sets `-pushPrimerShown NO`), and the card must not wait for the store.
+    @State private var dismissed = false
 
     var body: some View {
-        if PushPrimer.shouldShow(status: push.authorization, alreadyShown: shown) {
+        if !dismissed, PushPrimer.shouldShow(status: push.authorization, alreadyShown: shown) {
             PushPrimerCard(
                 allow: {
                     shown = true
+                    dismissed = true
                     Task { await push.requestPermission() }
                 },
-                later: { shown = true }
+                later: {
+                    shown = true
+                    dismissed = true
+                }
             )
             .padding(.vertical, 8)
             .accessibilityIdentifier("pushPrimer")

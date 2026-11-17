@@ -1,9 +1,8 @@
 import XCTest
 
-/// App Review's items in the running app, against scripts/test-homeserver.sh: "Melden" on a
-/// message reaches the server (the sheet says thanks only after Synapse answered 200), Ich holds
-/// the blocked list, the moderation contact and "Konto löschen", and the push primer asks on
-/// #one-Chat instead of at sign-in.
+/// App Review's items in the running app, against scripts/test-homeserver.sh: Ich holds the
+/// blocked list, the moderation contact and "Konto löschen", and the push primer asks on
+/// #one-Chat instead of at sign-in. "Melden" on a message is ReportUITests.
 final class ModerationUITests: XCTestCase {
     private var env: [String: String] { ProcessInfo.processInfo.environment }
 
@@ -29,25 +28,6 @@ final class ModerationUITests: XCTestCase {
         app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE"] + arguments
         app.launch()
         return app
-    }
-
-    /// Long-press a seeded message, "Melden", a reason, "Senden": the thanks appear only once the
-    /// server accepted the report.
-    func testReportAMessage() throws {
-        let app = try launch(["IPHONEBLOG_START_TAB": "chat", "IPHONEBLOG_START_ROOM": env["IPHONEBLOG_TEST_CHANNEL_ROOM"] ?? ""])
-        XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "channel did not open")
-        let message = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Lies das'")).firstMatch
-        for _ in 0..<8 where !message.isHittable { app.swipeDown(velocity: .slow) }
-        XCTAssertTrue(message.waitForExistence(timeout: 30), "seeded message not found")
-        message.press(forDuration: 1.0)
-        let report = app.buttons["Melden"]
-        XCTAssertTrue(report.waitForExistence(timeout: 10), "no Melden in the menu")
-        report.tap()
-        XCTAssertTrue(app.buttons["report.send"].waitForExistence(timeout: 10), "report sheet did not open")
-        attach(app, "report-sheet")
-        app.buttons["report.send"].tap()
-        let thanks = app.staticTexts["Danke. Die Moderation schaut es sich an."]
-        XCTAssertTrue(thanks.waitForExistence(timeout: 20), "the server did not accept the report")
     }
 
     /// Ich: the blocked list opens (empty for the test user), the moderation contact and
