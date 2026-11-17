@@ -122,6 +122,13 @@ is the report (infra, `docs/monitoring.md`, the speed reports). Once per build i
 screen's frame rate, which is how a TestFlight build proves 120 Hz on a Pro iPhone the day it is
 installed.
 
+**TestFlight only.** An App Store copy reports nothing (GDPR, Thorsten 2026-11-17). The same
+binary moves from TestFlight to the App Store unchanged, so the app asks StoreKit's
+AppTransaction where it came from: `.sandbox` (TestFlight) and `.xcode` report, `.production`
+and anything unknown stay silent. `scripts/check-release-clean.sh`, run by the TestFlight lane,
+fails a build whose binary lacks the gate's marker (`rum-gate-v1`); `MetricsGateTests` pins the
+rule.
+
 **What it sends, and nothing else:** `src=ios`, `kind` (`install`, `metrics`, `hang`), app version
 and build, device model, iOS version, `hz` (the screen's maximum), `hitch` (ms/s), `launch_ms` and
 `launch_opt_ms` (medians), `hang_n` and `hang_ms`. No message, room, user ID or call stack; the
