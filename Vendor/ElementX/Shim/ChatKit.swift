@@ -196,3 +196,10 @@ public enum ChatKitReads {
 public enum ChatKitContacts {
     public static var share: ((String) -> Void)?
 }
+
+/// A message as one line of plain text for our lists (thread summaries): the app's own helper
+/// (PushText.plain), so pushes, @Mentions, search and threads read the same. Gets `body` and,
+/// when there is one, `formatted_body`.
+public enum ChatKitText {
+    public static var preview: ((String, String?) -> String)?
+}

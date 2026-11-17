@@ -87,7 +87,8 @@ final class ChatSearchModel: ObservableObject {
             var found: [Hit] = []
             for result in page.results ?? [] {
                 let event = result.result
-                guard event.type == "m.room.message", let text = event.content?.body else { continue }
+                guard event.type == "m.room.message", let raw = event.content?.body else { continue }
+                let text = PushText.plain(body: raw, formattedBody: event.content?.formattedBody)
                 let root = event.content?.relates?.rel_type == "m.thread" ? event.content?.relates?.event_id : nil
                 found.append(Hit(id: event.event_id, roomID: event.room_id ?? roomIDs.first ?? "",
                                  senderID: event.sender, senderName: await name(of: event.sender),
@@ -129,8 +130,9 @@ final class ChatSearchModel: ObservableObject {
         }
         struct Content: Decodable {
             let body: String?
+            let formattedBody: String?
             let relates: Relation?
-            enum CodingKeys: String, CodingKey { case body, relates = "m.relates_to" }
+            enum CodingKeys: String, CodingKey { case body, formattedBody = "formatted_body", relates = "m.relates_to" }
         }
         struct Relation: Decodable { let rel_type: String?; let event_id: String? }
         let search_categories: Categories

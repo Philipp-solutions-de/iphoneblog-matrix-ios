@@ -1,7 +1,8 @@
 import Foundation
 
-/// A message as plain text for a lock-screen notification. The notification extension shows
-/// it; the app's tests check it. A push showed "[Philip Braeunlich](https://matrix.to/#/@…)nicht":
+/// A message as plain text: the one preview helper for pushes, @Mentions, search results and
+/// thread summaries (and the coming "Für dich"), whichever client wrote it. formatted_body first,
+/// mentions as "@Name". The notification extension shows it; the app's tests check it. A push showed "[Philip Braeunlich](https://matrix.to/#/@…)nicht":
 /// markdown, a link and a lost space. Pure Foundation, so the extension can compile it too.
 enum PushText {
     /// The channel title with one "#", and "· Thread" for a reply in a thread.

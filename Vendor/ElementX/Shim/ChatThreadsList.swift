@@ -270,7 +270,17 @@ final class ChatThreadsListModel: ObservableObject {
     private static func text(_ content: TimelineItemContent?) -> String {
         guard case let .msgLike(content)? = content else { return "" }
         switch content.kind {
-        case .message(let message): return message.body
+        case .message(let message):
+            // Another client's body may hold "[Name](https://matrix.to/#/@…)"; the app's preview
+            // reads formatted_body first (ChatKitText).
+            var html: String?
+            switch message.msgType {
+            case .text(let text): html = text.formatted?.body
+            case .notice(let notice): html = notice.formatted?.body
+            case .emote(let emote): html = emote.formatted?.body
+            default: break
+            }
+            return ChatKitText.preview?(message.body, html) ?? message.body
         case .sticker(let body, _, _): return body
         case .poll(let question, _, _, _, _, _, _): return question
         default: return ""

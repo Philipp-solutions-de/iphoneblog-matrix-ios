@@ -71,6 +71,22 @@ struct TestServer {
                           token: token, body: ["avatar_url": url])
     }
 
+    /// The content of the newest message in the room whose body contains `text`, waiting up to
+    /// 30 seconds for it to arrive.
+    func message(in room: String, containing text: String) throws -> [String: Any]? {
+        for _ in 0..<30 {
+            let page = try Self.call(base, "/_matrix/client/v3/rooms/\(Self.encode(room))/messages?dir=b&limit=30",
+                                     method: "GET", token: token, body: nil)
+            for event in page["chunk"] as? [[String: Any]] ?? [] {
+                if let content = event["content"] as? [String: Any], (content["body"] as? String)?.contains(text) == true {
+                    return content
+                }
+            }
+            sleep(1)
+        }
+        return nil
+    }
+
     /// One of this user's account data entries, or nil.
     func accountData(_ type: String) throws -> [String: Any]? {
         let result = try Self.call(base, "/_matrix/client/v3/user/\(Self.encode(userID))/account_data/\(type)", method: "GET",

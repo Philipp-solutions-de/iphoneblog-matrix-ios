@@ -17,4 +17,14 @@ final class ComposerTextTests: XCTestCase {
         XCTAssertEqual(ComposerText.html(typed),
                        #"<strong>fett</strong> &amp; <em>schräg</em> <code>a&lt;b</code> <a href="https://example.org">Link</a><br>Zeile 2"#)
     }
+
+    /// A mention picked from the list, then text (Alex's message, 2026-11-17): the composer's
+    /// markdown, as Element X hands it over, becomes a plain body and a link in HTML.
+    func testPickedMentionThenText() {
+        let markdown = "[Kyrios](https://matrix.to/#/@kyrios:iphoneblog.de) Wir könnten das so machen"
+        XCTAssertTrue(ComposerText.hasMention(markdown))
+        XCTAssertEqual(ComposerText.plainBody(markdown), "Kyrios Wir könnten das so machen")
+        XCTAssertEqual(ComposerText.html(markdown),
+                       #"<a href="https://matrix.to/#/@kyrios:iphoneblog.de">Kyrios</a> Wir könnten das so machen"#)
+    }
 }

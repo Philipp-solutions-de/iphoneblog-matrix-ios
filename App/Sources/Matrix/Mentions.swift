@@ -166,7 +166,9 @@ final class MentionsModel: ObservableObject {
 
     private func mention(from entry: NotificationPage.Entry, session: ChatSession) async -> Mention? {
         let event = entry.event
-        guard event.sender != session.userID, let body = event.content?.body else { return nil }
+        guard event.sender != session.userID, let raw = event.content?.body else { return nil }
+        // Any client's message as plain text, mentions as "@Name" (PushText, the one preview helper).
+        let body = PushText.plain(body: raw, formattedBody: event.content?.formattedBody)
         // No direct messages in this app (Thorsten, 2026-11-16): a mention in one stays out.
         if session.rooms.rooms.first(where: { $0.id == entry.roomId })?.isDirect == true { return nil }
         let thread = event.content?.relatesTo?.relType == "m.thread" ? event.content?.relatesTo?.eventId : nil
@@ -231,9 +233,10 @@ final class MentionsModel: ObservableObject {
 
         struct Content: Decodable {
             let body: String?
+            let formattedBody: String?
             let relatesTo: Relation?
 
-            enum CodingKeys: String, CodingKey { case body, relatesTo = "m.relates_to" }
+            enum CodingKeys: String, CodingKey { case body, formattedBody = "formatted_body", relatesTo = "m.relates_to" }
         }
 
         struct Relation: Decodable {
