@@ -56,14 +56,18 @@ final class FourTabsUITests: XCTestCase {
         for (n, name) in ["Entertainment und Kultur", "Technik und Zubehör", "Market und Kleinanzeigen"].enumerated() {
             let id = try me.createRoom(name)
             try me.addChild(id, toSpace: space, order: "z\(n)")
+            sleep(1) // Synapse limits how fast rooms are made
             last = id
         }
+        // The tester has written there (as one does), so what comes after counts as new.
+        try me.send("Hallo", in: last)
         try other.join(last)
         try other.send("Ganz hinten \(Int(Date().timeIntervalSince1970))", in: last)
         let app = launch(tab: "chat", room: room)
         XCTAssertTrue(app.buttons.matching(identifier: "one-room").element(boundBy: 4).waitForExistence(timeout: 120), "the new rooms are not in the bar")
         let dot = app.descendants(matching: .any)["one.roomBar.moreNews"]
-        XCTAssertTrue(dot.waitForExistence(timeout: 30), "no dot for the room with news out of sight")
+        if !dot.waitForExistence(timeout: 30) { save(app, "debug-dot") }
+        XCTAssertTrue(dot.exists, "no dot for the room with news out of sight")
         save(app, "room-bar-dot")
     }
 
@@ -102,7 +106,8 @@ final class FourTabsUITests: XCTestCase {
         sleep(4)
         app.tabBars.buttons["#one"].tap()
         let pill = app.buttons["room.jumpToUnread"]
-        XCTAssertTrue(pill.waitForExistence(timeout: 30), "no pill for the first unread message out of sight")
+        if !pill.waitForExistence(timeout: 30) { save(app, "debug-jump-pill") }
+        XCTAssertTrue(pill.exists, "no pill for the first unread message out of sight")
         XCTAssertTrue(pill.label.contains("neue"), pill.label)
         save(app, "jump-pill")
         pill.tap()

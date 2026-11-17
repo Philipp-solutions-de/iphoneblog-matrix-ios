@@ -84,12 +84,19 @@ protocol ChatScreenProviding: AnyObject {
     func markThreadsSeen(_ threads: [InvolvedThread])
     /// The accounts the chat server lists as bots, marked "Bot" in the conversation views.
     func setBots(_ ids: Set<String>)
+    /// The room under the app's own header (the #one room bar): no title of its own.
+    func roomScreenUnderBar(roomID: String, host: ChatHost) -> AnyView
     /// An article's thread under the app's own discussion header: the thread screen without
     /// its "Thread" title.
     func discussionScreen(roomID: String, rootEventID: String, host: ChatHost) -> AnyView
 }
 
 extension ChatScreenProviding {
+    /// The room under the app's own header (the #one room bar): no title of its own.
+    func roomScreenUnderBar(roomID: String, host: ChatHost) -> AnyView {
+        roomScreen(roomID: roomID, host: host)
+    }
+
     func discussionScreen(roomID: String, rootEventID: String, host: ChatHost) -> AnyView {
         threadScreen(roomID: roomID, rootEventID: rootEventID, host: host)
     }

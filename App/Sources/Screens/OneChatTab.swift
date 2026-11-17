@@ -183,7 +183,7 @@ private struct OneRoomView: View {
         VStack(spacing: 0) {
             RoomBar(rooms: session.oneRooms, current: current, summary: summary) { router.openRoom($0) }
             if let current {
-                ChatScreens.provider.roomScreen(roomID: current, host: session)
+                ChatScreens.provider.roomScreenUnderBar(roomID: current, host: session)
                     .id(current)
                     .overlay(alignment: .bottom) {
                         if let next = nextWithNews {
@@ -213,6 +213,16 @@ private struct OneRoomView: View {
         .navigationTitle("#one")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // "#one", and the open room's topic under it (the bar names the room).
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 0) {
+                    Text("#one").font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.ink)
+                    if let topic = session.oneRooms.first(where: { $0.id == current })?.topic, !topic.isEmpty {
+                        Text(topic).font(.system(size: 12)).foregroundStyle(Theme.ink3)
+                    }
+                }
+                .lineLimit(1)
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { router.openSearch(in: session.oneRooms.map(\.id), current: current) } label: {
                     Image(systemName: "magnifyingglass")
@@ -263,6 +273,7 @@ private struct RoomBar: View {
                 .padding(.horizontal, Theme.Space.page)
                 .padding(.vertical, 8)
             }
+            .accessibilityIdentifier("one.roomBar")
             .onChange(of: current) { _, id in
                 guard let id else { return }
                 if reduceMotion { proxy.scrollTo(id) } else { withAnimation { proxy.scrollTo(id) } }
@@ -274,11 +285,11 @@ private struct RoomBar: View {
         .overlay(alignment: .trailing) { if hiddenNews.right { edgeDot.padding(.trailing, 3) } }
         .background(Theme.background)
         .overlay(alignment: .bottom) { Rectangle().fill(Theme.line).frame(height: 1) }
-        .accessibilityIdentifier("one.roomBar")
     }
 
     private var edgeDot: some View {
         Circle().fill(Theme.teal).frame(width: 8, height: 8)
+            .accessibilityElement()
             .accessibilityLabel("Weitere Räume mit Neuem")
             .accessibilityIdentifier("one.roomBar.moreNews")
     }

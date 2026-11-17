@@ -17,37 +17,46 @@ struct TabLongPress: UIViewRepresentable {
         view.attach()
     }
 
-    final class HookView: UIView {
+    final class HookView: UIView, UIGestureRecognizerDelegate {
         var index = 0
         var action: () -> Void = {}
-        private weak var bar: UITabBar?
-        private var recognizer: UILongPressGestureRecognizer?
+        private weak var hookedWindow: UIWindow?
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
             attach()
         }
 
+        /// On the window, so it works whenever the tab bar appears; it reacts only to a press
+        /// that starts on the tab bar, over this tab.
         func attach() {
-            guard let window, bar == nil, let tabBar = Self.tabBar(in: window) else { return }
+            guard let window, hookedWindow !== window else { return }
             let press = UILongPressGestureRecognizer(target: self, action: #selector(pressed(_:)))
             press.minimumPressDuration = 0.5
-            tabBar.addGestureRecognizer(press)
-            bar = tabBar
-            recognizer = press
+            press.cancelsTouchesInView = false
+            press.delegate = self
+            window.addGestureRecognizer(press)
+            hookedWindow = window
         }
 
+        func gestureRecognizer(_ gesture: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+
         @objc private func pressed(_ press: UILongPressGestureRecognizer) {
-            guard press.state == .began, let bar, let count = bar.items?.count, count > 0 else { return }
-            let slot = Int(press.location(in: bar).x / (bar.bounds.width / CGFloat(count)))
+            guard press.state == .began, let window = hookedWindow, let bar = Self.tabBar(from: window.rootViewController),
+                  let count = bar.items?.count, count > 0 else { return }
+            let point = press.location(in: bar)
+            guard bar.bounds.contains(point) else { return }
+            let slot = Int(point.x / (bar.bounds.width / CGFloat(count)))
             guard slot == index else { return }
             action()
         }
 
-        private static func tabBar(in view: UIView) -> UITabBar? {
-            if let bar = view as? UITabBar { return bar }
-            for sub in view.subviews { if let bar = tabBar(in: sub) { return bar } }
-            return nil
+        /// The tab bar of the tab bar controller SwiftUI's TabView builds.
+        private static func tabBar(from controller: UIViewController?) -> UITabBar? {
+            guard let controller else { return nil }
+            if let tabs = controller as? UITabBarController { return tabs.tabBar }
+            for child in controller.children { if let bar = tabBar(from: child) { return bar } }
+            return tabBar(from: controller.presentedViewController)
         }
     }
 }
