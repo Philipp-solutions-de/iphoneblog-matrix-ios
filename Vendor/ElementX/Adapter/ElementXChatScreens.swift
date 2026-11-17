@@ -29,6 +29,9 @@ final class ElementXChatScreens: ChatScreenProviding {
         sessionUserID = host.userID
         hosts = [:]
         ChatKitContacts.share = { [weak host] userID in host?.shareContact(userID: userID) }
+        ChatKitReads.isOnScreen = { [weak host] roomID, threadRoot in
+            host?.isOnScreen(roomID: roomID, threadRootEventID: threadRoot) ?? false
+        }
         ChatKitReads.seen = { [weak host] roomID, threadRoot, eventID in
             host?.didSee(roomID: roomID, threadRootEventID: threadRoot, eventID: eventID)
         }

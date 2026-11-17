@@ -112,6 +112,25 @@ final class Router: ObservableObject {
 
     func openThreadsList() { chatPath.append(.threads) }
 
+    /// The timeline the reader sees: the top of the visible tab's stack. Only it sends read
+    /// receipts ("read up to here" must not reach messages nobody had on screen).
+    func isOnScreen(roomID: String, threadRootEventID: String?) -> Bool {
+        if presentedURL != nil || profile != nil || moderation != nil || showSignIn { return false }
+        switch tab {
+        case .chat:
+            switch chatPath.last {
+            case .room(let id)?: return threadRootEventID == nil && id == roomID
+            case .thread(let thread)?: return thread.roomID == roomID && thread.rootEventID == threadRootEventID
+            default: return false
+            }
+        case .blog:
+            if case .thread(let root)? = blogPath.last { return roomID == blogRoomID && root == threadRootEventID }
+            return false
+        default:
+            return false
+        }
+    }
+
     func openSearch(in roomIDs: [String]) { chatPath.append(.search(roomIDs)) }
 
     /// A search result: the message in its channel, scrolled to and highlighted.
@@ -126,9 +145,13 @@ final class Router: ObservableObject {
             blogPath = [.thread(rootEventID: rootEventID)]
             return
         }
-        // The thread over its room, so back leads into the room, then to the list.
         tab = .chat
-        chatPath = [.room(roomID), .thread(ThreadRoute(roomID: roomID, rootEventID: rootEventID))]
+        let thread = ChatRoute.thread(ThreadRoute(roomID: roomID, rootEventID: rootEventID))
+        // From the Threads list or a search, the thread goes on top, so back returns there.
+        if case .threads? = chatPath.last { chatPath.append(thread); return }
+        if case .search? = chatPath.last { chatPath.append(thread); return }
+        // Otherwise over its room, so back leads into the room, then to the list.
+        chatPath = [.room(roomID), thread]
     }
 
     /// Back to a clean state after signing out; the Blog tab stays readable.

@@ -18,13 +18,12 @@ final class RouterTests: XCTestCase {
         XCTAssertEqual(router.selectedRoomID, "!a")
     }
 
-    /// From the Threads list or a search, a thread replaces them.
-    func testThreadFromTheThreadsListReplacesIt() {
+    /// From the Threads list or a search, a thread goes on top, so back returns there.
+    func testThreadFromTheThreadsListGoesOnTop() {
         let router = Router()
         router.openThreadsList()
         router.openThread(roomID: "!b", rootEventID: "$r")
-        XCTAssertEqual(router.chatPath.first, .room("!b"))
-        XCTAssertFalse(router.chatPath.contains(.threads))
+        XCTAssertEqual(router.chatPath, [.threads, .thread(.init(roomID: "!b", rootEventID: "$r"))])
     }
 
     /// A push or link into an article thread opens it in the Blog tab, not in #one-Chat.
@@ -47,5 +46,18 @@ final class RouterTests: XCTestCase {
         XCTAssertEqual(router.tab, .blog)
         XCTAssertTrue(router.chatPath.isEmpty)
         XCTAssertNil(router.blogRoomID)
+    }
+
+    /// Only the timeline on top of the visible tab reads (sends receipts).
+    func testOnlyTheTimelineOnTopIsOnScreen() {
+        let router = Router()
+        router.openRoom("!a")
+        XCTAssertTrue(router.isOnScreen(roomID: "!a", threadRootEventID: nil))
+        XCTAssertFalse(router.isOnScreen(roomID: "!b", threadRootEventID: nil))
+        router.openThread(roomID: "!a", rootEventID: "$r")
+        XCTAssertFalse(router.isOnScreen(roomID: "!a", threadRootEventID: nil), "the room under the thread is not on screen")
+        XCTAssertTrue(router.isOnScreen(roomID: "!a", threadRootEventID: "$r"))
+        router.tab = .me
+        XCTAssertFalse(router.isOnScreen(roomID: "!a", threadRootEventID: "$r"), "a timeline behind another tab is not on screen")
     }
 }

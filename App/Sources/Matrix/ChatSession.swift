@@ -363,6 +363,10 @@ final class ChatSession: ObservableObject, ChatHost {
         return relates["event_id"] as? String
     }
 
+    func isOnScreen(roomID: String, threadRootEventID: String?) -> Bool {
+        router.isOnScreen(roomID: roomID, threadRootEventID: threadRootEventID)
+    }
+
     func didSee(roomID: String, threadRootEventID: String?, eventID: String) {
         Task { await mentions.didSee(roomID: roomID, threadRoot: threadRootEventID, eventID: eventID) }
     }

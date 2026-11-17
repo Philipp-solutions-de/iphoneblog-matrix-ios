@@ -94,6 +94,17 @@ struct MainView: View {
             }
         }
         .animation(.default, value: router.notice)
+        #if DEBUG
+        // UI tests read the tab badges here: iOS 26's tab bar does not expose them
+        // (IPHONEBLOG_EXPOSE_BADGES=1; debug builds only).
+        .overlay(alignment: .topLeading) {
+            if ProcessInfo.processInfo.environment["IPHONEBLOG_EXPOSE_BADGES"] == "1" {
+                Text("mentions=\(router.mentionsBadge) chat=\(router.chatBadge)")
+                    .font(.system(size: 1)).opacity(0.02)
+                    .accessibilityIdentifier("debug.badges")
+            }
+        }
+        #endif
     }
 
     /// #one-Chat counts unread messages in the channel, for members.

@@ -37,6 +37,8 @@ protocol ChatHost: AnyObject {
     /// A timeline showed the reader up to `eventID` (in a thread when `threadRootEventID` is set)
     /// and sent its read receipt.
     func didSee(roomID: String, threadRootEventID: String?, eventID: String)
+    /// Whether this room's timeline (or this thread) is the screen on top right now.
+    func isOnScreen(roomID: String, threadRootEventID: String?) -> Bool
 }
 
 /// What the conversation views give the app. Implemented once in Vendor/ (today Element X's

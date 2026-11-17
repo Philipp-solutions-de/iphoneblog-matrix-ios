@@ -74,12 +74,13 @@ struct MentionsView: View {
         case .channel(let roomID, let root?, _):
             router.openThread(roomID: roomID, rootEventID: root)
         case .channel(let roomID, nil, _):
-            router.openRoom(roomID)
+            // Scrolled to the mention, so it is on screen (and read, "up to here").
+            router.openMessage(roomID: roomID, eventID: mention.id)
         case .discussion(let root, _):
             router.tab = .blog
             router.blogPath = [.thread(rootEventID: root)]
         case .room(let roomID, _):
-            router.openRoom(roomID)
+            router.openMessage(roomID: roomID, eventID: mention.id)
         }
     }
 }

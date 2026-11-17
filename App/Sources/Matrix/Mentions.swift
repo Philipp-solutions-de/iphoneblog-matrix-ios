@@ -2,6 +2,7 @@ import Combine
 import Foundation
 import MatrixRustSDK
 import OSLog
+import UIKit
 
 /// @Mentions (preview 4): every event that mentions me, newest first, from the server's
 /// notification list (`GET /notifications?only=highlight`). The server keeps it across devices
@@ -28,7 +29,8 @@ final class MentionsModel: ObservableObject {
         let date: Date
         /// The thread it was said in, if any.
         let threadRoot: String?
-        /// Unread on the server and not seen in the app (`seen`).
+        /// No receipt of this account at or after it ("read up to here", Thorsten's decision A,
+        /// 2026-11-17); see `withReadState`.
         var unread: Bool
     }
 
@@ -37,13 +39,6 @@ final class MentionsModel: ObservableObject {
     var unreadCount: Int { items.filter(\.unread).count }
 
     private weak var session: ChatSession?
-    /// Mentions in a room's own timeline that were on screen. Synapse marks those read for its
-    /// notification list only on an unthreaded private receipt; the room timeline's receipt
-    /// (thread "main") does not count, and an unthreaded one would also clear unopened thread
-    /// mentions. So the app keeps them itself, in account data, for every device of the account.
-    private var seen: Set<String> = []
-    private var seenLoaded = false
-    private static let seenType = "de.iphoneblog.mentions_seen"
     private var names: [String: String] = [:]
     private var watch: AnyCancellable?
     private var loading: Task<Void, Never>?
@@ -62,81 +57,134 @@ final class MentionsModel: ObservableObject {
         reload()
     }
 
-    /// "Alle als gelesen": every room with an unread mention gets a read receipt up to its
-    /// newest message, so the mentions, the badges and the rooms' counts clear.
+    /// "Alle als gelesen" (Thorsten, 2026-11-17: in build 133 it did nothing for thread replies).
+    /// Receipts for exactly what the list shows, under "read up to here": per thread a threaded
+    /// receipt on its newest unread mention, per room's own timeline a "main" one on its newest
+    /// unread mention, as the web chat sends them. Failures are said, and the list reloads.
     func markAllRead() async {
         guard let session else { return }
         let unread = items.filter(\.unread)
-        for roomID in Set(unread.map(\.roomID)) {
-            try? await session.client.getRoom(roomId: roomID)?.markAsRead(receiptType: .read)
+        guard !unread.isEmpty else { return }
+        let receipts = Self.receipts(for: unread)
+        items = items.map { var mention = $0; mention.unread = false; return mention }
+        let background = UIApplication.shared.beginBackgroundTask(withName: "mentions-read")
+        var failed = 0
+        for receipt in receipts {
+            do {
+                _ = try await session.api("POST", receipt.path, body: receipt.body)
+            } catch {
+                failed += 1
+            }
         }
-        // The server may keep some unread (see `seen`); here they are read.
-        seen.formUnion(unread.map(\.id))
-        await saveSeen(session: session)
+        UIApplication.shared.endBackgroundTask(background)
+        if failed > 0 {
+            session.router.notice = "Nicht alles ließ sich als gelesen markieren. Versuch es gleich noch einmal."
+            log.error("mark all read: \(failed, privacy: .public) of \(receipts.count, privacy: .public) receipts failed")
+        }
+        try? await Task.sleep(for: .seconds(1))
         reload()
     }
 
-    /// A timeline sent a read receipt for `eventID` (ChatKitReads): in a thread, the server
-    /// marks its mentions read, so the list reloads; in a room's own timeline, every mention of
-    /// that room up to the event counts as seen here.
-    func didSee(roomID: String, threadRoot: String?, eventID: String) async {
-        guard threadRoot == nil else {
-            try? await Task.sleep(for: .seconds(1))
-            reload()
-            return
-        }
-        let candidates = items.filter { $0.unread && $0.roomID == roomID && $0.threadRoot == nil }
-        guard !candidates.isEmpty, let session else { return }
-        let upTo: Date
-        if let known = items.first(where: { $0.id == eventID }) {
-            upTo = known.date
-        } else if let date = await eventDate(eventID, in: roomID, session: session) {
-            upTo = date
-        } else {
-            return
-        }
-        let newlySeen = candidates.filter { $0.date <= upTo }.map(\.id)
-        guard !newlySeen.isEmpty else { return }
-        seen.formUnion(newlySeen)
-        items = items.map { mention in
-            var mention = mention
-            if seen.contains(mention.id) { mention.unread = false }
-            return mention
-        }
-        await saveSeen(session: session)
+    struct Receipt: Equatable {
+        let path: String
+        let body: Data
     }
 
-    private func eventDate(_ eventID: String, in roomID: String, session: ChatSession) async -> Date? {
+    /// The receipts that mark these mentions read: newest per thread, newest per room timeline.
+    nonisolated static func receipts(for mentions: [Mention]) -> [Receipt] {
+        let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/?#"))
+        func path(_ room: String, _ event: String) -> String? {
+            guard let room = room.addingPercentEncoding(withAllowedCharacters: allowed),
+                  let event = event.addingPercentEncoding(withAllowedCharacters: allowed) else { return nil }
+            return "/_matrix/client/v3/rooms/\(room)/receipt/m.read/\(event)"
+        }
+        func body(_ thread: String?) -> Data {
+            (try? JSONSerialization.data(withJSONObject: thread.map { ["thread_id": $0] } ?? [:])) ?? Data("{}".utf8)
+        }
+        var newest: [String: Mention] = [:] // key: room + thread ("main" for the timeline)
+        for mention in mentions {
+            let key = mention.roomID + "|" + (mention.threadRoot ?? "main")
+            if let known = newest[key], known.date >= mention.date { continue }
+            newest[key] = mention
+        }
+        var result: [Receipt] = []
+        for (_, mention) in newest.sorted(by: { $0.key < $1.key }) {
+            guard let path = path(mention.roomID, mention.id) else { continue }
+            if let root = mention.threadRoot {
+                result.append(Receipt(path: path, body: body(root)))
+            } else {
+                result.append(Receipt(path: path, body: body("main")))
+            }
+        }
+        return result
+    }
+
+    /// A timeline sent a read receipt (ChatKitReads.seen). The server marks the mentions up to
+    /// it read, in a room and in a thread; the list reloads, once soon and once when the receipt
+    /// has surely landed, so the badge follows without waiting for a room count to move.
+    func didSee(roomID: String, threadRoot: String?, eventID: String) async {
+        for delay in [1.0, 3.0] {
+            try? await Task.sleep(for: .seconds(delay))
+            reload()
+        }
+    }
+
+    // MARK: Read state
+
+    /// Read or not, from the account's own receipts, as the web chat does. Synapse's own read flag
+    /// in /notifications is not usable: it takes one receipt row per room, whichever the database
+    /// returns last, of any thread (receipts.py, _get_receipts_for_user_with_orderings; measured by
+    /// the web session, 2026-11-17). A mention is read once a receipt of this account (public or
+    /// private, any device) is at or after it: the thread's or the unthreaded one for a thread
+    /// reply, the main timeline's or the unthreaded one for a room message. "At or after" compares
+    /// the server times of the two events.
+    private var eventTimes: [String: Date] = [:]
+
+    private func withReadState(_ mentions: [Mention], session: ChatSession) async -> [Mention] {
+        var newest: [String: Date] = [:] // "room|thread" → time of the newest receipted event
+        func receiptTime(room: Room, roomID: String, thread: ReceiptThread, key: String) async -> Date? {
+            if let known = newest[key] { return known == .distantPast ? nil : known }
+            var best: Date?
+            for type in [ReceiptType.read, .readPrivate] {
+                guard let receipt = try? await room.loadUserReceipt(receiptType: type, thread: thread, userId: session.userID),
+                      let time = await eventTime(receipt.eventId, roomID: roomID, session: session) else { continue }
+                best = max(best ?? time, time)
+            }
+            newest[key] = best ?? .distantPast
+            return best
+        }
+        var result: [Mention] = []
+        for var mention in mentions {
+            guard let room = try? session.client.getRoom(roomId: mention.roomID) else {
+                result.append(mention)
+                continue
+            }
+            let own: (ReceiptThread, String) = mention.threadRoot.map { (.thread(threadRootEventId: $0), $0) } ?? (.main, "main")
+            var read = false
+            for (thread, name) in [own, (.unthreaded, "unthreaded")] where !read {
+                if let time = await receiptTime(room: room, roomID: mention.roomID, thread: thread, key: mention.roomID + "|" + name) {
+                    read = time >= mention.date
+                }
+            }
+            mention.unread = !read
+            result.append(mention)
+        }
+        return result
+    }
+
+    /// An event's server time, from @Mentions itself or the server, kept for the app's run.
+    private func eventTime(_ eventID: String, roomID: String, session: ChatSession) async -> Date? {
+        if let known = eventTimes[eventID] { return known }
+        if let listed = items.first(where: { $0.id == eventID }) { return listed.date }
         let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/?#"))
         guard let room = roomID.addingPercentEncoding(withAllowedCharacters: allowed),
               let event = eventID.addingPercentEncoding(withAllowedCharacters: allowed),
               let data = try? await session.api("GET", "/_matrix/client/v3/rooms/\(room)/event/\(event)"),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let ts = json["origin_server_ts"] as? Double else { return nil }
-        return Date(timeIntervalSince1970: ts / 1000)
-    }
-
-    private func seenPath(_ session: ChatSession) -> String? {
-        guard let user = session.userID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "@:/"))) else { return nil }
-        return "/_matrix/client/v3/user/\(user)/account_data/\(Self.seenType)"
-    }
-
-    private func loadSeen(session: ChatSession) async {
-        guard !seenLoaded, let path = seenPath(session) else { return }
-        if let data = try? await session.api("GET", path),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            seen = Set(json["ids"] as? [String] ?? [])
-        }
-        seenLoaded = true
-    }
-
-    /// Keeps the IDs of mentions still in the list, so the set stays as small as the list.
-    private func saveSeen(session: ChatSession) async {
-        guard let path = seenPath(session) else { return }
-        let listed = Set(items.map(\.id))
-        let kept = seen.filter { listed.contains($0) }
-        guard let body = try? JSONSerialization.data(withJSONObject: ["ids": Array(kept).sorted()]) else { return }
-        _ = try? await session.api("PUT", path, body: body)
+        let date = Date(timeIntervalSince1970: ts / 1000)
+        eventTimes[eventID] = date
+        return date
     }
 
     func reload() {
@@ -149,12 +197,12 @@ final class MentionsModel: ObservableObject {
         do {
             let data = try await session.api("GET", "/_matrix/client/v3/notifications?only=highlight&limit=50")
             let page = try JSONDecoder().decode(NotificationPage.self, from: data)
-            await loadSeen(session: session)
             var result: [Mention] = []
             for entry in page.notifications {
                 guard let mention = await mention(from: entry, session: session) else { continue }
                 result.append(mention)
             }
+            result = await withReadState(result, session: session)
             guard !Task.isCancelled else { return }
             if result != items { items = result }
             hasLoaded = true
@@ -187,7 +235,7 @@ final class MentionsModel: ObservableObject {
         return Mention(id: event.eventId, roomID: entry.roomId, place: place, senderID: event.sender,
                        senderName: await name(of: event.sender, session: session),
                        body: body, date: Date(milliseconds: event.originServerTs ?? entry.ts),
-                       threadRoot: thread, unread: !entry.read && !seen.contains(event.eventId))
+                       threadRoot: thread, unread: !entry.read)
     }
 
     /// An article's title by its thread root, fetched once per app run.

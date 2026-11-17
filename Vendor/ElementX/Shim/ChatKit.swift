@@ -187,10 +187,13 @@ public enum ChatKitLinks {
 
 /// What the reader has seen: called after a timeline sent its read receipt, with the room, the
 /// thread root (nil for the room's own timeline) and the newest visible event. The app keeps
-/// @Mentions in step: Synapse does not count the room timeline's receipt (thread "main") for its
-/// notification list, and a thread's receipt changes no room count the list watches.
+/// @Mentions in step: the server marks mentions up to the receipt read, but a thread's receipt
+/// changes no room count the list would otherwise follow.
 public enum ChatKitReads {
     public static var seen: ((String, String?, String) -> Void)?
+    /// Whether this timeline (room, thread root or nil) is the screen the reader sees now: a
+    /// timeline kept alive behind another tab or screen sends no read receipt.
+    public static var isOnScreen: ((String, String?) -> Bool)?
 }
 
 /// "Kontaktdaten teilen" from a long press on a sender's name or avatar. The app sets it and
