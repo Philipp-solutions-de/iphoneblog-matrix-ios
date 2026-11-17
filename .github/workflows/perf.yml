@@ -1,0 +1,76 @@
+name: Performance
+
+# The performance tests (docs/performance.md): scroll, open and launch timings with hitch
+# ratios on an iPhone Pro simulator, against a throwaway Synapse with a seeded history.
+# scripts/perf-gate.py fails the run when a number is worse than its baseline
+# (scripts/perf-baseline.json) by more than the tolerance there.
+#
+# Its own workflow, beside build.yml, so a slow or flaky simulator never holds up a build or
+# a TestFlight upload; a red run here still blocks the pull request.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  perf:
+    name: Performance tests
+    runs-on: xcode-27
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        run: |
+          xcode="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1)"
+          [ -n "$xcode" ] || { ls -d /Applications/Xcode*; exit 1; }
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+
+      - name: Install tools
+        run: |
+          scripts/install-xcodegen.sh build/tools >> "$GITHUB_PATH"
+          brew install uv
+
+      - name: Generate the project
+        run: scripts/configure.sh
+
+      - name: Cache Swift packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build/DerivedData/SourcePackages
+          key: spm-${{ hashFiles('project.yml') }}
+          restore-keys: spm-
+
+      - name: Build
+        run: scripts/perf.sh build
+
+      - name: Run and gate
+        run: scripts/perf.sh run
+
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: perf
+          path: |
+            build/perf.xcresult
+            build/perf*.log
+            build/perf-report.md
+            build/perf-synapse/*.log
+          if-no-files-found: ignore
+
+      - name: Summary
+        if: always()
+        run: '[ -f build/perf-report.md ] && cat build/perf-report.md >> "$GITHUB_STEP_SUMMARY" || true'

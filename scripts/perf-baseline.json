@@ -1,0 +1,52 @@
+{
+  "_comment": "docs/performance.md. baselines: medians of a CI run on the xcode-27 runner (scripts/perf-gate.py --write-baseline on its perf.log artifact); tolerance: how much worse than the baseline fails, relative AND absolute, per_test overrides the absolute slack. budgets: hard limits per test, none for the simulator.",
+  "gated": [
+    "Hitch time ratio",
+    "Clock Monotonic Time"
+  ],
+  "budgets": {},
+  "tolerance": {
+    "relative": 0.5,
+    "absolute": {
+      "Hitch time ratio": 1.0,
+      "Clock Monotonic Time": 2.0
+    },
+    "per_test": {
+      "testLaunch": {
+        "Clock Monotonic Time": 10.0
+      },
+      "testOpenThread": {
+        "Clock Monotonic Time": 8.0
+      },
+      "testScrollBlog": {
+        "Hitch time ratio": 40.0
+      },
+      "testScrollOneChat": {
+        "Hitch time ratio": 150.0
+      },
+      "testScrollThread": {
+        "Hitch time ratio": 150.0
+      }
+    }
+  },
+  "baselines": {
+    "testLaunch": {
+      "Clock Monotonic Time": 8.8938
+    },
+    "testOpenThread": {
+      "Clock Monotonic Time": 12.1337
+    },
+    "testScrollBlog": {
+      "Hitch time ratio": 25.3733
+    },
+    "testScrollOneChat": {
+      "Hitch time ratio": 140.6524
+    },
+    "testScrollThread": {
+      "Hitch time ratio": 214.6622
+    },
+    "testSwitchTabs": {
+      "Clock Monotonic Time": 12.263
+    }
+  }
+}

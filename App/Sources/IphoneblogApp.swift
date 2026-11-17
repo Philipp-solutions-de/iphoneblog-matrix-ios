@@ -11,6 +11,9 @@ struct IphoneblogApp: App {
                 .environmentObject(model)
                 .tint(Theme.teal)
                 .task { await model.restore() }
+                // The frame-rate readout and the device metrics (docs/performance.md).
+                .background(PerfInstrumentsHook().frame(width: 0, height: 0))
+                .onAppear { MetricsReporter.shared.start() }
         }
     }
 }
