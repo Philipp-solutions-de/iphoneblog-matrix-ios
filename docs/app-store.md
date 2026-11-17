@@ -147,7 +147,7 @@ person-to-person. If Apple refuses, the app stays as it is (3.1.3(f), no link).
 > **Content type.** Newspapers and magazines: a news publication.
 >
 > **What is bought outside the app.** #one, the publication's paid membership: weekly videos, a
-> private video feed and the members' area with its members' chat. Readers buy and manage #one
+> private video feed and the members' community. Readers buy and manage #one
 > only on our website, iphoneblog.de, paid through Stripe. Members sign in to the app with the
 > same iphoneblog.de account to reach what they bought. The app offers no In-App Purchase and
 > will not.
@@ -162,7 +162,7 @@ person-to-person. If Apple refuses, the app stays as it is (3.1.3(f), no link).
 
 ### The link in the app, once granted (code only after the grant)
 
-- **Where:** #one-Chat's "Nur für #one-Mitglieder" screen (`OneMembersOnly` in
+- **Where:** the #one tab's "Nur für #one-Mitglieder" screen (`OneMembersOnly` in
   `OneChatTab.swift`), under the sentence, above "Abmelden" and "Konto löschen". Nowhere else:
   not in Ich, not on the signed-out screen, not in the blog's web view.
 - **Text:** "Gehe zu iphoneblog.de, um #one abzuschließen oder zu verwalten." in link style;
@@ -179,30 +179,34 @@ person-to-person. If Apple refuses, the app stays as it is (3.1.3(f), no link).
 
 ## Store listing
 
-`fastlane/metadata/{de-DE,en-US}/`, `fastlane/metadata/{primary,secondary}_category.txt`. The
-listing presents the app as the publication's app: articles first, the community second.
-**Name and category are open** with Thorsten and Alex; the files hold variant A.
+`fastlane/metadata/{de-DE,en-US}/`, `fastlane/metadata/primary_category.txt`. The listing
+presents the app as the publication's app: articles first, the members' community second.
+**No "Chat"** in name, subtitle, screenshots or the entitlement request (Thorsten, 2026-11-17);
+the words are #one, Community, #one-connect. **The name is open** with Thorsten and Alex; the
+files hold option 1.
 
-| | A (in the files) | B |
-|---|---|---|
-| Name | iPhoneBlog | iPhoneBlog Chat |
-| Subtitle, de | Apple-News, Diskussion, #one | Apple-News und Diskussion |
-| Subtitle, en | Apple news, comments and #one | Apple news and discussion |
-| Primary category | News | News |
-| Secondary category | Magazines & Newspapers | Social Networking |
+| | Name | Subtitle de | Subtitle en | Verdict |
+|---|---|---|---|---|
+| 1 | iPhoneBlog (10) | News und #one-Community (23) | News and the #one community (27) | **Recommended.** The publication's own name, which readers search for; the subtitle carries the rest. Strongest for the reader-app case. |
+| 2 | iPhoneBlog Connect (18) | Apple-News und #one-Community (29) | Apple news and #one community (29) | Possible. "Connect" reads as a social or messaging app, which the entitlement case argues against, and readers do not search for it. |
+| 3 | iPhoneBlog #one (15) | Apple-News und Community (24) | Apple news and community (24) | Possible. Puts the paid membership in the name, though most of the app is free to read; non-members may think it is members only. |
 
-Subtitles are at most 30 characters. B puts "Chat" in the name, which works against the reader-app
-case; its subtitle and categories keep the news first. Switching to B changes `name.txt`,
-`subtitle.txt` in both languages and `secondary_category.txt`.
+All within Apple's 30 characters (counted with spaces). Category: **primary News, no secondary.**
+Social Networking would invite the reviewer to judge the app as a social network first, and
+the reader-app case rests on it being a publication.
 
-**Screenshots** (6.9" iPhone, German, the demo account, no prices anywhere):
+**Screenshots** (6.9" iPhone, German, the demo account, no prices, no "Chat" in captions):
 
 1. Blog: the article list. "Alle Artikel von iPhoneBlog.de"
 2. One article, open. "Lesen ohne Anmeldung"
 3. The discussion under that article. "Unter jedem Artikel: die Diskussion"
-4. #one-Chat: the members' channel with a thread. "#one: der Bereich der Mitglieder"
+4. #one: the members' channel with a thread. "#one: die Community der Mitglieder"
 5. @Mentions. "Antworten und Erwähnungen im Blick"
 6. Ich: notifications, blocked users, report. "Melden, blockieren, selbst entscheiden"
+
+**The tab label shows in shot 4:** the app calls the tab "#one-Chat". To keep "Chat" out of the
+screenshots the tab becomes "#one" (or "#one-connect") in the app itself; the app session owns
+that label.
 
 ## Review notes and demo account
 
