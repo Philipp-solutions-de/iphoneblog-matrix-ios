@@ -22,8 +22,10 @@ protocol ChatHost: AnyObject {
 
     /// Opens a thread of this room as its own screen (iPhone) or column (iPad).
     func openThread(roomID: String, rootEventID: String)
-    /// Opens a person's profile (or starts a direct message from there).
+    /// Opens a person's profile sheet, with "Kontaktdaten teilen".
     func openUser(userID: String)
+    /// Opens "Kontaktdaten teilen" with this person straight away (a long press on the name).
+    func shareContact(userID: String)
     /// Opens a room by ID, for example a room link inside a message.
     func openRoom(roomID: String)
     /// Opens a web address the way the app wants (in-app Safari).

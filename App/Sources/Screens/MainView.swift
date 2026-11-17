@@ -67,6 +67,10 @@ struct MainView: View {
         .sheet(item: $router.presentedURL) { url in
             SafariView(url: url).ignoresSafeArea()
         }
+        // A person: from a tap on a name, an avatar or a mention; a long press shares at once.
+        .sheet(item: $router.profile) { person in
+            if let session { ProfileSheet(person: person, session: session, router: router) }
+        }
         .sheet(isPresented: $router.showSignIn) {
             SignInView()
                 .environmentObject(model)

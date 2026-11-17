@@ -190,3 +190,9 @@ public enum ChatKitLinks {
 public enum ChatKitReads {
     public static var seen: ((String, String?, String) -> Void)?
 }
+
+/// "Kontaktdaten teilen" from a long press on a sender's name or avatar. The app sets it and
+/// shows its own sheet (and nothing for the reader's own name).
+public enum ChatKitContacts {
+    public static var share: ((String) -> Void)?
+}

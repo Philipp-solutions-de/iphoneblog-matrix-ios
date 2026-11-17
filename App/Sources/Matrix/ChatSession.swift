@@ -305,8 +305,12 @@ final class ChatSession: ObservableObject, ChatHost {
     }
 
     func openUser(userID: String) {
-        // Profiles come with the conversation views; until then a mention opens nothing.
-        log.info("open user requested")
+        router.profile = Router.Person(userID: userID, shareNow: false)
+    }
+
+    func shareContact(userID: String) {
+        guard userID != self.userID else { return }
+        router.profile = Router.Person(userID: userID, shareNow: true)
     }
 
     func openRoom(roomID: String) {

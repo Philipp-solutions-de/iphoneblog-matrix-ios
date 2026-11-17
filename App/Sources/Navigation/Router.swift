@@ -42,6 +42,13 @@ final class Router: ObservableObject {
     var blogRoomID: String?
 
     @Published var presentedURL: URL?
+    /// A person's profile sheet; `shareNow` opens "Kontaktdaten teilen" in it at once.
+    struct Person: Identifiable, Hashable {
+        let userID: String
+        let shareNow: Bool
+        var id: String { userID }
+    }
+    @Published var profile: Person?
     @Published var notice: String?
     /// The sign-in sheet, offered where reading ends and writing would start.
     @Published var showSignIn = false
