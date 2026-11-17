@@ -371,6 +371,25 @@ final class ChatSession: ObservableObject, ChatHost {
         router.notice = text
     }
 
+    // MARK: - Block and report
+
+    /// Blocked people (Matrix "ignored users"): their messages no longer reach this account.
+    func isBlocked(_ userID: String) async -> Bool {
+        (try? await client.ignoredUsers())?.contains(userID) ?? false
+    }
+
+    func setBlocked(_ userID: String, _ on: Bool) async throws {
+        if on { try await client.ignoreUser(userId: userID) } else { try await client.unignoreUser(userId: userID) }
+    }
+
+    /// Reports a person to the server's admins (POST /users/{id}/report, Matrix 1.14).
+    func reportUser(_ userID: String, reason: String) async throws {
+        let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/?#"))
+        guard let user = userID.addingPercentEncoding(withAllowedCharacters: allowed) else { throw URLError(.badURL) }
+        let body = try JSONSerialization.data(withJSONObject: ["reason": reason.isEmpty ? "Gemeldet in der iPhoneBlog-App" : reason])
+        _ = try await api("POST", "/_matrix/client/v3/users/\(user)/report", body: body)
+    }
+
     // MARK: - Push
 
     /// Registers this device with our Sygnal. Called with the APNs token after sign-in and

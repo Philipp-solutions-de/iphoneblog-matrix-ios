@@ -12,6 +12,12 @@ struct ProfileSheet: View {
     @State private var detent: PresentationDetent = .medium
 
     private var displayName: String { name ?? MentionsModel.localpart(person.userID) }
+    /// Another person, not oneself and not the room bot: block and report.
+    private var isOther: Bool { ContactShare.canShare(with: person.userID, me: session.userID) }
+    @State private var blocked = false
+    @State private var confirmBlock = false
+    @State private var reporting = false
+    @State private var reason = ""
     /// Members only, and only with another person (not oneself, not the room bot).
     private var canShare: Bool { router.isMember && ContactShare.canShare(with: person.userID, me: session.userID) }
 
@@ -39,6 +45,18 @@ struct ProfileSheet: View {
                     .padding(.top, 10)
                     .accessibilityIdentifier("profile.shareContact")
                 }
+                if isOther {
+                    HStack(spacing: 12) {
+                        Button(blocked ? "Blockierung aufheben" : "Blockieren", role: blocked ? nil : .destructive) {
+                            if blocked { Task { await setBlocked(false) } } else { confirmBlock = true }
+                        }
+                        .accessibilityIdentifier("profile.block")
+                        Button("Melden", role: .destructive) { reporting = true }
+                            .accessibilityIdentifier("profile.report")
+                    }
+                    .buttonStyle(.bordered)
+                    .padding(.top, 6)
+                }
                 Spacer()
             }
             .frame(maxWidth: .infinity)
@@ -59,9 +77,45 @@ struct ProfileSheet: View {
         .presentationDetents([.medium, .large], selection: $detent)
         .onChange(of: path) { _, path in if !path.isEmpty { detent = .large } }
         .presentationDragIndicator(.visible)
+        .alert("\(displayName) blockieren?", isPresented: $confirmBlock) {
+            Button("Abbrechen", role: .cancel) { }
+            Button("Blockieren", role: .destructive) { Task { await setBlocked(true) } }
+        } message: {
+            Text("Du siehst keine Nachrichten von \(displayName) mehr. \(displayName) erfährt davon nichts. "
+                 + "Unter dem Profil hebst du es wieder auf.")
+        }
+        .alert("\(displayName) melden", isPresented: $reporting) {
+            TextField("Was ist passiert?", text: $reason)
+            Button("Abbrechen", role: .cancel) { reason = "" }
+            Button("Melden", role: .destructive) { Task { await report() } }
+        } message: {
+            Text("Das Team sieht die Meldung und prüft sie. \(displayName) erfährt nicht, wer gemeldet hat.")
+        }
         .task {
+            if isOther { blocked = await session.isBlocked(person.userID) }
             if person.shareNow, canShare { path = ["share"] }
             name = try? await session.client.getProfile(userId: person.userID).displayName
+        }
+    }
+
+    private func setBlocked(_ on: Bool) async {
+        do {
+            try await session.setBlocked(person.userID, on)
+            blocked = on
+            router.notice = on ? "\(displayName) ist blockiert." : "Blockierung von \(displayName) aufgehoben."
+        } catch {
+            router.notice = "Das hat nicht geklappt. Versuch es noch einmal."
+        }
+    }
+
+    private func report() async {
+        let text = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        reason = ""
+        do {
+            try await session.reportUser(person.userID, reason: text)
+            router.notice = "Danke. Das Team sieht sich die Meldung an."
+        } catch {
+            router.notice = "Die Meldung ging nicht raus. Versuch es später noch einmal."
         }
     }
 }

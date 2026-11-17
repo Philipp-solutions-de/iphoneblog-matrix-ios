@@ -318,6 +318,12 @@ class TimelineViewModel: TimelineViewModelType, TimelineViewModelProtocol {
     // MARK: - Private
     
     private func handleTappedOnSenderDetails(sender: TimelineItemSender) {
+        // iphoneblog: the app's own profile sheet at once (Thorsten, 2026-11-17: "View Profile
+        // funktioniert nicht"); Element X's member sheet only for those who may remove or ban.
+        guard state.canCurrentUserKick || state.canCurrentUserBan else {
+            actionsSubject.send(.displaySenderDetails(userID: sender.id))
+            return
+        }
         let memberDetails: ManageRoomMemberDetails = if let memberProxy = roomProxy.membersPublisher.value.first(where: { $0.userID == sender.id }) {
             .memberDetails(roomMember: .init(withProxy: memberProxy))
         } else {
