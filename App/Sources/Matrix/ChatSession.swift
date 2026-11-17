@@ -309,7 +309,7 @@ final class ChatSession: ObservableObject, ChatHost {
     }
 
     func shareContact(userID: String) {
-        guard userID != self.userID else { return }
+        guard router.isMember, ContactShare.canShare(with: userID, me: self.userID) else { return }
         router.profile = Router.Person(userID: userID, shareNow: true)
     }
 
@@ -464,6 +464,22 @@ final class ChatSession: ObservableObject, ChatHost {
                 guard let (_, response) = try? await URLSession.shared.data(for: request) else { return false }
                 return (response as? HTTPURLResponse)?.statusCode == 200
             })
+    }
+
+    /// One call to our own endpoints, with the HTTP status for the caller to read (no backoff):
+    /// "Kontaktdaten teilen" tells each refusal apart.
+    func call(_ method: String, _ path: String, body: Data? = nil) async throws -> (Data, Int) {
+        let base = client.homeserver().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard let url = URL(string: base + path) else { throw URLError(.badURL) }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("Bearer \(try client.session().accessToken)", forHTTPHeaderField: "Authorization")
+        if let body {
+            request.httpBody = body
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
     }
 
     private func apiCall(_ method: String, _ path: String, body: Data? = nil) async throws -> Data {

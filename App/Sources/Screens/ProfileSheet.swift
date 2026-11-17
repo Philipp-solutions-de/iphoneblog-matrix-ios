@@ -9,9 +9,11 @@ struct ProfileSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name: String?
     @State private var path: [String] = []
+    @State private var detent: PresentationDetent = .medium
 
     private var displayName: String { name ?? MentionsModel.localpart(person.userID) }
-    private var isMe: Bool { person.userID == session.userID }
+    /// Members only, and only with another person (not oneself, not the room bot).
+    private var canShare: Bool { router.isMember && ContactShare.canShare(with: person.userID, me: session.userID) }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -24,7 +26,7 @@ struct ProfileSheet: View {
                 Text(person.userID)
                     .font(.footnote)
                     .foregroundStyle(Theme.ink3)
-                if !isMe {
+                if canShare {
                     Button {
                         path = ["share"]
                     } label: {
@@ -53,26 +55,31 @@ struct ProfileSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        // The sharing form needs the whole height; the profile alone fits in half.
+        .presentationDetents([.medium, .large], selection: $detent)
+        .onChange(of: path) { _, path in if !path.isEmpty { detent = .large } }
         .presentationDragIndicator(.visible)
         .task {
-            if person.shareNow, !isMe { path = ["share"] }
+            if person.shareNow, canShare { path = ["share"] }
             name = try? await session.client.getProfile(userId: person.userID).displayName
         }
     }
 }
 
-/// Choose what to share, see who gets it and a warning, then confirm once more by name.
+/// Choose what to share, see who gets it and a warning, then confirm once more by name. The
+/// server mails the recipient; nothing appears in the chat.
 struct ContactShareView: View {
     let recipientID: String
     let recipientName: String
     @ObservedObject var session: ChatSession
     let done: () -> Void
 
-    @State private var own: ContactShare.OwnDetails?
+    @State private var offer: ContactShare.Offer?
     @State private var loadError: String?
     @State private var shareEmail = false
     @State private var sharePhone = false
+    @State private var phone = ""
+    @State private var note = ""
     @State private var confirming = false
     @State private var sending = false
     @State private var sendError: String?
@@ -81,15 +88,21 @@ struct ContactShareView: View {
         (shareEmail ? [.email] : []) + (sharePhone ? [.phone] : [])
     }
 
+    private var canSend: Bool {
+        !chosen.isEmpty && (!sharePhone || ContactShare.isPhoneNumber(phone)) && !sending
+    }
+
     var body: some View {
         Form {
             Section {
                 LabeledContent("An", value: recipientName)
                     .accessibilityIdentifier("contactShare.recipient")
+            } footer: {
+                Text("\(recipientName) bekommt eine E-Mail mit dem, was du hier auswählst. Im Chat erscheint nichts.")
             }
-            if let own {
+            if let offer, offer.member {
                 Section("Was du teilst") {
-                    if let email = own.email {
+                    if offer.fields.contains(.email), let email = offer.email {
                         Toggle(isOn: $shareEmail) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("E-Mail-Adresse")
@@ -98,21 +111,27 @@ struct ContactShareView: View {
                         }
                         .accessibilityIdentifier("contactShare.email")
                     }
-                    if let phone = own.phone {
-                        Toggle(isOn: $sharePhone) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Telefonnummer")
-                                Text(phone).font(.footnote).foregroundStyle(Theme.ink3)
-                            }
+                    if offer.fields.contains(.phone) {
+                        Toggle("Telefonnummer", isOn: $sharePhone)
+                            .accessibilityIdentifier("contactShare.phone")
+                        if sharePhone {
+                            TextField("+49 170 1234567", text: $phone)
+                                .keyboardType(.phonePad)
+                                .textContentType(.telephoneNumber)
+                                .accessibilityLabel("Telefonnummer")
+                                .accessibilityIdentifier("contactShare.phoneNumber")
                         }
-                        .accessibilityIdentifier("contactShare.phone")
-                    }
-                    if own.email == nil, own.phone == nil {
-                        Text("In deinem Konto ist weder eine E-Mail-Adresse noch eine Telefonnummer hinterlegt.")
-                            .foregroundStyle(Theme.ink2)
                     }
                 }
                 .tint(Theme.teal)
+                Section("Nachricht (freiwillig)") {
+                    TextField("Ein paar Worte dazu", text: $note, axis: .vertical)
+                        .lineLimit(2...4)
+                        .onChange(of: note) { _, text in if text.count > 500 { note = String(text.prefix(500)) } }
+                        .accessibilityIdentifier("contactShare.note")
+                }
+            } else if offer != nil {
+                Section { Text(ContactShare.Failure.notMember.message).foregroundStyle(Theme.ink2) }
             } else if let loadError {
                 Section { Text(loadError).foregroundStyle(Theme.ink2) }
             } else {
@@ -129,7 +148,7 @@ struct ContactShareView: View {
                 .foregroundStyle(Theme.ink2)
             }
             if let sendError {
-                Section { Text(sendError).foregroundStyle(.red) }
+                Section { Text(sendError).foregroundStyle(.red).accessibilityIdentifier("contactShare.error") }
             }
             Section {
                 Button {
@@ -140,7 +159,7 @@ struct ContactShareView: View {
                         if sending { Spacer(); ProgressView() }
                     }
                 }
-                .disabled(chosen.isEmpty || sending)
+                .disabled(!canSend)
                 .accessibilityIdentifier("contactShare.send")
             }
         }
@@ -157,16 +176,16 @@ struct ContactShareView: View {
 
     private var confirmText: String {
         var lines: [String] = []
-        if shareEmail, let email = own?.email { lines.append("E-Mail: \(email)") }
-        if sharePhone, let phone = own?.phone { lines.append("Telefon: \(phone)") }
+        if shareEmail, let email = offer?.email { lines.append("E-Mail: \(email)") }
+        if sharePhone { lines.append("Telefon: \(phone.trimmingCharacters(in: .whitespaces))") }
         return lines.joined(separator: "\n") + "\n\n\(recipientName) kann sie danach behalten und weitergeben."
     }
 
     private func load() async {
         do {
-            own = try await ContactShare(session: session).ownDetails()
+            offer = try await ContactShare(session: session).offer()
         } catch {
-            loadError = "Deine Kontaktdaten ließen sich nicht laden. Versuch es später noch einmal."
+            loadError = "Was du teilen kannst, ließ sich nicht laden. Versuch es später noch einmal."
         }
     }
 
@@ -175,10 +194,13 @@ struct ContactShareView: View {
         sendError = nil
         defer { sending = false }
         do {
-            try await ContactShare(session: session).share(chosen, with: recipientID)
+            try await ContactShare(session: session)
+                .send(ContactShare.request(to: recipientID, fields: chosen, phone: phone, note: note))
             done()
+        } catch let failure as ContactShare.Failure {
+            sendError = failure.message
         } catch {
-            sendError = "Das hat nicht geklappt. Es wurde nichts gesendet."
+            sendError = ContactShare.Failure.other.message
         }
     }
 }

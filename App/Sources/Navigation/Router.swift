@@ -72,6 +72,9 @@ final class Router: ObservableObject {
         if let root = env["IPHONEBLOG_START_DISCUSSION"], !root.isEmpty {
             blogPath = [.thread(rootEventID: root)]
         }
+        if let user = env["IPHONEBLOG_START_PROFILE"], !user.isEmpty {
+            profile = Person(userID: user, shareNow: env["IPHONEBLOG_START_SHARE"] == "1")
+        }
         if let room = env["IPHONEBLOG_START_ROOM"], !room.isEmpty {
             chatPath = [.room(room)]
         }

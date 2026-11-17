@@ -42,11 +42,14 @@ public enum ChatContactWarning {
     static func confirm(_ found: [String]) async -> Bool {
         await withCheckedContinuation { continuation in
             let list = found.map { "„\($0)“" }.joined(separator: ", ")
+            // The chat server stores email addresses in messages masked (a***@***.de), so an
+            // address sent this way does not even arrive as written.
+            let masked = found.contains { $0.contains("@") }
+                ? " E-Mail-Adressen zeigt der Chat nur unkenntlich (a***@***.de)." : ""
             let alert = UIAlertController(
                 title: "Kontaktdaten senden?",
-                message: "Deine Nachricht enthält \(list). Alle in diesem Raum können sie lesen. "
-                    + "Teile E-Mail-Adressen und Telefonnummern nur, wenn du das wirklich willst. "
-                    + "Für eine Person allein: „Kontaktdaten teilen“ an ihrem Namen.",
+                message: "Deine Nachricht enthält \(list). Alle in diesem Raum können sie lesen.\(masked) "
+                    + "Für eine Person allein: lange auf ihren Namen drücken, dann „Kontaktdaten teilen“.",
                 preferredStyle: .alert)
             alert.view.accessibilityIdentifier = "contact-warning"
             alert.addAction(UIAlertAction(title: "Abbrechen", style: .cancel) { _ in continuation.resume(returning: false) })

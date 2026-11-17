@@ -142,6 +142,15 @@ unthreaded receipt would count, but would also clear thread mentions not yet ope
 screen, in account data (`de.iphoneblog.mentions_seen`) for every device of the account
 (`ChatKitReads` reports each receipt). The web chat reads the server's flag only.
 
+**Contact details go by mail, not into the chat.** A tap on a name, an avatar or a mention
+opens the person's profile; a long press on a name or avatar opens "Kontaktdaten teilen" at
+once. Members choose their email address (the blog account's, held by the server) and/or a phone
+number typed each time, see who gets it and a warning, and confirm by name; the chat server
+mails the recipient (`ContactShare`; contract in infra's docs/matrix.md, "Sharing contact
+details"). Not offered with oneself or the room bot. A message with an email address or a
+phone number asks first (`ChatContactWarning`); the server stores email addresses in messages
+masked.
+
 **Message links on our own domain.** "Link kopieren" copies
 `https://chat.iphoneblog.de/#/<room>/$<event>`, where `<room>` is the room alias's localpart
 (`one-chat`), else the percent-encoded room ID (`ChatLink`). The web chat at that address
