@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The #one-Chat tab for everyone (Thorsten, 2026-11-16): members get the #one rooms; signed
+/// The #one tab for everyone (Thorsten, 2026-11-16): members get the #one rooms; signed
 /// out, a neutral sign-in; signed in without #one, "Nur für #one-Mitglieder" with the account
 /// actions Apple asks for (there is no Ich tab for them). No price, no way to buy, no hint.
 struct OneChatGate: View {
@@ -18,7 +18,7 @@ struct OneChatGate: View {
     }
 }
 
-/// Signed out: what #one-Chat is, and the way in.
+/// Signed out: what #one is, and the way in.
 struct OneSignIn: View {
     @ObservedObject var router: Router
 
@@ -88,10 +88,10 @@ struct OneMembersOnly: View {
     }
 }
 
-/// "#one-Chat" as a title, "#one" in the #one colour.
+/// "#one" as a title, in the #one colour.
 private struct OneChatTitle: View {
     var body: some View {
-        (Text("#one").foregroundStyle(Theme.coral) + Text("-Chat").foregroundStyle(Theme.ink))
+        Text("#one").foregroundStyle(Theme.coral)
             .font(.system(size: 30, weight: .semibold))
     }
 }
@@ -111,14 +111,16 @@ private struct LegalLinks: View {
     }
 }
 
-/// #one-Chat for #one members: the #one rooms, Threads on top; a room opens as a channel.
+/// #one for members, variant A (Thorsten, 2026-11-17): a bar with the #one rooms under the title,
+/// each with its unread count, and the open room below it. A tap switches rooms; the tab opens
+/// the last room read; "Weiter" leads to the next room with news; the search looks in all rooms.
 struct OneChatTab: View {
     @ObservedObject var router: Router
     @ObservedObject var session: ChatSession
 
     var body: some View {
         NavigationStack(path: $router.chatPath) {
-            OneRoomsList(session: session, router: router)
+            OneRoomView(session: session, router: router)
                 .safeAreaInset(edge: .top) { PushPrimerSlot() }
                 .navigationDestination(for: Router.ChatRoute.self) { route in
                     destination(route)
@@ -131,30 +133,22 @@ struct OneChatTab: View {
     private func destination(_ route: Router.ChatRoute) -> some View {
         switch route {
         case .room(let roomID):
-            ChatScreens.provider.roomScreen(roomID: roomID, host: session)
-                .id(roomID)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button { router.openSearch(in: [roomID]) } label: { Image(systemName: "magnifyingglass") }
-                            .accessibilityLabel("In diesem Raum suchen")
-                            .accessibilityIdentifier("room-search")
-                    }
-                }
+            ChatScreens.provider.roomScreen(roomID: roomID, host: session).id(roomID)
         case .thread(let thread):
             ResolvedThreadScreen(thread: thread, session: session, router: router)
         case .threads:
             ChatScreens.provider.threadsScreen(host: session)
                 .navigationTitle("Threads")
                 .navigationBarTitleDisplayMode(.inline)
-        case .search(let roomIDs):
-            ChatSearchView(model: ChatSearchModel(session: session, roomIDs: roomIDs), router: router)
+        case .search(let roomIDs, let current):
+            ChatSearchView(model: ChatSearchModel(session: session, roomIDs: roomIDs, current: current), router: router,
+                           roomName: session.oneRooms.first { $0.id == current }?.name)
         }
     }
 }
 
-/// The list: "#one-Chat" with a search over all rooms, Threads, then each room with its unread
-/// count (members) or a lock (non-members).
-private struct OneRoomsList: View {
+/// The room bar and the open room.
+private struct OneRoomView: View {
     @ObservedObject var session: ChatSession
     @ObservedObject var router: Router
     @ObservedObject private var roomList: RoomListModel
@@ -162,21 +156,57 @@ private struct OneRoomsList: View {
     init(session: ChatSession, router: Router) {
         self.session = session
         self.router = router
-        self.roomList = session.rooms
+        roomList = session.rooms
+    }
+
+    /// The open room: the last one read, else the first room.
+    private var current: String? {
+        if let id = router.currentRoomID, session.oneRooms.contains(where: { $0.id == id }) { return id }
+        return session.oneRooms.first?.id
+    }
+
+    private func summary(_ id: String) -> RoomSummary? { roomList.rooms.first { $0.id == id } }
+
+    /// The next room with news after the open one, in the bar's order.
+    private var nextWithNews: (room: ChatSession.OneRoom, unread: Int)? {
+        let rooms = session.oneRooms
+        guard let current, let index = rooms.firstIndex(where: { $0.id == current }), rooms.count > 1,
+              (summary(current)?.unreadMessages ?? 0) == 0 else { return nil }
+        for offset in 1..<rooms.count {
+            let room = rooms[(index + offset) % rooms.count]
+            if let unread = summary(room.id)?.unreadMessages, unread > 0 { return (room, unread) }
+        }
+        return nil
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                // Slack's place for threads: above the rooms, with a count of the ones with news.
-                ChatScreens.provider.threadsEntry(host: session) { router.openThreadsList() }
-                ForEach(session.oneRooms) { room in
-                    Button { router.chatPath.append(.room(room.id)) } label: {
-                        OneRoomRow(room: room, unread: unread(room.id))
+        VStack(spacing: 0) {
+            RoomBar(rooms: session.oneRooms, current: current, summary: summary) { router.openRoom($0) }
+            if let current {
+                ChatScreens.provider.roomScreen(roomID: current, host: session)
+                    .id(current)
+                    .overlay(alignment: .bottom) {
+                        if let next = nextWithNews {
+                            Button { router.openRoom(next.room.id) } label: {
+                                HStack(spacing: 4) {
+                                    Text("Weiter: # \(next.room.name) ·").foregroundStyle(Theme.ink)
+                                    Text(next.unread > 99 ? "99+ neu" : "\(next.unread) neu").foregroundStyle(Theme.teal)
+                                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.ink3)
+                                }
+                                .font(.system(size: 14, weight: .semibold))
+                                .padding(.horizontal, 14)
+                                .frame(minHeight: 36)
+                                .background(.regularMaterial, in: Capsule())
+                                .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.bottom, 72) // above the composer
+                            .accessibilityLabel("Weiter zu \(next.room.name), \(next.unread) neu")
+                            .accessibilityIdentifier("one.next")
+                        }
                     }
-                    .buttonStyle(.plain)
-                    Divider().overlay(Theme.line).padding(.leading, Theme.Space.page)
-                }
+            } else {
+                ProgressView().frame(maxHeight: .infinity)
             }
         }
         .background(Theme.background)
@@ -184,52 +214,104 @@ private struct OneRoomsList: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button { router.openSearch(in: session.oneRooms.map(\.id)) } label: { Image(systemName: "magnifyingglass") }
-                    .accessibilityLabel("In #one suchen")
-                    .accessibilityIdentifier("chat-search")
+                Button { router.openSearch(in: session.oneRooms.map(\.id), current: current) } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+                .accessibilityLabel("In #one suchen")
+                .accessibilityIdentifier("chat-search")
             }
         }
-        .overlay {
-            if session.oneRooms.isEmpty { ProgressView() }
-        }
-        .refreshable { await session.loadOneRooms() }
-    }
-
-    private func unread(_ roomID: String) -> Int {
-        roomList.rooms.first { $0.id == roomID }?.unreadMessages ?? 0
+        .onAppear { if router.currentRoomID == nil, let current { router.currentRoomID = current } }
     }
 }
 
-/// One #one room: "# Allgemein", its topic, its unread count.
-private struct OneRoomRow: View {
-    let room: ChatSession.OneRoom
-    let unread: Int
+/// The #one rooms as chips, tap only (no swipe between rooms). Each shows its unread count, with
+/// "@" for a mention and 99+ as the cap. A room with news that is scrolled out of sight leaves a
+/// teal dot at that edge.
+private struct RoomBar: View {
+    let rooms: [ChatSession.OneRoom]
+    let current: String?
+    let summary: (String) -> RoomSummary?
+    let select: (String) -> Void
+
+    @State private var frames: [String: CGRect] = [:]
+    @State private var width: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private func unread(_ id: String) -> Int { summary(id)?.unreadMessages ?? 0 }
+
+    private var hiddenNews: (left: Bool, right: Bool) {
+        var left = false, right = false
+        for room in rooms where unread(room.id) > 0 && room.id != current {
+            guard let frame = frames[room.id] else { continue }
+            if frame.minX < 0 { left = true }
+            if frame.maxX > width { right = true }
+        }
+        return (left, right)
+    }
 
     var body: some View {
-        HStack(spacing: 12) {
-            Text("#").font(Theme.Font.rowHash).foregroundStyle(Theme.ink3).frame(width: 22)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(room.name)
-                    .font(Theme.Font.rowTitle.weight(unread > 0 ? .semibold : .regular))
-                    .foregroundStyle(Theme.ink)
-                if let topic = room.topic, !topic.isEmpty {
-                    Text(topic).font(Theme.Font.footnote).foregroundStyle(Theme.ink3).lineLimit(1)
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(rooms) { room in
+                        chip(room)
+                            .id(room.id)
+                            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("roomBar")) } action: { frames[room.id] = $0 }
+                    }
                 }
+                .padding(.horizontal, Theme.Space.page)
+                .padding(.vertical, 8)
             }
-            Spacer()
-            if unread > 0 {
-                Text("\(unread)")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 7)
-                    .frame(minWidth: 22, minHeight: 22)
-                    .background(Theme.badge, in: Capsule())
+            .onChange(of: current) { _, id in
+                guard let id else { return }
+                if reduceMotion { proxy.scrollTo(id) } else { withAnimation { proxy.scrollTo(id) } }
             }
         }
-        .padding(.horizontal, Theme.Space.page)
-        .padding(.vertical, 13)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
+        .coordinateSpace(name: "roomBar")
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        .overlay(alignment: .leading) { if hiddenNews.left { edgeDot.padding(.leading, 3) } }
+        .overlay(alignment: .trailing) { if hiddenNews.right { edgeDot.padding(.trailing, 3) } }
+        .background(Theme.background)
+        .overlay(alignment: .bottom) { Rectangle().fill(Theme.line).frame(height: 1) }
+        .accessibilityIdentifier("one.roomBar")
+    }
+
+    private var edgeDot: some View {
+        Circle().fill(Theme.teal).frame(width: 8, height: 8)
+            .accessibilityLabel("Weitere Räume mit Neuem")
+            .accessibilityIdentifier("one.roomBar.moreNews")
+    }
+
+    private func chip(_ room: ChatSession.OneRoom) -> some View {
+        let selected = room.id == current
+        let count = unread(room.id)
+        let mentions = summary(room.id)?.unreadMentions ?? 0
+        return Button { select(room.id) } label: {
+            HStack(spacing: 6) {
+                Text("# \(room.name)")
+                    .font(.system(size: 15, weight: selected || count > 0 ? .semibold : .regular))
+                if count > 0 {
+                    HStack(spacing: 2) {
+                        if mentions > 0 { Text("@") }
+                        Text(count > 99 ? "99+" : "\(count)")
+                    }
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(selected ? Theme.teal : .white)
+                    .padding(.horizontal, 6)
+                    .frame(minWidth: 20, minHeight: 20)
+                    .background(selected ? Color.white : Theme.teal, in: Capsule())
+                }
+            }
+            .foregroundStyle(selected ? .white : Theme.ink)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 34)
+            .background(selected ? Theme.teal : Theme.line.opacity(0.5), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(count > 0 ? "\(room.name), \(count) ungelesen" + (mentions > 0 ? ", Erwähnung" : "") : room.name)
+        .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
         .accessibilityIdentifier("one-room")
     }
 }
+

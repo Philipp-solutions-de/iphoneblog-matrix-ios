@@ -1,6 +1,6 @@
 import XCTest
 
-/// The Threads list reads like the rest of the app (Philip, 2026-11-17): a mention in a root's
+/// Für dich › Threads reads like the rest of the app (Philip, 2026-11-17): a mention in a root's
 /// body as "@Name", not "[Name](https://matrix.to/…)"; a sender by name, not by ID; an article
 /// root by the article's title, not its URL.
 final class ThreadsListPreviewUITests: XCTestCase {
@@ -47,9 +47,11 @@ final class ThreadsListPreviewUITests: XCTestCase {
         ]
         app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE"]
         app.launch()
-        let entry = app.buttons["threads-entry"]
-        XCTAssertTrue(entry.waitForExistence(timeout: 120), "no Threads row")
-        entry.tap()
+        XCTAssertTrue(app.tabBars.buttons["Für dich"].waitForExistence(timeout: 120), "not signed in")
+        app.tabBars.buttons["Für dich"].tap()
+        let threads = app.segmentedControls.buttons["Threads"]
+        XCTAssertTrue(threads.waitForExistence(timeout: 30), "no Threads filter in Für dich")
+        threads.tap()
 
         let pillRow = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Pilltest \(stamp)")).firstMatch
         XCTAssertTrue(pillRow.waitForExistence(timeout: 30), "the pill thread is not listed")

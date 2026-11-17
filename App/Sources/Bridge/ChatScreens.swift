@@ -17,6 +17,9 @@ struct InvolvedThread: Identifiable, Equatable {
     let roomName: String
     let rootEventID: String
     let rootText: String
+    let rootSenderID: String
+    let rootSenderName: String?
+    let replies: Int
     let latestSenderID: String?
     let latestSenderName: String?
     let latestText: String?

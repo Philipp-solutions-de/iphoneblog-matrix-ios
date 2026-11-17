@@ -1,7 +1,7 @@
 import SwiftUI
 import UserNotifications
 
-/// Asks for push permission where it makes sense: on the first visit to #one-Chat, after one
+/// Asks for push permission where it makes sense: on the first visit to #one, after one
 /// sentence on what is pushed, not the moment sign-in ends (App Review asks for permission
 /// requests in context; Human Interface Guidelines, "Requesting permission").
 enum PushPrimer {
@@ -13,7 +13,7 @@ enum PushPrimer {
     }
 }
 
-/// The primer as a card at the top of #one-Chat.
+/// The primer as a card at the top of #one.
 struct PushPrimerCard: View {
     /// Ask iOS (UNUserNotificationCenter.requestAuthorization), then register.
     let allow: () -> Void
@@ -23,7 +23,7 @@ struct PushPrimerCard: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Mitteilungen")
                 .font(Theme.Font.name).foregroundStyle(Theme.ink)
-            Text("Wir melden dir neue Artikel, Antworten auf deine Beiträge und @Mentions. Was genau, stellst du unter Ich ein.")
+            Text("Wir melden dir neue Artikel, Antworten auf deine Beiträge und Erwähnungen. Was genau, stellst du unter Ich ein.")
                 .font(Theme.Font.footnote).foregroundStyle(Theme.ink2)
             HStack {
                 Button(action: allow) {
@@ -42,7 +42,7 @@ struct PushPrimerCard: View {
     }
 }
 
-/// The card where it belongs: on top of #one-Chat's rooms, once, until iOS has been asked or the
+/// The card where it belongs: on top of #one's room bar, once, until iOS has been asked or the
 /// member said "Später".
 struct PushPrimerSlot: View {
     @ObservedObject private var push = PushCenter.shared

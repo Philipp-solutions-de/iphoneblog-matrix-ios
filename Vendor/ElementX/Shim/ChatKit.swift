@@ -162,6 +162,8 @@ public final class ChatKitSession {
                                   rootSenderName: entry.rootSender.displayName,
                                   latestSenderID: entry.latestSender?.id, latestSenderName: entry.latestSender?.displayName,
                                   latestText: entry.latestText, latestIsOwn: entry.latestIsOwn,
+                                  replies: ChatThreadCount.replies(server: ChatThreadActivity.shared.thread(roomID: entry.roomID, rootEventID: entry.rootEventID)?.serverReplies,
+                                                                   timeline: entry.replies, repliers: 0),
                                   lastActivity: entry.lastActivity, isUnread: ChatThreadSeen.isUnread(entry))
                 }
             }
@@ -257,6 +259,7 @@ public struct ChatKitThread: Identifiable, Equatable {
     public let latestSenderName: String?
     public let latestText: String?
     public let latestIsOwn: Bool
+    public let replies: Int
     public let lastActivity: Date
     /// New replies since you last had the thread open on this device.
     public let isUnread: Bool

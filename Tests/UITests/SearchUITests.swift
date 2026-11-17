@@ -33,7 +33,7 @@ final class SearchUITests: XCTestCase {
     private func openSearch() throws -> XCUIApplication {
         let app = try launch(tab: "chat")
         XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "channel did not open")
-        app.buttons["room-search"].tap()
+        app.buttons["chat-search"].tap()
         let field = app.searchFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 10), "no search field")
         field.tap()

@@ -68,7 +68,8 @@ final class ElementXChatScreens: ChatScreenProviding {
             .map { threads in
                 threads.map {
                     InvolvedThread(roomID: $0.roomID, roomName: $0.roomName, rootEventID: $0.rootEventID,
-                                   rootText: $0.rootText, latestSenderID: $0.latestSenderID,
+                                   rootText: $0.rootText, rootSenderID: $0.rootSenderID, rootSenderName: $0.rootSenderName,
+                                   replies: $0.replies, latestSenderID: $0.latestSenderID,
                                    latestSenderName: $0.latestSenderName, latestText: $0.latestText,
                                    lastActivity: $0.lastActivity, isUnread: $0.isUnread)
                 }

@@ -121,7 +121,7 @@ final class ReadStateUITests: XCTestCase {
         XCTAssertFalse(try me.receiptsCover(mention, in: room, thread: nil), "a receipt covers it although it came after")
     }
 
-    // 3) Threads → a thread with new replies → back: read, the Threads count one lower.
+    // 3) Für dich › Threads → a thread with new replies → back: read, the badge lower.
     func testThreadsListClearsWhenAThreadIsRead() throws {
         let (me, other) = try accounts()
         defer { me.signOut(); other.signOut() }
@@ -130,25 +130,25 @@ final class ReadStateUITests: XCTestCase {
         try other.send("Neue Antwort eins", in: room, thread: root)
         try other.send("Neue Antwort zwei", in: room, thread: root)
 
-        let app = launch(tab: "chat")
-        let entry = app.buttons["threads-entry"]
-        XCTAssertTrue(entry.waitForExistence(timeout: 120), "no Threads row")
-        let unreadBefore = waitForThreadsCount(entry, atLeast: 1)
-        XCTAssertGreaterThanOrEqual(unreadBefore, 1, "the Threads row shows no new threads")
-        entry.tap()
+        let app = launch(tab: "foryou")
+        let threads = app.segmentedControls.buttons["Threads"]
+        XCTAssertTrue(threads.waitForExistence(timeout: 120), "no Threads filter in Für dich")
+        threads.tap()
         let threadRow = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Mein Thread \(stamp)")).firstMatch
-        XCTAssertTrue(threadRow.waitForExistence(timeout: 30), "the thread is not in the Threads list")
+        XCTAssertTrue(threadRow.waitForExistence(timeout: 30), "the thread is not in Für dich › Threads")
+        let unread = NSPredicate(format: "label CONTAINS 'ungelesen'")
+        XCTAssertEqual(XCTWaiter.wait(for: [expectation(for: unread, evaluatedWith: threadRow)], timeout: 20), .completed,
+                       "the thread is not marked new")
+        let before = try XCTUnwrap(mentionsBadge(app))
         threadRow.tap()
         XCTAssertTrue(app.staticTexts["Thread"].waitForExistence(timeout: 30), "the thread did not open")
         sleep(2)
-        goBack(app)
-        XCTAssertTrue(threadRow.waitForExistence(timeout: 10), "back did not return to the Threads list")
+        app.tabBars.buttons["Für dich"].tap()
+        XCTAssertTrue(threadRow.waitForExistence(timeout: 10), "the thread left Für dich › Threads")
         let read = NSPredicate(format: "NOT (label CONTAINS 'ungelesen')")
         XCTAssertEqual(XCTWaiter.wait(for: [expectation(for: read, evaluatedWith: threadRow)], timeout: 10), .completed,
                        "the thread is still marked new")
-        goBack(app)
-        XCTAssertTrue(entry.waitForExistence(timeout: 10), "back did not return to the rooms")
-        XCTAssertEqual(threadsCount(entry), unreadBefore - 1, "the Threads count did not drop by one")
+        XCTAssertTrue(waitForBadge(app, atMost: before - 1), "the badge did not drop")
     }
 
     /// "Alle als gelesen" (build 133 did nothing for thread replies): mentions in the timelines
@@ -244,19 +244,7 @@ final class ReadStateUITests: XCTestCase {
         return false
     }
 
-    private func threadsCount(_ entry: XCUIElement) -> Int {
-        guard let match = entry.label.range(of: #"\d+(?= ungelesen)"#, options: .regularExpression) else { return 0 }
-        return Int(entry.label[match]) ?? 0
-    }
 
-    private func waitForThreadsCount(_ entry: XCUIElement, atLeast: Int) -> Int {
-        for _ in 0..<30 {
-            let count = threadsCount(entry)
-            if count >= atLeast { return count }
-            sleep(1)
-        }
-        return threadsCount(entry)
-    }
 
     private func waitForReceipts(_ me: TestServer, _ eventID: String, in target: String? = nil, thread: String?) throws -> Bool {
         for _ in 0..<20 {

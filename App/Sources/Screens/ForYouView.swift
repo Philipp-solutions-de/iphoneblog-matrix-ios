@@ -94,13 +94,16 @@ struct ForYouView: View {
     }
 }
 
-/// A thread you are in: the room, who wrote last and what, the thread's start below.
+/// A thread you are in: where and how many replies, who started it with what, and who answered
+/// last with what.
 struct ThreadNewsRow: View {
     let thread: InvolvedThread
 
+    private var starter: String { thread.rootSenderName ?? MentionsModel.localpart(thread.rootSenderID) }
+
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            MemberAvatar(userID: thread.latestSenderID ?? "", name: thread.latestSenderName ?? "?", roomID: thread.roomID,
+            MemberAvatar(userID: thread.rootSenderID, name: starter, roomID: thread.roomID,
                          size: Theme.Size.chatAvatar, corner: Theme.Size.chatAvatarCorner)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
@@ -119,20 +122,23 @@ struct ThreadNewsRow: View {
                             .accessibilityLabel("ungelesen")
                     }
                 }
-                if let name = thread.latestSenderName {
-                    Text(name).font(Theme.Font.name).foregroundStyle(Theme.ink)
-                }
-                if let latest = thread.latestText {
-                    Text(latest)
-                        .font(.system(size: 15.5))
-                        .foregroundStyle(Theme.ink2)
-                        .lineLimit(3)
-                        .multilineTextAlignment(.leading)
-                }
+                Text(starter).font(Theme.Font.name).foregroundStyle(Theme.ink)
                 Text(thread.rootText)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.ink3)
-                    .lineLimit(1)
+                    .font(.system(size: 15.5))
+                    .foregroundStyle(Theme.ink2)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                HStack(spacing: 4) {
+                    Text(thread.replies == 1 ? "1 Antwort" : "\(thread.replies) Antworten")
+                        .font(.system(size: 13, weight: thread.isUnread ? .bold : .semibold))
+                        .foregroundStyle(Theme.teal)
+                    if let name = thread.latestSenderName, let latest = thread.latestText {
+                        Text("· \(name): \(latest)")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.ink3)
+                            .lineLimit(1)
+                    }
+                }
             }
         }
         .padding(.horizontal, Theme.Space.page)

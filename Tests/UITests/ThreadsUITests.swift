@@ -128,9 +128,11 @@ final class ThreadsUITests: XCTestCase {
     func testThreadsRowListsYourThreads() throws {
         let (_, stamp) = try makeBusyThread()
         let app = try openChannel(inRoom: false)
-        let entry = app.buttons["threads-entry"]
-        XCTAssertTrue(entry.waitForExistence(timeout: 120), "no Threads row")
-        entry.tap()
+        XCTAssertTrue(app.tabBars.buttons["Für dich"].waitForExistence(timeout: 120), "not signed in")
+        app.tabBars.buttons["Für dich"].tap()
+        let threads = app.segmentedControls.buttons["Threads"]
+        XCTAssertTrue(threads.waitForExistence(timeout: 30), "no Threads filter in Für dich")
+        threads.tap()
         // Newest activity first, so the thread just written is on top.
         let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Viel los \(stamp)")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 30), "your thread is not listed")
