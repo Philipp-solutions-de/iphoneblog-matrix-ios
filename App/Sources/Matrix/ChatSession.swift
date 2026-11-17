@@ -429,7 +429,7 @@ final class ChatSession: ObservableObject, ChatHost {
             }
             apiFailures = 0
             return data
-        } catch let error as URLError where error.code != .badServerResponse || lastStatus >= 500 {
+        } catch let error as URLError where Self.countsAsOutage(error.code, status: lastStatus) {
             apiFailures += 1
             apiPausedUntil = Date().addingTimeInterval(min(60, pow(2, Double(apiFailures - 1))) * Double.random(in: 0.8...1.2))
             throw error
@@ -437,6 +437,18 @@ final class ChatSession: ObservableObject, ChatHost {
     }
 
     private var lastStatus = 0
+
+    /// What pauses our calls (the backoff): the server or the network failing, not a request
+    /// the app itself cancelled (search cancels one per keystroke: "Comics" typed letter by
+    /// letter paused every call for up to a minute, "Die Suche ist gerade nicht erreichbar"),
+    /// not a token check, and not a 4xx answer.
+    nonisolated static func countsAsOutage(_ code: URLError.Code, status: Int) -> Bool {
+        switch code {
+        case .cancelled, .userAuthenticationRequired: return false
+        case .badServerResponse: return status >= 500
+        default: return true
+        }
+    }
 
     private enum TokenRefused: Error { case unknownToken }
 
