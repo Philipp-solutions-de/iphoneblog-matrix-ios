@@ -27,12 +27,21 @@ final class MessageMenuUITests: XCTestCase {
         XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "channel did not open")
         sleep(3)
 
-        // Swipe left on a message in the middle of the timeline opens its menu.
-        let y = app.frame.height * 0.5
-        let origin = app.coordinate(withNormalizedOffset: .zero)
-        origin.withOffset(CGVector(dx: app.frame.width * 0.8, dy: y))
-            .press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: app.frame.width * 0.2, dy: y)),
-                   withVelocity: .fast, thenHoldForDuration: 0.05)
+        // A text message of its own, so the menu belongs to text, then a long press on it.
+        let body = "Menütest \(Int(Date().timeIntervalSince1970))"
+        let composer = app.textViews["room-message_composer"].firstMatch
+        XCTAssertTrue(composer.waitForExistence(timeout: 30), "no composer")
+        composer.tap()
+        composer.typeText(body)
+        app.buttons["room-send_button"].tap()
+        let sent = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", body)).firstMatch
+        XCTAssertTrue(sent.waitForExistence(timeout: 30), "the test message did not appear")
+        sleep(2)
+        // Message text reports no frame to XCUITest; the newest message sits just above the
+        // composer, so the long press goes there.
+        let above = composer.frame.minY - 24
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: app.frame.width * 0.4, dy: above))
+            .press(forDuration: 1.2)
 
         let select = app.buttons["Text auswählen"]
         XCTAssertTrue(select.waitForExistence(timeout: 20), "no \"Text auswählen\" in the menu")
@@ -46,6 +55,7 @@ final class MessageMenuUITests: XCTestCase {
         menu.name = "message-menu"
         menu.lifetime = .keepAlways
         add(menu)
+        save(app, "message-menu")
 
         select.tap()
         let text = app.textViews["text-selection.text"]
@@ -55,8 +65,19 @@ final class MessageMenuUITests: XCTestCase {
         sheet.name = "text-selection"
         sheet.lifetime = .keepAlways
         add(sheet)
+        save(app, "text-selection")
 
         app.buttons["text-selection.done"].tap()
         XCTAssertTrue(text.waitForNonExistence(timeout: 10), "\"Fertig\" did not close the sheet")
+    }
+
+    /// A passing run drops its attachments; with IPHONEBLOG_SHOTS set (as TEST_RUNNER_…), the
+    /// screenshots also land in the runner's temporary folder, under iphoneblog-shots/, where
+    /// the simulator's data folder on the Mac holds them.
+    private func save(_ app: XCUIApplication, _ name: String) {
+        guard env["IPHONEBLOG_SHOTS"] == "1" else { return }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("iphoneblog-shots")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? app.screenshot().pngRepresentation.write(to: dir.appendingPathComponent("\(name).png"))
     }
 }

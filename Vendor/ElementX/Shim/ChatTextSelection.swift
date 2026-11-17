@@ -15,11 +15,26 @@ enum ChatTextSelection {
         controller.modalPresentationStyle = .pageSheet
         controller.sheetPresentationController?.detents = [.medium(), .large()]
         controller.sheetPresentationController?.prefersGrabberVisible = true
+        // The action comes from the message menu, itself a sheet that is still closing; a
+        // sheet presented on it now never shows. Wait until nothing is being dismissed.
+        Task { @MainActor in
+            for _ in 0..<20 {
+                if let top = topViewController(), !top.isBeingDismissed, top.transitionCoordinator == nil {
+                    top.present(controller, animated: true)
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            topViewController()?.present(controller, animated: true)
+        }
+    }
+
+    private static func topViewController() -> UIViewController? {
         var top = UIApplication.shared.connectedScenes
             .compactMap { ($0 as? UIWindowScene)?.keyWindow }
             .first?.rootViewController
-        while let presented = top?.presentedViewController { top = presented }
-        top?.present(controller, animated: true)
+        while let presented = top?.presentedViewController, !presented.isBeingDismissed { top = presented }
+        return top
     }
 }
 
