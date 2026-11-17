@@ -57,23 +57,23 @@ final class SignInAndRoomListTests: XCTestCase {
             XCTAssertEqual(session.rooms.rooms.first { $0.id == channel }?.name, "Allgemein")
         }
 
-        // The mention also reaches @Mentions, from the server's notification list.
+        // The mention also reaches Für dich, from the server's notification list.
         if let mentionRoom = env["IPHONEBLOG_TEST_MENTION_ROOM"], !mentionRoom.isEmpty {
             let until = Date().addingTimeInterval(30)
             while Date() < until, session.mentions.items.isEmpty {
                 session.mentions.reload()
                 try await Task.sleep(for: .seconds(1))
             }
-            let mention = try XCTUnwrap(session.mentions.items.first, "no mention in @Mentions")
+            let mention = try XCTUnwrap(session.mentions.items.first, "no mention in Für dich")
             XCTAssertTrue(mention.unread)
             XCTAssertGreaterThanOrEqual(session.mentions.unreadCount, 1)
             // The tab badges, with ten messages and more after the mention (a busy channel).
             let badgeUntil = Date().addingTimeInterval(10)
-            while Date() < badgeUntil, session.router.mentionsBadge == 0 || session.router.chatBadge == 0 {
+            while Date() < badgeUntil, session.router.forYouBadge == 0 || session.router.chatBadge == 0 {
                 try await Task.sleep(for: .milliseconds(250))
             }
-            XCTAssertGreaterThanOrEqual(session.router.mentionsBadge, 1, "@Mentions tab has no badge")
-            XCTAssertGreaterThanOrEqual(session.router.chatBadge, 1, "#one-Chat tab has no badge")
+            XCTAssertGreaterThanOrEqual(session.router.forYouBadge, 1, "Für dich tab has no badge")
+            XCTAssertGreaterThanOrEqual(session.router.chatBadge, 1, "#one tab has no badge")
         }
 
         // The Blog room is joined, and the new-articles push rule exists on the server.

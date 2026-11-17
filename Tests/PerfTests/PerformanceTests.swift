@@ -123,13 +123,13 @@ final class PerformanceTests: XCTestCase {
 
     // MARK: Tabs
 
-    /// Blog → #one-Chat → @Mentions → Ich → Blog, each until the tab's content shows.
+    /// Blog → #one → Für dich → Ich → Blog, each until the tab's content shows.
     func testSwitchTabs() throws {
         let app = try app()
         launchSignedIn(app)
         _ = try openOneChat(app)
         measure(metrics: [XCTClockMetric(), XCTOSSignpostMetric.navigationTransitionMetric], options: options) {
-            for name in ["Blog", "#one-Chat", "@Mentions", "Ich", "Blog"] {
+            for name in ["Blog", "#one", "Für dich", "Ich", "Blog"] {
                 let tab = tabButton(app, name)
                 tab.tap()
                 XCTAssertTrue(tab.isSelected, "\(name) not selected")
@@ -188,16 +188,16 @@ final class PerformanceTests: XCTestCase {
         #endif
     }
 
-    /// Opens the #one-Chat tab and returns its timeline once the newest seeded messages show.
+    /// Opens the #one tab and returns its timeline once the newest seeded messages show.
     private func openOneChat(_ app: XCUIApplication) throws -> XCUIElement {
         allowLocalNetwork()
-        let tab = tabButton(app, "#one-Chat")
-        XCTAssertTrue(tab.waitForExistence(timeout: 30), "no #one-Chat tab")
+        let tab = tabButton(app, "#one")
+        XCTAssertTrue(tab.waitForExistence(timeout: 30), "no #one tab")
         // The sign-in runs in the background after launch; the tab shows the channel once the
         // session and the space are there.
         // Two minutes: a CI runner's simulator signs in and syncs slowly.
         let deadline = Date().addingTimeInterval(120)
-        // #one-Chat lists #one's rooms; Allgemein, the first, holds the seeded history.
+        // #one's room bar; Allgemein, the first room, holds the seeded history.
         let room = app.buttons.matching(identifier: "one-room").firstMatch
         repeat {
             tab.tap()
@@ -206,7 +206,7 @@ final class PerformanceTests: XCTestCase {
         } while Date() < deadline
         if !app.staticTexts["Felix H."].firstMatch.exists {
             print("PERF-HIERARCHY-BEGIN\n\(app.debugDescription)\nPERF-HIERARCHY-END")
-            XCTFail("#one-Chat shows no seeded messages")
+            XCTFail("#one shows no seeded messages")
         }
         return timeline(app)
     }

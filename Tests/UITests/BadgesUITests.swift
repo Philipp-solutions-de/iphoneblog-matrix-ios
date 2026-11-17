@@ -29,11 +29,11 @@ final class BadgesUITests: XCTestCase {
         app.launch()
 
         // iOS 26's tab bar draws badges but does not expose them to accessibility, so the count
-        // itself is checked in the sign-in test (Router.mentionsBadge, chatBadge); here the
-        // screenshot keeps the badges, and @Mentions must list the mention as unread.
+        // itself is checked in the sign-in test (Router.forYouBadge, chatBadge); here the
+        // screenshot keeps the badges, and Für dich must list the mention as unread.
         let mentionsTab = app.tabBars.buttons["Für dich"]
         XCTAssertTrue(mentionsTab.waitForExistence(timeout: 120), "not signed in")
-        sleep(15) // membership, the room list and @Mentions load
+        sleep(15) // membership, the room list and Für dich load
         let badges = XCTAttachment(screenshot: app.screenshot())
         badges.name = "badges"
         badges.lifetime = .keepAlways
