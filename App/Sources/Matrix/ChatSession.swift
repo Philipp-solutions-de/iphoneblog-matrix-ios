@@ -60,7 +60,13 @@ final class ChatSession: ObservableObject, ChatHost {
         self.client = client
         self.router = router
         userID = try client.userId()
+        refreshWatch = NotificationCenter.default.addObserver(forName: KeychainSessionDelegate.didSave, object: nil,
+                                                              queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.authGuard.noteRefresh() }
+        }
     }
+
+    private var refreshWatch: NSObjectProtocol?
 
     var roomListService: RoomListService {
         // Only read after start(); the views exist only once sync runs.
@@ -400,11 +406,12 @@ final class ChatSession: ObservableObject, ChatHost {
         if Date() < apiPausedUntil { throw URLError(.cannotConnectToHost) }
         do {
             let data: Data
+            let sent = Date()
             do {
                 data = try await apiCall(method, path, body: body)
             } catch TokenRefused.unknownToken {
                 // Our calls take the token as it is; the SDK refreshes it. Check, then once more.
-                guard await authGuard.confirmValid(path: path) else { throw URLError(.userAuthenticationRequired) }
+                guard await authGuard.confirmValid(path: path, requestSent: sent) else { throw URLError(.userAuthenticationRequired) }
                 data = try await apiCall(method, path, body: body)
             }
             apiFailures = 0

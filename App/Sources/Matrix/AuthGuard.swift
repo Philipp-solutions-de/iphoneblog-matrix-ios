@@ -41,6 +41,12 @@ final class AuthGuard {
     /// Where the suspicion came from: "sdk" or the shape of our own call's path, and its errcode.
     private var trigger = ("", "")
     private var checking: Task<Void, Never>?
+    /// The check in progress: every caller awaits the same one, so two token errors at once
+    /// lead to one SDK request and so at most one refresh.
+    private var inFlight: Task<Verdict, Never>?
+    /// When the SDK last saved refreshed tokens (KeychainSessionDelegate). A 401 for a request
+    /// sent before it, and refusals counted before it, say nothing about the new token.
+    private(set) var lastRefresh = Date.distantPast
     /// Seconds between checks while the server is away: 2, 4, 8 … 60.
     static let backoff: [Int] = [2, 4, 8, 16, 32, 60]
     /// How many refusals in a row, with MAS answering, end the session.
@@ -52,8 +58,22 @@ final class AuthGuard {
         self.signOut = signOut
     }
 
-    /// One check, as the order above describes.
+    /// One check, as the order above describes; joins the one in progress, if any.
     func check() async -> Verdict {
+        if let inFlight { return await inFlight.value }
+        let task = Task { await checkOnce() }
+        inFlight = task
+        let verdict = await task.value
+        inFlight = nil
+        return verdict
+    }
+
+    /// The SDK saved a refreshed pair.
+    func noteRefresh(at date: Date = .now) {
+        lastRefresh = date
+    }
+
+    private func checkOnce() async -> Verdict {
         guard let sdkError = await probes.sdkRequest() else { return .valid }
         if sdkError.contains("invalid_grant") { return .invalid }
         guard let (status, body) = await probes.whoami() else { return .unreachable }
@@ -64,8 +84,9 @@ final class AuthGuard {
 
     /// Something reported a token error: check, and keep checking with backoff until the
     /// token works or the session is definitely over. One check at a time.
-    func suspect(from source: String = "sdk", errcode: String = "M_UNKNOWN_TOKEN") {
-        guard checking == nil else { return }
+    func suspect(from source: String = "sdk", errcode: String = "M_UNKNOWN_TOKEN", requestSent: Date = .now) {
+        // An answer to a request made with the previous token: the new one has not failed.
+        guard requestSent >= lastRefresh, checking == nil else { return }
         trigger = (source, errcode)
         checking = Task { [weak self] in
             await self?.run()
@@ -74,9 +95,10 @@ final class AuthGuard {
     }
 
     /// For our own calls: true when the token works now (refreshed), so the call may be retried.
-    func confirmValid(path: String) async -> Bool {
+    func confirmValid(path: String, requestSent: Date) async -> Bool {
+        if requestSent < lastRefresh { return true }
         if await check() == .valid { return true }
-        suspect(from: Self.shape(of: path))
+        suspect(from: Self.shape(of: path), requestSent: requestSent)
         return false
     }
 
@@ -93,7 +115,11 @@ final class AuthGuard {
         var refusals = 0
         var attempt = 0
         while !Task.isCancelled {
-            switch await check() {
+            let refreshBefore = lastRefresh
+            let verdict = await check()
+            // A refresh during or since the last checks: what was refused was the old token.
+            if lastRefresh != refreshBefore { refusals = 0 }
+            switch verdict {
             case .valid:
                 // Only worth a line when it took more than the first check.
                 if attempt > 0 { breadcrumb("kept", checks: attempt + 1) }
@@ -102,6 +128,8 @@ final class AuthGuard {
                 breadcrumb("signout_invalid_grant", checks: attempt + 1)
                 signOut("invalid_grant")
                 return
+            case .refused where lastRefresh != refreshBefore:
+                refusals = 0
             case .refused:
                 refusals += 1
                 if refusals >= Self.refusalsToSignOut {

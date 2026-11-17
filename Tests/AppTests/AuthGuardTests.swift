@@ -15,6 +15,9 @@ final class AuthGuardTests: XCTestCase {
         var whoami: [(Int, Data)?]
         var issuer: [Bool]
         var sleeps: [Duration] = []
+        var sdkCalls = 0
+        /// Runs inside the SDK probe: a refresh landing while the check is under way.
+        var duringSDK: ((Int) -> Void)?
         var signedOut = false
         var reasons: [String] = []
         var reports: [[String: String]] = []
@@ -25,7 +28,12 @@ final class AuthGuardTests: XCTestCase {
     }
 
     private func guardFor(_ script: Script) -> AuthGuard {
-        AuthGuard(probes: .init(sdkRequest: { script.next(&script.sdk) },
+        AuthGuard(probes: .init(sdkRequest: {
+                                    script.sdkCalls += 1
+                                    script.duringSDK?(script.sdkCalls)
+                                    try? await Task.sleep(for: .milliseconds(50))
+                                    return script.next(&script.sdk)
+                                },
                                 whoami: { script.next(&script.whoami).map { (status: $0.0, body: $0.1) } },
                                 issuerUp: { script.next(&script.issuer) },
                                 sleep: { script.sleeps.append($0) }),
@@ -84,7 +92,7 @@ final class AuthGuardTests: XCTestCase {
     /// Our own call with an expired token: the SDK refreshes, the call may go again, no logout.
     func testAnExpiredTokenOnOurOwnCallRefreshesAndRetries() async {
         let script = Script(sdk: [nil])
-        let ok = await guardFor(script).confirmValid(path: "/_matrix/client/v3/pushrules/global/override/x")
+        let ok = await guardFor(script).confirmValid(path: "/_matrix/client/v3/pushrules/global/override/x", requestSent: .now)
         XCTAssertTrue(ok)
         XCTAssertFalse(script.signedOut)
     }
@@ -115,5 +123,39 @@ final class AuthGuardTests: XCTestCase {
                             whoami: [(401, hard401)], issuer: [true, true, false, true, true])
         await guardFor(script).run()
         XCTAssertFalse(script.signedOut, "refusals around an outage were counted together")
+    }
+
+    /// Two token errors at once (server log: two refreshes 45 ms apart, MAS saw reuse): one check,
+    /// one SDK request, so at most one refresh.
+    func testTwoConcurrentErrorsMakeOneSDKRequest() async {
+        let script = Script(sdk: [nil])
+        let guardian = guardFor(script)
+        async let first = guardian.confirmValid(path: "/_matrix/client/v3/notifications", requestSent: .now)
+        async let second = guardian.confirmValid(path: "/_matrix/client/v3/pushrules/", requestSent: .now)
+        let results = await [first, second]
+        XCTAssertEqual(results, [true, true])
+        XCTAssertEqual(script.sdkCalls, 1, "two errors at once led to two SDK requests")
+    }
+
+    /// A 401 for a request sent before the latest refresh says nothing about the new token.
+    func testAStale401AfterARefreshCannotSignOut() async {
+        let script = Script(sdk: [refresh502], whoami: [(401, hard401)], issuer: [true])
+        let guardian = guardFor(script)
+        let sent = Date.now.addingTimeInterval(-5)
+        guardian.noteRefresh()
+        guardian.suspect(from: "/_matrix/client/versions", requestSent: sent)
+        let retried = await guardian.confirmValid(path: "/_matrix/client/v3/user/x/account_data/y", requestSent: sent)
+        XCTAssertTrue(retried, "a stale 401 was not simply retried")
+        XCTAssertEqual(script.sdkCalls, 0, "a stale 401 started a check")
+        XCTAssertFalse(script.signedOut)
+    }
+
+    /// A refresh between refusals: the earlier refusals were the old token's, the count restarts.
+    func testARefreshBetweenRefusalsRestartsTheCount() async {
+        let script = Script(sdk: [refresh502, refresh502, refresh502, refresh502, nil], whoami: [(401, hard401)], issuer: [true])
+        let guardian = guardFor(script)
+        script.duringSDK = { call in if call == 3 { guardian.noteRefresh() } }
+        await guardian.run()
+        XCTAssertFalse(script.signedOut, "refusals from before a refresh counted towards the sign-out")
     }
 }

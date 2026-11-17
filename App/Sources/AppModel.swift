@@ -67,7 +67,15 @@ final class AppModel: ObservableObject {
 
     // MARK: - Start
 
+    /// Once per app process. SwiftUI runs the root view's task again when iOS rebuilds the scene
+    /// while the process lives on; a second restore built a second client beside the running
+    /// one, and the two refreshed the same token 45 ms apart, which MAS treats as reuse and
+    /// answers by revoking the session (server logs, 2026-11-17).
+    private var restoreStarted = false
+
     func restore() async {
+        guard !restoreStarted else { return }
+        restoreStarted = true
         #if DEBUG
         // UI tests open a chat link as iOS would hand one over (IPHONEBLOG_OPEN_URL).
         if let link = ProcessInfo.processInfo.environment["IPHONEBLOG_OPEN_URL"], let url = URL(string: link) {

@@ -128,8 +128,12 @@ MAS (502, 503, reset, timeout) it reports the same "unknown token" as a revoked 
 `AuthGuard` checks every such report: one SDK request (refreshing on the way), then whoami. The
 session ends only when MAS refuses the refresh token (invalid_grant) or the server refuses the
 token three times in a row while MAS answers; anything else keeps the session and checks again
-after 2, 4, 8 … 60 s. Our own calls retry once after a successful check (Alex's logouts on
-deploy days, 2026-11-17).
+after 2, 4, 8 … 60 s. Our own calls retry once after a successful check. Concurrent errors
+share one check, so at most one refresh; a 401 for a request sent before the latest refresh,
+and refusals counted before it, never count. The app restores its session once per process: a
+second restore after iOS rebuilt the scene ran two clients that refreshed the same token 45 ms
+apart, which MAS treats as reuse and answers by revoking the session (Alex's logouts,
+2026-11-17).
 
 **Message links on our own domain.** "Link kopieren" copies
 `https://chat.iphoneblog.de/#/<room>/$<event>`, where `<room>` is the room alias's localpart
