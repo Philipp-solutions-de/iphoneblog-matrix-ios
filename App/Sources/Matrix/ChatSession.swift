@@ -470,6 +470,15 @@ final class ChatSession: ObservableObject, ChatHost {
     /// One call to our own endpoints, with the HTTP status for the caller to read (no backoff):
     /// "Kontaktdaten teilen" tells each refusal apart.
     func call(_ method: String, _ path: String, body: Data? = nil) async throws -> (Data, Int) {
+        let sent = Date()
+        let answer = try await callOnce(method, path, body: body)
+        // A stale token: AuthGuard checks (the SDK refreshes), then one more try (as api()).
+        guard answer.1 == 401, String(data: answer.0.prefix(300), encoding: .utf8)?.contains("M_UNKNOWN_TOKEN") == true,
+              await authGuard.confirmValid(path: path, requestSent: sent) else { return answer }
+        return try await callOnce(method, path, body: body)
+    }
+
+    private func callOnce(_ method: String, _ path: String, body: Data?) async throws -> (Data, Int) {
         let base = client.homeserver().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard let url = URL(string: base + path) else { throw URLError(.badURL) }
         var request = URLRequest(url: url)
