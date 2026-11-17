@@ -12,7 +12,9 @@ final class AppModel: ObservableObject {
         case signedIn(ChatSession)
     }
 
-    @Published private(set) var state: State = .starting
+    @Published private(set) var state: State = .starting {
+        didSet { openPendingLink() }
+    }
     /// Navigation lives here, not in the session: the Blog tab exists signed out too.
     let router = Router()
     @Published var errorMessage: String?
@@ -21,6 +23,9 @@ final class AppModel: ObservableObject {
     @Published private(set) var offersPasswordLogin = false
 
     let homeserverURL: String
+    /// A chat link that arrived while the app was still starting; opened once it knows whether
+    /// someone is signed in.
+    private var pendingLinkURL: URL?
     private let store: SessionStore
     private var pendingClient: (client: Client, storeID: String)?
     /// Keeps the SDK's auth-error callback registered while signed in.
@@ -34,10 +39,40 @@ final class AppModel: ObservableObject {
         self.store = store
     }
 
+    // MARK: - Links
+
+    /// A chat link (ours on chat.iphoneblog.de, or matrix.to) from outside the app or tapped in
+    /// it: signed in, the room, thread or message in the app; signed out, the web chat, which
+    /// shows what it may. False for any other address, which the caller opens as before.
+    @discardableResult
+    func open(_ url: URL) -> Bool {
+        guard let link = ChatLink.parse(url) else { return false }
+        switch state {
+        case .starting:
+            pendingLinkURL = url
+        case .signedIn(let session):
+            Task { await session.open(link) }
+        case .signedOut, .signingIn:
+            router.presentedURL = url
+        }
+        return true
+    }
+
+    private func openPendingLink() {
+        guard let url = pendingLinkURL else { return }
+        if case .starting = state { return }
+        pendingLinkURL = nil
+        open(url)
+    }
+
     // MARK: - Start
 
     func restore() async {
         #if DEBUG
+        // UI tests open a chat link as iOS would hand one over (IPHONEBLOG_OPEN_URL).
+        if let link = ProcessInfo.processInfo.environment["IPHONEBLOG_OPEN_URL"], let url = URL(string: link) {
+            open(url)
+        }
         // UI tests of the signed-out app start without the session a member test left behind.
         if ProcessInfo.processInfo.environment["IPHONEBLOG_SIGNED_OUT"] == "1" {
             store.delete()

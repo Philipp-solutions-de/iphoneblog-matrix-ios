@@ -122,6 +122,17 @@ both a thread reply and a channel message; it would take two events), push for r
 threads you are in without a mention (Synapse sends none), and thread rows in the Blog tab,
 which shows the website.
 
+**Message links on our own domain.** "Link kopieren" copies
+`https://chat.iphoneblog.de/#/<room>/$<event>`, where `<room>` is the room alias's localpart
+(`one-chat`), else the percent-encoded room ID (`ChatLink`). The web chat at that address
+copies and routes the same single form, so a link works without the app; with the app
+installed, iOS hands it over as a universal link (`applinks:chat.iphoneblog.de`; the chat
+server's apple-app-site-association names the app for `/` with a fragment). The link names no
+thread: the opener reads the event and opens its thread if it replies in one, else the room
+scrolled to the message, so a link stays right when a message moves into a thread. Signed out,
+the web chat opens in a sheet. matrix.to links to rooms and messages open the same way. The
+thread screen does not yet scroll to the reply.
+
 **Pushes for mentions, not for every message.** At an account's first sign-in the app turns the
 default underride `.m.rule.message` off, once, marked in account data
 (`de.iphoneblog.push_defaults`) so a later choice stays: every message then only counts towards

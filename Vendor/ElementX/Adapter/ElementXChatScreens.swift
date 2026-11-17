@@ -17,6 +17,8 @@ final class ElementXChatScreens: ChatScreenProviding {
 
     init() {
         ChatKitTheme.apply(.app)
+        // "Link kopieren": the app's readable link (ChatLink), not matrix.to.
+        ChatKitLinks.message = { roomID, alias, eventID in ChatLink.url(roomID: roomID, alias: alias, eventID: eventID) }
     }
 
     func start(host: ChatHost) async throws {

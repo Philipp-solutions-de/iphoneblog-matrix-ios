@@ -301,7 +301,48 @@ final class ChatSession: ObservableObject, ChatHost {
     }
 
     func openURL(_ url: URL) {
+        if let link = ChatLink.parse(url) {
+            Task { await open(link) }
+            return
+        }
         router.presentedURL = url
+    }
+
+    /// A chat link: a thread reply opens its thread, any other message its room, scrolled to and
+    /// highlighted; a room link the room. The link names no thread, so the event says (as the
+    /// web chat does). The thread screen does not scroll to a reply yet.
+    func open(_ link: ChatLink) async {
+        let roomID: String
+        if link.room.hasPrefix("#") {
+            guard let resolved = await resolve(link.room) else {
+                router.notice = "Diesen Raum gibt es nicht."
+                return
+            }
+            roomID = resolved.roomId
+        } else {
+            roomID = link.room
+        }
+        guard let eventID = link.eventID else {
+            router.openRoom(roomID)
+            return
+        }
+        if let root = await threadRoot(of: eventID, in: roomID) {
+            router.openThread(roomID: roomID, rootEventID: root)
+        } else {
+            router.openMessage(roomID: roomID, eventID: eventID)
+        }
+    }
+
+    /// The thread an event replies in, from the event itself (GET /rooms/{id}/event/{id}).
+    private func threadRoot(of eventID: String, in roomID: String) async -> String? {
+        let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/?#"))
+        guard let room = roomID.addingPercentEncoding(withAllowedCharacters: allowed),
+              let event = eventID.addingPercentEncoding(withAllowedCharacters: allowed),
+              let data = try? await api("GET", "/_matrix/client/v3/rooms/\(room)/event/\(event)"),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let relates = (json["content"] as? [String: Any])?["m.relates_to"] as? [String: Any],
+              relates["rel_type"] as? String == "m.thread" else { return nil }
+        return relates["event_id"] as? String
     }
 
     func showMessage(_ text: String) {

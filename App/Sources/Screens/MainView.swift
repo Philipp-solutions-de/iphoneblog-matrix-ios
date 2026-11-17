@@ -61,6 +61,9 @@ struct MainView: View {
         .onChange(of: session == nil) { _, signedOut in
             if signedOut, router.tab == .mentions { router.tab = .blog }
         }
+        // A chat link tapped anywhere in the app (a message, the blog) opens in the app, not in
+        // Safari; anything else as before.
+        .environment(\.openURL, OpenURLAction { url in model.open(url) ? .handled : .systemAction })
         .sheet(item: $router.presentedURL) { url in
             SafariView(url: url).ignoresSafeArea()
         }
