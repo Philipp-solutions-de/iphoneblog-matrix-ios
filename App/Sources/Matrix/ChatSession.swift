@@ -60,6 +60,7 @@ final class ChatSession: ObservableObject, ChatHost {
         self.client = client
         self.router = router
         userID = try client.userId()
+        AvatarStore.shared.client = client
         refreshWatch = NotificationCenter.default.addObserver(forName: KeychainSessionDelegate.didSave, object: nil,
                                                               queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.authGuard.noteRefresh() }
@@ -305,8 +306,12 @@ final class ChatSession: ObservableObject, ChatHost {
     }
 
     func openUser(userID: String) {
-        // Profiles come with the conversation views; until then a mention opens nothing.
-        log.info("open user requested")
+        router.profile = Router.Person(userID: userID, shareNow: false)
+    }
+
+    func shareContact(userID: String) {
+        guard router.isMember, ContactShare.canShare(with: userID, me: self.userID) else { return }
+        router.profile = Router.Person(userID: userID, shareNow: true)
     }
 
     func openRoom(roomID: String) {
@@ -356,6 +361,14 @@ final class ChatSession: ObservableObject, ChatHost {
               let relates = (json["content"] as? [String: Any])?["m.relates_to"] as? [String: Any],
               relates["rel_type"] as? String == "m.thread" else { return nil }
         return relates["event_id"] as? String
+    }
+
+    func isOnScreen(roomID: String, threadRootEventID: String?) -> Bool {
+        router.isOnScreen(roomID: roomID, threadRootEventID: threadRootEventID)
+    }
+
+    func didSee(roomID: String, threadRootEventID: String?, eventID: String) {
+        Task { await mentions.didSee(roomID: roomID, threadRoot: threadRootEventID, eventID: eventID) }
     }
 
     func showMessage(_ text: String) {
@@ -416,7 +429,7 @@ final class ChatSession: ObservableObject, ChatHost {
             }
             apiFailures = 0
             return data
-        } catch let error as URLError where error.code != .badServerResponse || lastStatus >= 500 {
+        } catch let error as URLError where Self.countsAsOutage(error.code, status: lastStatus) {
             apiFailures += 1
             apiPausedUntil = Date().addingTimeInterval(min(60, pow(2, Double(apiFailures - 1))) * Double.random(in: 0.8...1.2))
             throw error
@@ -424,6 +437,18 @@ final class ChatSession: ObservableObject, ChatHost {
     }
 
     private var lastStatus = 0
+
+    /// What pauses our calls (the backoff): the server or the network failing, not a request
+    /// the app itself cancelled (search cancels one per keystroke: "Comics" typed letter by
+    /// letter paused every call for up to a minute, "Die Suche ist gerade nicht erreichbar"),
+    /// not a token check, and not a 4xx answer.
+    nonisolated static func countsAsOutage(_ code: URLError.Code, status: Int) -> Bool {
+        switch code {
+        case .cancelled, .userAuthenticationRequired: return false
+        case .badServerResponse: return status >= 500
+        default: return true
+        }
+    }
 
     private enum TokenRefused: Error { case unknownToken }
 
@@ -456,6 +481,31 @@ final class ChatSession: ObservableObject, ChatHost {
                 guard let (_, response) = try? await URLSession.shared.data(for: request) else { return false }
                 return (response as? HTTPURLResponse)?.statusCode == 200
             })
+    }
+
+    /// One call to our own endpoints, with the HTTP status for the caller to read (no backoff):
+    /// "Kontaktdaten teilen" tells each refusal apart.
+    func call(_ method: String, _ path: String, body: Data? = nil) async throws -> (Data, Int) {
+        let sent = Date()
+        let answer = try await callOnce(method, path, body: body)
+        // A stale token: AuthGuard checks (the SDK refreshes), then one more try (as api()).
+        guard answer.1 == 401, String(data: answer.0.prefix(300), encoding: .utf8)?.contains("M_UNKNOWN_TOKEN") == true,
+              await authGuard.confirmValid(path: path, requestSent: sent) else { return answer }
+        return try await callOnce(method, path, body: body)
+    }
+
+    private func callOnce(_ method: String, _ path: String, body: Data?) async throws -> (Data, Int) {
+        let base = client.homeserver().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard let url = URL(string: base + path) else { throw URLError(.badURL) }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("Bearer \(try client.session().accessToken)", forHTTPHeaderField: "Authorization")
+        if let body {
+            request.httpBody = body
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
     }
 
     private func apiCall(_ method: String, _ path: String, body: Data? = nil) async throws -> Data {

@@ -94,9 +94,18 @@ struct TimelineItemRowStylerView<Content: View>: View {
         if showsSender {
             ChatAvatar(sender: timelineItem.sender, size: style.metrics.avatar, mediaProvider: context.mediaProvider)
                 .onTapGesture { context.send(viewAction: .tappedOnSenderDetails(sender: timelineItem.sender)) }
+                .highPriorityGesture(shareContactGesture)
                 .accessibilityHidden(true)
         } else {
             Color.clear.frame(width: style.metrics.avatar, height: 1)
+        }
+    }
+
+    /// A long press on a name or avatar: "Kontaktdaten teilen" with that person (ChatKitContacts);
+    /// the rest of the row keeps the message's own long press.
+    private var shareContactGesture: some Gesture {
+        LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+            ChatKitContacts.share?(timelineItem.sender.id)
         }
     }
 
@@ -108,6 +117,7 @@ struct TimelineItemRowStylerView<Content: View>: View {
                 .lineLimit(1)
                 .accessibilityHidden(true) // read by the accessibility modifier below
                 .onTapGesture { context.send(viewAction: .tappedOnSenderDetails(sender: timelineItem.sender)) }
+                .highPriorityGesture(shareContactGesture)
             Text(ChatTimeLabel.short(timelineItem.timestamp))
                 .font(style.fonts.time)
                 .foregroundStyle(style.colors.ink3)
@@ -318,7 +328,7 @@ struct ChatThreadSummary: View {
 
     private var thread: ChatThreadActivity.Thread? { activity.thread(roomID: roomID, rootEventID: rootEventID) }
     /// The server's count once fetched; the timeline's summary and the thread list can be off.
-    private var count: Int { thread?.serverReplies ?? numberOfReplies }
+    private var count: Int { ChatThreadCount.replies(server: thread?.serverReplies, timeline: numberOfReplies, repliers: thread?.repliers.count ?? 0) }
     private var isUnread: Bool { activity.isUnread(roomID: roomID, rootEventID: rootEventID) }
     private var repliers: [TimelineItemSender] {
         let known = thread?.repliers ?? []

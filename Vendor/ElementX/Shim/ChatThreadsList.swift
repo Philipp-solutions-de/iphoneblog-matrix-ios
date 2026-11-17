@@ -34,7 +34,9 @@ final class ChatThreadActivity: ObservableObject {
     /// Threads you take part in that have news for you; the Threads row's count.
     @Published private(set) var unreadInvolved = 0
     /// Fetches the newest repliers of one thread (room, root) from the server.
-    var fetchRepliers: ((String, String) async -> (senders: [TimelineItemSender], count: Int))?
+    /// Nil when the server did not answer: then nothing changes (a failed fetch once stored 0,
+    /// and the row read "Noch keine Antworten" under three repliers, Thorsten 2026-11-17).
+    var fetchRepliers: ((String, String) async -> (senders: [TimelineItemSender], count: Int)?)?
     private var fetched: [String: Int] = [:]
 
     static func key(_ roomID: String, _ rootEventID: String) -> String { "\(roomID)|\(rootEventID)" }
@@ -47,7 +49,12 @@ final class ChatThreadActivity: ObservableObject {
         return ChatThreadSeen.isUnread(key: Self.key(roomID, rootEventID), lastActivity: last)
     }
 
-    func update(_ new: [String: Thread], unreadInvolved: Int) {
+    /// The threads you take part in that could be unread (key → last activity), so opening one
+    /// recounts the Threads row at once.
+    private var involved: [String: Date] = [:]
+
+    func update(_ new: [String: Thread], unreadInvolved: Int, involved: [String: Date] = [:]) {
+        self.involved = involved
         var merged = new
         for (key, thread) in new {
             merged[key]?.repliers = threads[key]?.repliers ?? thread.repliers
@@ -64,7 +71,10 @@ final class ChatThreadActivity: ObservableObject {
         guard fetched[key] != hint, let fetchRepliers else { return }
         fetched[key] = hint
         Task {
-            let result = await fetchRepliers(roomID, rootEventID)
+            guard let result = await fetchRepliers(roomID, rootEventID) else {
+                fetched[key] = nil // try again when the row next appears
+                return
+            }
             var thread = threads[key] ?? Thread(replies: result.count, lastReply: nil, latestIsOwn: false)
             if !result.senders.isEmpty { thread.repliers = result.senders }
             thread.serverReplies = result.count
@@ -75,6 +85,8 @@ final class ChatThreadActivity: ObservableObject {
     /// A thread was opened: its replies are seen now.
     func markSeen(roomID: String, rootEventID: String) {
         ChatThreadSeen.markSeen(roomID: roomID, rootEventID: rootEventID)
+        let count = involved.filter { ChatThreadSeen.isUnread(key: $0.key, lastActivity: $0.value) }.count
+        if count != unreadInvolved { unreadInvolved = count }
         objectWillChange.send()
     }
 }
@@ -104,6 +116,14 @@ final class ChatThreadsListModel: ObservableObject {
     private let ownUserID: String
     private var services: [String: (service: ThreadListService, handle: TaskHandle)] = [:]
     private var itemsByRoom: [String: [ThreadListItem]] = [:]
+    /// Names and pictures the SDK's thread list does not carry yet (lazy-loaded members, as the
+    /// Blog bot showed as "@iphoneblog:iphoneblog.de", Philip 2026-11-17): from the room member,
+    /// else the profile. Looked up once per person.
+    private var people: [String: TimelineItemSender] = [:]
+    /// Article roots preview as the article's title, not their URL: the bot's
+    /// `de.iphoneblog.article` field, read once per root ("" when there is none).
+    private var articleTitles: [String: String] = [:]
+    private var looking: Set<String> = []
     private var roomInfo: [String: (name: String, isDirect: Bool)] = [:]
     /// Root event IDs of threads you wrote in, per room, from the server.
     private var participated: [String: Set<String>] = [:]
@@ -120,7 +140,7 @@ final class ChatThreadsListModel: ObservableObject {
     /// Loads the threads of every joined room and keeps them live. Safe to call again.
     func start() async {
         ChatThreadActivity.shared.fetchRepliers = { [weak self] room, root in
-            await self?.repliers(roomID: room, rootEventID: root) ?? ([], 0)
+            await self?.repliers(roomID: room, rootEventID: root)
         }
         let rooms = client.rooms().filter { $0.membership() == .joined }
         for room in rooms {
@@ -188,36 +208,40 @@ final class ChatThreadsListModel: ObservableObject {
                 // Yours if you started it, wrote the latest reply, or the server says you wrote in it.
                 guard root.isOwn || item.latestEvent?.isOwn == true || mine.contains(root.eventId) else { continue }
                 let latest = item.latestEvent
+                let title = articleTitles[root.eventId].flatMap { $0.isEmpty ? nil : $0 }
                 result.append(ChatThreadEntry(roomID: roomID,
                                               roomName: info.name,
                                               isDirect: info.isDirect,
                                               rootEventID: root.eventId,
-                                              rootSender: Self.sender(root),
-                                              rootText: Self.text(root.content),
+                                              rootSender: person(root, roomID: roomID),
+                                              rootText: title ?? Self.text(root.content),
                                               replies: Int(item.numReplies),
-                                              latestSender: latest.map(Self.sender),
+                                              latestSender: latest.map { person($0, roomID: roomID) },
                                               latestText: latest.map { Self.text($0.content) },
                                               latestIsOwn: latest?.isOwn ?? root.isOwn,
                                               lastActivity: Self.date(latest?.timestamp ?? root.timestamp)))
             }
         }
         entries = result.sorted { $0.lastActivity > $1.lastActivity }
-        ChatThreadActivity.shared.update(activity, unreadInvolved: entries.filter(ChatThreadSeen.isUnread).count)
+        for entry in entries where articleTitles[entry.rootEventID] == nil { lookUpArticle(roomID: entry.roomID, rootEventID: entry.rootEventID) }
+        let unread = entries.filter(ChatThreadSeen.isUnread)
+        ChatThreadActivity.shared.update(activity, unreadInvolved: unread.count,
+                                         involved: Dictionary(unread.map { ($0.id, $0.lastActivity) }, uniquingKeysWith: { a, _ in a }))
     }
 
     /// The newest distinct repliers of a thread, at most three, from the server's thread relations.
-    func repliers(roomID: String, rootEventID: String) async -> (senders: [TimelineItemSender], count: Int) {
+    func repliers(roomID: String, rootEventID: String) async -> (senders: [TimelineItemSender], count: Int)? {
         guard let session = try? client.session(),
               let room = roomID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "!:"))),
               let root = rootEventID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "$:"))),
               let url = URL(string: "\(client.homeserver().trimmingCharacters(in: CharacterSet(charactersIn: "/")))/_matrix/client/v1/rooms/\(room)/relations/\(root)/m.thread?limit=100&dir=b") else {
-            return ([], 0)
+            return nil
         }
         var request = URLRequest(url: url)
         request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               (response as? HTTPURLResponse)?.statusCode == 200,
-              let body = try? JSONDecoder().decode(RelationsResponse.self, from: data) else { return ([], 0) }
+              let body = try? JSONDecoder().decode(RelationsResponse.self, from: data) else { return nil }
         // The count is the server's own (the root's bundled thread relation); the page above holds
         // at most 100 replies and only serves the repliers.
         var count = body.chunk.count
@@ -263,6 +287,56 @@ final class ChatThreadsListModel: ObservableObject {
 
     // MARK: Helpers
 
+    /// The sender with a name: the SDK's profile when it has one, else what was looked up.
+    private func person(_ event: ThreadListItemEvent, roomID: String) -> TimelineItemSender {
+        let sender = Self.sender(event)
+        if sender.displayName != nil { return sender }
+        if let known = people[event.sender] { return known }
+        lookUpPerson(event.sender, roomID: roomID)
+        return sender
+    }
+
+    private func lookUpPerson(_ userID: String, roomID: String) {
+        guard looking.insert("person:" + userID).inserted else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            var name: String?
+            var avatar: String?
+            if let room = try? client.getRoom(roomId: roomID), let member = try? await room.member(userId: userID) {
+                name = member.displayName
+                avatar = member.avatarUrl
+            }
+            if name == nil, let profile = try? await client.getProfile(userId: userID) {
+                name = profile.displayName
+                avatar = avatar ?? profile.avatarUrl
+            }
+            guard let name, !name.isEmpty else { return }
+            people[userID] = TimelineItemSender(id: userID, displayName: name, avatarURL: avatar.flatMap(URL.init(string:)))
+            rebuild()
+        }
+    }
+
+    private func lookUpArticle(roomID: String, rootEventID: String) {
+        guard looking.insert("article:" + rootEventID).inserted, let session = try? client.session(),
+              let room = roomID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "/?#"))),
+              let root = rootEventID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "/?#"))),
+              let url = URL(string: "\(client.homeserver().trimmingCharacters(in: CharacterSet(charactersIn: "/")))/_matrix/client/v3/rooms/\(room)/event/\(root)") else { return }
+        Task { [weak self] in
+            var request = URLRequest(url: url)
+            request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+            guard let (data, response) = try? await URLSession.shared.data(for: request),
+                  (response as? HTTPURLResponse)?.statusCode == 200,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                self?.looking.remove("article:" + rootEventID) // try again on the next rebuild
+                return
+            }
+            let content = json["content"] as? [String: Any]
+            let title = (content?["de.iphoneblog.article"] as? [String: Any])?["title"] as? String ?? ""
+            self?.articleTitles[rootEventID] = title
+            if !title.isEmpty { self?.rebuild() }
+        }
+    }
+
     private static func sender(_ event: ThreadListItemEvent) -> TimelineItemSender {
         TimelineItemSender(senderID: event.sender, senderProfile: event.senderProfile)
     }
@@ -270,7 +344,17 @@ final class ChatThreadsListModel: ObservableObject {
     private static func text(_ content: TimelineItemContent?) -> String {
         guard case let .msgLike(content)? = content else { return "" }
         switch content.kind {
-        case .message(let message): return message.body
+        case .message(let message):
+            // Another client's body may hold "[Name](https://matrix.to/#/@…)"; the app's preview
+            // reads formatted_body first (ChatKitText).
+            var html: String?
+            switch message.msgType {
+            case .text(let text): html = text.formatted?.body
+            case .notice(let notice): html = notice.formatted?.body
+            case .emote(let emote): html = emote.formatted?.body
+            default: break
+            }
+            return ChatKitText.preview?(message.body, html) ?? message.body
         case .sticker(let body, _, _): return body
         case .poll(let question, _, _, _, _, _, _): return question
         default: return ""
@@ -408,7 +492,8 @@ struct ChatThreadRow: View {
 
     /// The server's count once fetched; the SDK's thread list count can be off.
     private var replies: Int {
-        activity.thread(roomID: entry.roomID, rootEventID: entry.rootEventID)?.serverReplies ?? entry.replies
+        let thread = activity.thread(roomID: entry.roomID, rootEventID: entry.rootEventID)
+        return ChatThreadCount.replies(server: thread?.serverReplies, timeline: entry.replies, repliers: thread?.repliers.count ?? 0)
     }
 
     private var style: ChatKitStyle { ChatKitStyle.current }

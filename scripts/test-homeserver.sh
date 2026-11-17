@@ -150,6 +150,9 @@ send "$blog" a2 "{\"msgtype\":\"m.text\",\"body\":\"Erste Antwort\",\"m.relates_
 # The same set in the article's thread (Tests/UITests/RichMessagesUITests.swift).
 python3 "$here/scripts/test-rich-messages.py" "$url" "$writer" "$blog" "$root"
 curl -fs -X POST "$url/_matrix/client/v3/logout" -H "Authorization: Bearer $token" >/dev/null
+# A server admin who reads the reports Synapse received (Tests/UITests: "Melden" reaches the server).
+moderator_password="$(openssl rand -hex 16)"
+run register_new_matrix_user -c homeserver.yaml -u moderator -p "$moderator_password" --admin "$url" >/dev/null
 
 cat > "$here/build/test-homeserver.env" <<EOF
 IPHONEBLOG_TEST_HOMESERVER=$url
@@ -159,12 +162,16 @@ IPHONEBLOG_TEST_USER2=anna
 IPHONEBLOG_TEST_USER3=ben
 IPHONEBLOG_TEST_PASSWORD3=$ben_password
 IPHONEBLOG_TEST_PASSWORD2=$reader_password
+IPHONEBLOG_TEST_ADMIN=moderator
+IPHONEBLOG_TEST_ADMIN_PASSWORD=$moderator_password
 IPHONEBLOG_TEST_ROOMS='$(IFS=,; echo "${rooms[*]}")'
 IPHONEBLOG_TEST_MENTION_ROOM=Allgemein
 IPHONEBLOG_ONE_ALIAS=#one:localhost
 IPHONEBLOG_BLOG_ALIAS=#blog:localhost
 IPHONEBLOG_CHANNEL_ALIAS=#allgemein:localhost
 IPHONEBLOG_TEST_CHANNEL_ROOM=$allgemein
+IPHONEBLOG_TEST_ROOM2=$raum2
+IPHONEBLOG_TEST_BLOG_ROOM=$blog
 IPHONEBLOG_TEST_CHANNEL_THREAD='$hello'
 IPHONEBLOG_TEST_ARTICLE_ROOT='$root'
 EOF

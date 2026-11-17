@@ -1,5 +1,7 @@
 import Foundation
 import MetricKit
+import os
+import StoreKit
 import UIKit
 
 /// The numbers a real iPhone measures, sent home once a day (docs/performance.md).
@@ -15,8 +17,23 @@ import UIKit
 /// error (AuthGuard: outcome, the path's shape with IDs blanked, the errcode, the number of
 /// checks). No message, no room, no user ID, no call stack.
 /// The request carries no cookie and no token.
+///
+/// **TestFlight only (GDPR, Thorsten 2026-11-17).** An App Store build sends nothing. The same
+/// binary goes from TestFlight to the App Store unchanged, so a build setting cannot tell them
+/// apart: StoreKit's AppTransaction says where this copy came from, and only `.sandbox`
+/// (TestFlight) and `.xcode` report. Unknown, unverifiable or `.production`: off.
+/// scripts/check-release-clean.sh fails a build without this gate ("rum-gate-v1").
 final class MetricsReporter: NSObject, MXMetricManagerSubscriber, @unchecked Sendable {
     static let shared = MetricsReporter()
+
+    /// Whether this copy may report. Off until StoreKit has answered.
+    private let allowed = OSAllocatedUnfairLock(initialState: false)
+    static let gateMarker = "rum-gate-v1"
+
+    /// The rule: TestFlight and Xcode builds report, the App Store never, and unknown never.
+    static func mayReport(_ environment: AppStore.Environment?) -> Bool {
+        environment == .sandbox || environment == .xcode
+    }
 
     private let session: URLSession = {
         let config = URLSessionConfiguration.ephemeral
@@ -40,6 +57,24 @@ final class MetricsReporter: NSObject, MXMetricManagerSubscriber, @unchecked Sen
     @MainActor
     func start() {
         maxFPS = UIScreen.main.maximumFramesPerSecond
+        Task { @MainActor in
+            let transaction = try? await AppTransaction.shared
+            let environment: AppStore.Environment? = switch transaction {
+            case .verified(let app)?: app.environment
+            default: nil
+            }
+            // The marker string stays in the binary through this log line; the release check looks for it.
+            guard Self.mayReport(environment) else {
+                Logger(subsystem: Brand.bundleID, category: "metrics").info("\(Self.gateMarker, privacy: .public): off in this build")
+                return
+            }
+            allowed.withLock { $0 = true }
+            startReporting()
+        }
+    }
+
+    @MainActor
+    private func startReporting() {
         MXMetricManager.shared.add(self)
         // **Once per build: the screen's frame rate**, so the first report proves 120 Hz on a
         // ProMotion iPhone the day a tester installs the build, before MetricKit's first payload.
@@ -138,7 +173,7 @@ final class MetricsReporter: NSObject, MXMetricManagerSubscriber, @unchecked Sen
     }
 
     private func send(_ fields: [String: String]) {
-        guard let endpoint, var parts = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else { return }
+        guard allowed.withLock({ $0 }), let endpoint, var parts = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else { return }
         var all = fields
         all["src"] = "ios"
         all["v"] = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"

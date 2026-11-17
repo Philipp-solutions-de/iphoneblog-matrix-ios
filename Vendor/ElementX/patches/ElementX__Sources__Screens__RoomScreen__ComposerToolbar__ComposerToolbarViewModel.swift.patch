@@ -1,0 +1,32 @@
+--- a/ElementX/Sources/Screens/RoomScreen/ComposerToolbar/ComposerToolbarViewModel.swift
++++ b/ElementX/Sources/Screens/RoomScreen/ComposerToolbar/ComposerToolbarViewModel.swift
+@@ -58,6 +58,8 @@
+     }
+     
+     private var replyLoadingTask: Task<Void, Never>?
++    /// iphoneblog: the writer said "Trotzdem senden" (ChatContactWarning).
++    private var contactWarningConfirmed = false
+     
+     init(initialText: String? = nil,
+          roomProxy: JoinedRoomProxyProtocol,
+@@ -200,6 +202,20 @@
+             saveDraft()
+         case .sendMessage:
+             guard !state.sendButtonDisabled else { return }
++            
++            // iphoneblog: ask before an email address or phone number goes to the whole room.
++            if !contactWarningConfirmed, !state.isVoiceMessageModeActivated {
++                let found = ChatContactWarning.contactData(in: currentContent.plain)
++                if !found.isEmpty {
++                    Task { [weak self] in
++                        guard await ChatContactWarning.confirm(found), let self else { return }
++                        contactWarningConfirmed = true
++                        process(viewAction: .sendMessage)
++                        contactWarningConfirmed = false
++                    }
++                    return
++                }
++            }
+             
+             switch state.composerMode {
+             case .previewVoiceMessage:

@@ -134,6 +134,24 @@ and refusals counted before it, never count. The app restores its session once p
 second restore after iOS rebuilt the scene ran two clients that refreshed the same token 45 ms
 apart, which MAS treats as reuse and answers by revoking the session (Alex's logouts,
 2026-11-17).
+**Mentions turn read when seen, "read up to here".** Opening a mention's thread or room marks
+it read, without "Alle als gelesen": the timeline sends a read receipt for the newest message
+on screen (Element X), and every mention up to it counts as read, in rooms and in threads
+(Thorsten's decision A, 2026-11-17, as Element and the web chat do). Read or not comes from the
+account's own receipts (`MentionsModel.withReadState`): a receipt of the mention's thread, or of
+the room's timeline for a room message, or an unthreaded one, at an event no older than it.
+Synapse's own `read` flag in /notifications is not used: it takes one receipt row per room,
+whichever the database returns last, of any thread. "Alle als gelesen" sends one receipt per
+thread and per room timeline on the newest listed mention, says when one fails, and reloads.
+
+**Contact details go by mail, not into the chat.** A tap on a name, an avatar or a mention
+opens the person's profile; a long press on a name or avatar opens "Kontaktdaten teilen" at
+once. Members choose their email address (the blog account's, held by the server) and/or a phone
+number typed each time, see who gets it and a warning, and confirm by name; the chat server
+mails the recipient (`ContactShare`; contract in infra's docs/matrix.md, "Sharing contact
+details"). Not offered with oneself or the room bot. A message with an email address or a
+phone number asks first (`ChatContactWarning`); the server stores email addresses in messages
+masked.
 
 **Message links on our own domain.** "Link kopieren" copies
 `https://chat.iphoneblog.de/#/<room>/$<event>`, where `<room>` is the room alias's localpart

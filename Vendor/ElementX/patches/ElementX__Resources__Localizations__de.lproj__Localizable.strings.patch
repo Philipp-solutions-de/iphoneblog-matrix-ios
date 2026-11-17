@@ -18,3 +18,12 @@
  "action_report_dm" = "Chat melden";
  "action_report_room" = "Chat melden";
  "action_reset" = "Zurücksetzen";
+@@ -669,7 +669,7 @@
+ "screen_bottom_sheet_manage_room_member_kick_member_confirmation_description" = "Die Nutzer können dem Chat wieder beitreten, wenn sie eingeladen werden.";
+ "screen_bottom_sheet_manage_room_member_kick_member_confirmation_title" = "Möchtest du dieses Mitglied wirklich entfernen?";
+ "screen_bottom_sheet_manage_room_member_kick_member_from_space_confirmation_description" = "Diese Person kann dem Space wieder beitreten, wenn sie eingeladen wird. Ihre Mitgliedschaft in allen Chats und untergeordneten Spaces bleibt bestehen.";
+-"screen_bottom_sheet_manage_room_member_member_user_info" = "Nutzerprofil anzeigen";
++"screen_bottom_sheet_manage_room_member_member_user_info" = "Profil ansehen";
+ "screen_bottom_sheet_manage_room_member_remove" = "Mitglied entfernen";
+ "screen_bottom_sheet_manage_room_member_remove_confirmation_title" = "Mitglied entfernen und für die Zukunft sperren?";
+ "screen_bottom_sheet_manage_room_member_removing_user" = "%1$@ wird entfernt.";

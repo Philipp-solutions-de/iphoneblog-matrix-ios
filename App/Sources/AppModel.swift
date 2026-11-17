@@ -182,6 +182,7 @@ final class AppModel: ObservableObject {
         store.delete()
         pendingClient = nil
         router.reset()
+        AvatarStore.shared.reset()
         state = .signedOut
     }
 
@@ -199,6 +200,7 @@ final class AppModel: ObservableObject {
         store.delete()
         pendingClient = nil
         router.reset()
+        AvatarStore.shared.reset()
         state = .signedOut
         router.notice = String(localized: "Du wurdest abgemeldet. Bitte melde dich wieder an.")
         await PushCenter.shared.detach()

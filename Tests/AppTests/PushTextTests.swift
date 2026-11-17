@@ -26,4 +26,13 @@ final class PushTextTests: XCTestCase {
         XCTAssertEqual(PushText.title(room: "Fotos", inThread: false), "#Fotos")
         XCTAssertEqual(PushText.title(room: "#one-Chat", inThread: true), "#one-Chat · Thread")
     }
+
+    /// Alex's message in #bugs (2026-11-17), from the iOS build before #30: the pill as markdown
+    /// in body, a correct formatted_body. Either way the preview reads "@Kyrios".
+    func testAlexsMentionReadsAsAName() {
+        let body = "[Kyrios](https://matrix.to/#/@kyrios:iphoneblog.de) Wir könnten das so machen"
+        let html = #"<a href="https://matrix.to/#/@kyrios:iphoneblog.de">Kyrios</a> Wir könnten das so machen"#
+        XCTAssertEqual(PushText.plain(body: body), "@Kyrios Wir könnten das so machen")
+        XCTAssertEqual(PushText.plain(body: body, formattedBody: html), "@Kyrios Wir könnten das so machen")
+    }
 }
