@@ -41,7 +41,7 @@ final class MentionOpenUITests: XCTestCase {
         save(app, "mention-thread-room2")
 
         // The timeline message: its room opens at that message.
-        app.tabBars.buttons["@Mentions"].tap()
+        app.tabBars.buttons["Für dich"].tap()
         let roomRow = row(app, "Zweiter Raum Zeitleiste \(stamp)")
         XCTAssertTrue(roomRow.waitForExistence(timeout: 30), "the room mention is not in @Mentions")
         roomRow.tap()

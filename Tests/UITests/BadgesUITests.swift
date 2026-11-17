@@ -31,7 +31,7 @@ final class BadgesUITests: XCTestCase {
         // iOS 26's tab bar draws badges but does not expose them to accessibility, so the count
         // itself is checked in the sign-in test (Router.mentionsBadge, chatBadge); here the
         // screenshot keeps the badges, and @Mentions must list the mention as unread.
-        let mentionsTab = app.tabBars.buttons["@Mentions"]
+        let mentionsTab = app.tabBars.buttons["Für dich"]
         XCTAssertTrue(mentionsTab.waitForExistence(timeout: 120), "not signed in")
         sleep(15) // membership, the room list and @Mentions load
         let badges = XCTAttachment(screenshot: app.screenshot())
@@ -64,7 +64,7 @@ final class BadgesUITests: XCTestCase {
         ]
         app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE"]
         app.launch()
-        let button = app.buttons["mentions.markAllRead"]
+        let button = app.buttons["foryou.markAllRead"]
         XCTAssertTrue(button.waitForExistence(timeout: 120), "no Alle als gelesen with an unread mention")
         button.tap()
         let unread = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'ungelesen'")).firstMatch

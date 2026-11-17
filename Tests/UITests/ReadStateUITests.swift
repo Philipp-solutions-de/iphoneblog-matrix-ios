@@ -28,7 +28,7 @@ final class ReadStateUITests: XCTestCase {
         row.tap()
         XCTAssertTrue(app.staticTexts["Thread"].waitForExistence(timeout: 30), "the thread did not open")
         sleep(2)
-        app.tabBars.buttons["@Mentions"].tap()
+        app.tabBars.buttons["Für dich"].tap()
         XCTAssertTrue(waitUntilRead(row), "the row is still unread after reading the thread")
         XCTAssertTrue(waitForBadge(app, atMost: before - 1), "the badge did not drop")
         XCTAssertTrue(try waitForReceipts(me, mention, thread: root), "no receipt of this account covers it (the web would show it unread)")
@@ -61,7 +61,7 @@ final class ReadStateUITests: XCTestCase {
         row.tap()
         XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 30), "the room did not open")
         sleep(2) // longer than the dwell
-        app.tabBars.buttons["@Mentions"].tap()
+        app.tabBars.buttons["Für dich"].tap()
         XCTAssertTrue(waitUntilRead(row), "the row is still unread after reading it in the room")
         XCTAssertTrue(waitForBadge(app, atMost: before - 1), "the badge did not drop")
         XCTAssertTrue(try waitForReceipts(me, mention, thread: nil), "no receipt of this account covers it (the web would show it unread)")
@@ -95,7 +95,7 @@ final class ReadStateUITests: XCTestCase {
         try me.readReceipt(inRoom, in: room, thread: nil)
         // Sync brings it; the list reloads whenever it is shown.
         app.tabBars.buttons["Ich"].tap()
-        app.tabBars.buttons["@Mentions"].tap()
+        app.tabBars.buttons["Für dich"].tap()
         XCTAssertTrue(waitUntilRead(threadRow), "a thread read elsewhere is still unread here")
         XCTAssertTrue(waitUntilRead(roomRow), "a room mention read elsewhere is still unread here")
     }
@@ -113,7 +113,7 @@ final class ReadStateUITests: XCTestCase {
         sleep(1)
         let mention = try other.send("Danach \(stamp)", in: room, mention: me.userID)
         sleep(5) // sync brings it; the room's timeline is not on screen
-        app.tabBars.buttons["@Mentions"].tap()
+        app.tabBars.buttons["Für dich"].tap()
         let row = self.row(app, "Danach \(stamp)")
         XCTAssertTrue(row.waitForExistence(timeout: 30), "the mention is not in @Mentions")
         sleep(2)
@@ -174,7 +174,7 @@ final class ReadStateUITests: XCTestCase {
         let threadRow = row(app, "Alle Thread \(stamp)")
         XCTAssertTrue(threadRow.waitForExistence(timeout: 120), "the mentions are not listed")
         sleep(3)
-        let button = app.buttons["mentions.markAllRead"]
+        let button = app.buttons["foryou.markAllRead"]
         XCTAssertTrue(button.waitForExistence(timeout: 10), "no Alle als gelesen")
         button.tap()
         let anyUnread = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'ungelesen'")).firstMatch
@@ -232,8 +232,8 @@ final class ReadStateUITests: XCTestCase {
 
     private func mentionsBadge(_ app: XCUIApplication) -> Int? {
         let label = app.descendants(matching: .any)["debug.badges"].label
-        guard let part = label.split(separator: " ").first(where: { $0.hasPrefix("mentions=") }) else { return nil }
-        return Int(part.dropFirst("mentions=".count))
+        guard let part = label.split(separator: " ").first(where: { $0.hasPrefix("foryou=") }) else { return nil }
+        return Int(part.dropFirst("foryou=".count))
     }
 
     private func waitForBadge(_ app: XCUIApplication, atMost value: Int) -> Bool {

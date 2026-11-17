@@ -11,7 +11,7 @@ final class RouterTests: XCTestCase {
     /// A thread opens over its room in #one-Chat, from any tab, so back leads into the room.
     func testOpenThreadPutsItOverItsRoom() {
         let router = Router()
-        router.tab = .mentions
+        router.tab = .forYou
         router.openThread(roomID: "!a", rootEventID: "$root")
         XCTAssertEqual(router.tab, .chat)
         XCTAssertEqual(router.chatPath, [.room("!a"), .thread(Router.ThreadRoute(roomID: "!a", rootEventID: "$root"))])
@@ -41,7 +41,7 @@ final class RouterTests: XCTestCase {
     func testBlogThreadOpensInBlogTab() {
         let router = Router()
         router.blogRoomID = "!blog"
-        router.tab = .mentions
+        router.tab = .forYou
         router.openThread(roomID: "!blog", rootEventID: "$article")
         XCTAssertEqual(router.tab, .blog)
         XCTAssertEqual(router.blogPath, [.thread(rootEventID: "$article")])

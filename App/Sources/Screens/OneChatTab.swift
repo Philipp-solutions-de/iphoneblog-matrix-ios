@@ -180,12 +180,12 @@ private struct OneRoomsList: View {
             }
         }
         .background(Theme.background)
-        .navigationTitle("#one-Chat")
+        .navigationTitle("#one")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { router.openSearch(in: session.oneRooms.map(\.id)) } label: { Image(systemName: "magnifyingglass") }
-                    .accessibilityLabel("In #one-Chat suchen")
+                    .accessibilityLabel("In #one suchen")
                     .accessibilityIdentifier("chat-search")
             }
         }

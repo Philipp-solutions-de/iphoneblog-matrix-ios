@@ -31,18 +31,18 @@ struct MainView: View {
                 .tabItem { Label("Blog", systemImage: "doc.richtext") }
                 .tag(Router.Tab.blog)
 
-            // #one-Chat for everyone: the rooms for members, otherwise sign-in or "Nur für
-            // #one-Mitglieder". @Mentions and Ich for members only (Thorsten, 2026-11-16).
+            // #one for everyone: the rooms for members, otherwise sign-in or "Nur für
+            // #one-Mitglieder". Für dich and Ich for members only (Thorsten, 2026-11-16/17).
             OneChatGate(router: router, session: session)
-                .tabItem { Label("#one-Chat", systemImage: "number") }
+                .tabItem { Label("#one", systemImage: "number") }
                 .tag(Router.Tab.chat)
                 .badge(router.chatBadge)
 
             if let session, router.isMember {
-                MentionsView(session: session, mentions: session.mentions, router: router)
-                    .tabItem { Label("@Mentions", systemImage: "at") }
-                    .tag(Router.Tab.mentions)
-                    .badge(router.mentionsBadge)
+                ForYouView(session: session, model: session.forYou, router: router)
+                    .tabItem { Label("Für dich", systemImage: "bell") }
+                    .tag(Router.Tab.forYou)
+                    .badge(router.forYouBadge)
 
                 MeView(session: session, prefs: session.notificationPrefs, router: router)
                     .tabItem { Label("Ich", systemImage: "person") }
@@ -59,7 +59,7 @@ struct MainView: View {
             }
         }
         .onChange(of: session == nil) { _, signedOut in
-            if signedOut, router.tab == .mentions { router.tab = .blog }
+            if signedOut, router.tab == .forYou { router.tab = .blog }
         }
         // A chat link tapped anywhere in the app (a message, the blog) opens in the app, not in
         // Safari; anything else as before.
@@ -99,7 +99,7 @@ struct MainView: View {
         // (IPHONEBLOG_EXPOSE_BADGES=1; debug builds only).
         .overlay(alignment: .topLeading) {
             if ProcessInfo.processInfo.environment["IPHONEBLOG_EXPOSE_BADGES"] == "1" {
-                Text("mentions=\(router.mentionsBadge) chat=\(router.chatBadge)")
+                Text("foryou=\(router.forYouBadge) chat=\(router.chatBadge)")
                     .font(.system(size: 1)).opacity(0.02)
                     .accessibilityIdentifier("debug.badges")
             }

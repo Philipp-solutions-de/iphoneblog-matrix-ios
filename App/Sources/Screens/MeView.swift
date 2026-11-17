@@ -34,7 +34,7 @@ struct MeView: View {
                     // default; "Alle" pushes every message there, "Aus" not even mentions.
                     if session.isOneMember {
                         ForEach(session.oneRooms) { room in
-                            SettingsRow(label: "#one-Chat · \(room.name)") {
+                            SettingsRow(label: "#one · \(room.name)") {
                                 Menu {
                                     Picker(room.name, selection: Binding(get: { prefs.roomModes[room.id] ?? .mentions },
                                                                          set: { prefs.setMode($0, roomID: room.id) })) {

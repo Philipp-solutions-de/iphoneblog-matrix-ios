@@ -161,7 +161,7 @@ struct ChatSearchView: View {
         }
         .listStyle(.plain)
         .overlay { emptyState }
-        .searchable(text: $term, placement: .navigationBarDrawer(displayMode: .always), prompt: "In #one-Chat suchen")
+        .searchable(text: $term, placement: .navigationBarDrawer(displayMode: .always), prompt: "In #one suchen")
         .onChange(of: term) { _, new in model.search(new) }
         .navigationTitle("Suche")
         .navigationBarTitleDisplayMode(.inline)

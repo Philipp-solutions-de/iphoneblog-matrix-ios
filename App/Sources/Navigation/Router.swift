@@ -4,7 +4,7 @@ import Foundation
 /// One per app, signed in or not; the signed-in session borrows it.
 @MainActor
 final class Router: ObservableObject {
-    enum Tab: Hashable { case blog, chat, mentions, me }
+    enum Tab: Hashable { case blog, chat, forYou, me }
 
     struct ThreadRoute: Hashable {
         let roomID: String
@@ -57,12 +57,12 @@ final class Router: ObservableObject {
     /// The tab badges: #one-Chat's unread messages and unread @Mentions. ChatSession keeps them
     /// current; MainView observes only the router, so they live here.
     @Published var chatBadge = 0
-    @Published var mentionsBadge = 0
+    @Published var forYouBadge = 0
     /// A #one member: only members see #one-Chat and @Mentions (Thorsten, 2026-11-16). Set by
     /// ChatSession whenever membership changes, so the tabs follow without a restart.
     @Published var isMember = false {
         didSet {
-            if !isMember, tab == .mentions || tab == .me { tab = .chat }
+            if !isMember, tab == .forYou || tab == .me { tab = .chat }
         }
     }
 
@@ -86,12 +86,12 @@ final class Router: ObservableObject {
         #endif
     }
 
-    /// Blog, except in debug screenshot runs (IPHONEBLOG_START_TAB=blog|chat|mentions|me).
+    /// Blog, except in debug screenshot runs (IPHONEBLOG_START_TAB=blog|chat|foryou|me).
     private static var startTab: Tab {
         #if DEBUG
         switch ProcessInfo.processInfo.environment["IPHONEBLOG_START_TAB"] {
         case "chat": return .chat
-        case "mentions": return .mentions
+        case "mentions", "foryou": return .forYou
         case "me": return .me
         default: return .blog
         }
@@ -111,6 +111,20 @@ final class Router: ObservableObject {
     }
 
     func openThreadsList() { chatPath.append(.threads) }
+
+    /// Where a mention was said, from @Mentions and "Für dich" alike: a thread reply opens its
+    /// thread, an article's discussion the Blog tab, a room message the room scrolled to it.
+    func open(_ mention: MentionsModel.Mention) {
+        switch mention.place {
+        case .channel(let roomID, let root?, _):
+            openThread(roomID: roomID, rootEventID: root)
+        case .channel(let roomID, nil, _), .room(let roomID, _):
+            openMessage(roomID: roomID, eventID: mention.id)
+        case .discussion(let root, _):
+            tab = .blog
+            blogPath = [.thread(rootEventID: root)]
+        }
+    }
 
     /// The timeline the reader sees: the top of the visible tab's stack. Only it sends read
     /// receipts ("read up to here" must not reach messages nobody had on screen).
@@ -172,7 +186,7 @@ final class Router: ObservableObject {
         blogPath = []
         blogRoomID = nil
         chatBadge = 0
-        mentionsBadge = 0
+        forYouBadge = 0
         isMember = false
         moderation = nil
         profile = nil

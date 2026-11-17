@@ -1,7 +1,6 @@
 import XCTest
 
-/// Search in #one-Chat (Synapse's server-side search) and the filter in @Mentions, against the
-/// test homeserver's seeded messages.
+/// Search in #one (Synapse's server-side search), against the test homeserver's seeded messages.
 final class SearchUITests: XCTestCase {
     private var env: [String: String] { ProcessInfo.processInfo.environment }
 
@@ -72,19 +71,6 @@ final class SearchUITests: XCTestCase {
         app.searchFields.firstMatch.typeText("Quasselstrippe")
         XCTAssertTrue(app.staticTexts["Keine Treffer"].waitForExistence(timeout: 30))
         attach(app, "search-empty")
-    }
-
-    func testMentionsFilter() throws {
-        let app = try launch(tab: "mentions")
-        let field = app.textFields["mentions-search"]
-        XCTAssertTrue(field.waitForExistence(timeout: 120), "no filter field in @Mentions")
-        field.tap()
-        field.typeText("schau")
-        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'schau mal'")).firstMatch
-            .waitForExistence(timeout: 10), "the mention was filtered out")
-        attach(app, "mentions-filter")
-        field.typeText("zzz")
-        XCTAssertTrue(app.staticTexts["Keine Treffer"].waitForExistence(timeout: 5))
     }
 
     private func attach(_ app: XCUIApplication, _ name: String) {
