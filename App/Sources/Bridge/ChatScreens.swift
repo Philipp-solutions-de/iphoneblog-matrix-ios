@@ -32,6 +32,8 @@ protocol ChatHost: AnyObject {
     func openURL(_ url: URL)
     /// Shows a short notice (sent, copied, failed) the app's way.
     func showMessage(_ text: String)
+    /// Asks why, then reports the message to the moderators (App/Sources/Moderation).
+    func reportMessage(roomID: String, eventID: String)
     /// A timeline showed the reader up to `eventID` (in a thread when `threadRootEventID` is set)
     /// and sent its read receipt.
     func didSee(roomID: String, threadRootEventID: String?, eventID: String)

@@ -71,6 +71,9 @@ struct MainView: View {
         .sheet(item: $router.profile) { person in
             if let session { ProfileSheet(person: person, session: session, router: router) }
         }
+        .sheet(item: $router.moderation) { request in
+            if let session { ModerationSheet(request: request, session: session) }
+        }
         .sheet(isPresented: $router.showSignIn) {
             SignInView()
                 .environmentObject(model)

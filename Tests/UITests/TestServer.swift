@@ -10,11 +10,14 @@ struct TestServer {
 
     private static var env: [String: String] { ProcessInfo.processInfo.environment }
 
-    /// Signs in as IPHONEBLOG_TEST_USER (1), _USER2 (2) or _USER3 (3); skips without a server.
+    /// Signs in as IPHONEBLOG_TEST_USER (1), _USER2 (2) or _USER3 (3), or the server admin
+    /// (IPHONEBLOG_TEST_ADMIN, number 0); skips without a server.
     static func signIn(_ number: Int) throws -> TestServer {
         let suffix = number == 1 ? "" : "\(number)"
-        guard let base = env["IPHONEBLOG_TEST_HOMESERVER"], let user = env["IPHONEBLOG_TEST_USER\(suffix)"],
-              let password = env["IPHONEBLOG_TEST_PASSWORD\(suffix)"] else {
+        let userKey = number == 0 ? "IPHONEBLOG_TEST_ADMIN" : "IPHONEBLOG_TEST_USER\(suffix)"
+        let passwordKey = number == 0 ? "IPHONEBLOG_TEST_ADMIN_PASSWORD" : "IPHONEBLOG_TEST_PASSWORD\(suffix)"
+        guard let base = env["IPHONEBLOG_TEST_HOMESERVER"], let user = env[userKey],
+              let password = env[passwordKey] else {
             throw XCTSkip("no test homeserver configured")
         }
         let login = try call(base, "/_matrix/client/v3/login", method: "POST", token: nil, body: [
@@ -92,6 +95,16 @@ struct TestServer {
         let result = try Self.call(base, "/_matrix/client/v3/user/\(Self.encode(userID))/account_data/\(type)", method: "GET",
                                    token: token, body: nil)
         return result["errcode"] == nil ? result : nil
+    }
+
+    /// Server admin only: the reasons of the newest event reports and user reports Synapse holds.
+    func reportReasons() throws -> (events: [String], users: [String]) {
+        let events = try Self.call(base, "/_synapse/admin/v1/event_reports?dir=b&limit=50", method: "GET", token: token, body: nil)
+        let users = try Self.call(base, "/_synapse/admin/v1/user_reports?dir=b&limit=50", method: "GET", token: token, body: nil)
+        func reasons(_ page: [String: Any]) -> [String] {
+            (page["event_reports"] as? [[String: Any]] ?? page["user_reports"] as? [[String: Any]] ?? []).compactMap { $0["reason"] as? String }
+        }
+        return (reasons(events), reasons(users))
     }
 
     func signOut() {

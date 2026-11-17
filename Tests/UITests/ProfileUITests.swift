@@ -56,13 +56,23 @@ final class ProfileUITests: XCTestCase {
         XCTAssertTrue(app.buttons["profile.report"].exists, "no Melden")
         save(app, "profile-from-timeline")
 
-        // Melden reaches the server (the report endpoint answers).
+        // Melden: the shared report sheet; the report is on the server.
+        let admin = try TestServer.signIn(0)
+        defer { admin.signOut() }
         app.buttons["profile.report"].tap()
-        let alert = app.alerts.firstMatch
-        XCTAssertTrue(alert.waitForExistence(timeout: 10), "no report dialog")
-        alert.textFields.firstMatch.typeText("UI-Test")
-        alert.buttons.matching(NSPredicate(format: "label == %@", "Melden")).firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["Danke. Das Team sieht sich die Meldung an."].waitForExistence(timeout: 15), "the report failed")
+        let send = app.buttons["report.send"]
+        XCTAssertTrue(send.waitForExistence(timeout: 10), "no report sheet")
+        let note = app.textFields["report.note"].exists ? app.textFields["report.note"] : app.textViews["report.note"]
+        note.tap()
+        note.typeText("Profiltest \(stamp)")
+        send.tap()
+        XCTAssertTrue(app.staticTexts["Danke. Die Moderation schaut es sich an."].waitForExistence(timeout: 20), "the report failed")
+        var users: [String] = []
+        for _ in 0..<10 where !users.contains(where: { $0.contains("Profiltest \(stamp)") }) {
+            users = try admin.reportReasons().users
+            if !users.contains(where: { $0.contains("Profiltest \(stamp)") }) { sleep(1) }
+        }
+        XCTAssertTrue(users.contains { $0.contains("Profiltest \(stamp)") }, "the server has no report about the person")
     }
 
     private func save(_ app: XCUIApplication, _ name: String) {

@@ -85,4 +85,5 @@ private final class HostAdapter: ChatKitHost {
     func openUser(userID: String) { host?.openUser(userID: userID) }
     func openURL(_ url: URL) { host?.openURL(url) }
     func showMessage(_ text: String) { host?.showMessage(text) }
+    func reportMessage(roomID: String, eventID: String) { host?.reportMessage(roomID: roomID, eventID: eventID) }
 }

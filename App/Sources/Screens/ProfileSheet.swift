@@ -17,7 +17,7 @@ struct ProfileSheet: View {
     @State private var blocked = false
     @State private var confirmBlock = false
     @State private var reporting = false
-    @State private var reason = ""
+    private var moderation: SessionModeration { SessionModeration(session: session) }
     /// Members only, and only with another person (not oneself, not the room bot).
     private var canShare: Bool { router.isMember && ContactShare.canShare(with: person.userID, me: session.userID) }
 
@@ -84,15 +84,13 @@ struct ProfileSheet: View {
             Text("Du siehst keine Nachrichten von \(displayName) mehr. \(displayName) erfährt davon nichts. "
                  + "Unter dem Profil hebst du es wieder auf.")
         }
-        .alert("\(displayName) melden", isPresented: $reporting) {
-            TextField("Was ist passiert?", text: $reason)
-            Button("Abbrechen", role: .cancel) { reason = "" }
-            Button("Melden", role: .destructive) { Task { await report() } }
-        } message: {
-            Text("Das Team sieht die Meldung und prüft sie. \(displayName) erfährt nicht, wer gemeldet hat.")
+        .sheet(isPresented: $reporting) {
+            ReportSheet(subject: .user(userID: person.userID, name: displayName), backend: moderation) {
+                router.notice = $0
+            }
         }
         .task {
-            if isOther { blocked = await session.isBlocked(person.userID) }
+            if isOther { blocked = (try? await moderation.ignoredUsers())?.contains(person.userID) ?? false }
             if person.shareNow, canShare { path = ["share"] }
             name = try? await session.client.getProfile(userId: person.userID).displayName
         }
@@ -100,22 +98,11 @@ struct ProfileSheet: View {
 
     private func setBlocked(_ on: Bool) async {
         do {
-            try await session.setBlocked(person.userID, on)
+            if on { try await moderation.ignore(userID: person.userID) } else { try await moderation.unignore(userID: person.userID) }
             blocked = on
             router.notice = on ? "\(displayName) ist blockiert." : "Blockierung von \(displayName) aufgehoben."
         } catch {
             router.notice = "Das hat nicht geklappt. Versuch es noch einmal."
-        }
-    }
-
-    private func report() async {
-        let text = reason.trimmingCharacters(in: .whitespacesAndNewlines)
-        reason = ""
-        do {
-            try await session.reportUser(person.userID, reason: text)
-            router.notice = "Danke. Das Team sieht sich die Meldung an."
-        } catch {
-            router.notice = "Die Meldung ging nicht raus. Versuch es später noch einmal."
         }
     }
 }

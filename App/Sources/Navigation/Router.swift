@@ -49,6 +49,8 @@ final class Router: ObservableObject {
         var id: String { userID }
     }
     @Published var profile: Person?
+    /// A report from the conversation views (App/Sources/Moderation).
+    @Published var moderation: ModerationRequest?
     @Published var notice: String?
     /// The sign-in sheet, offered where reading ends and writing would start.
     @Published var showSignIn = false
@@ -138,5 +140,7 @@ final class Router: ObservableObject {
         chatBadge = 0
         mentionsBadge = 0
         isMember = false
+        moderation = nil
+        profile = nil
     }
 }
