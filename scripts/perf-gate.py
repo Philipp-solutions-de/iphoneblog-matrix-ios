@@ -4,20 +4,21 @@
     scripts/perf-gate.py build/perf.xcresult [--write-baseline]
 
 Reads the numbers the performance tests measured (from build/perf.log, the lines xcodebuild
-prints as "measured [<metric>, <unit>] average: …, values: [...]"), takes each metric's median,
-and fails when:
+prints as "measured [<metric>, <unit>] average: …, values: [...]"). Of each metric it drops the
+first iteration (the warm-up) and takes the best of the rest: a shared runner only adds time.
+It fails when:
 
-- a metric is over its **budget** in scripts/perf-baseline.json ("budgets"; empty for the
-  simulator, whose hitches are its own and not a phone's: the budget is checked on a device), or
-- a gated metric is worse than its **baseline** by more than the relative tolerance *and* the
-  absolute slack, both in the same file. Two conditions, because a simulator on a shared runner
-  is noisy: 0.4 ms/s against a baseline of 0.2 is +100 % and means nothing. "per_test" gives
-  one test its own slack (a cold launch on a busy runner varies by seconds).
+- a metric is over its **budget** in scripts/perf-baseline.json ("budgets"; empty: the CI
+  simulator's hitches are its own, not a phone's), or
+- a gated metric is worse than its **baseline** by more than the relative tolerance (1.0: twice
+  the baseline) *and* the absolute slack, both in the same file; "per_test" can give one test
+  its own slack.
 
+A smoke test (docs/performance.md): it catches a screen that got twice as slow, not a frame.
 A test that did not run, a metric it did not report, a log without numbers and a file without
-baselines fail too: a gate that silently
-measures less is no gate. `--write-baseline` writes the medians as the new baselines and keeps
-budgets and tolerances. Writes a Markdown table to build/perf-report.md for the CI summary.
+baselines fail too: a gate that silently measures less is no gate. `--write-baseline` writes
+the bests as the new baselines and keeps budgets and tolerances. Writes a Markdown table to
+build/perf-report.md for the CI summary.
 Standard library only.
 """
 import json
@@ -45,7 +46,10 @@ def measured(log):
             test, metric, unit, values = m.groups()
             vals = [float(v) for v in values.split(",") if v.strip()]
             if vals:
-                out.setdefault(test, {})[metric] = {"median": statistics.median(vals), "unit": unit, "values": vals}
+                # The first iteration warms up (caches, the first layout) and is dropped; of the
+                # rest the best counts, because a shared runner only ever adds time, never takes it.
+                rest = vals[1:] or vals
+                out.setdefault(test, {})[metric] = {"best": min(rest), "unit": unit, "values": vals}
     return out
 
 
@@ -61,7 +65,7 @@ def main():
         for test, metrics in got.items():
             for metric in conf["gated"]:
                 if metric in metrics:
-                    conf["baselines"].setdefault(test, {})[metric] = round(metrics[metric]["median"], 4)
+                    conf["baselines"].setdefault(test, {})[metric] = round(metrics[metric]["best"], 4)
         with open(BASELINE, "w") as f:
             json.dump(conf, f, indent=2, ensure_ascii=False)
             f.write("\n")
@@ -72,7 +76,7 @@ def main():
         failures.append("no measured numbers in the log")
     if not conf["baselines"]:
         failures.append("no baselines: run scripts/perf.sh baseline and commit scripts/perf-baseline.json")
-    rows = ["| test | metric | median | baseline | budget | |", "|---|---|---:|---:|---:|---|"]
+    rows = ["| test | metric | best | baseline | budget | |", "|---|---|---:|---:|---:|---|"]
     for test, base in sorted(conf["baselines"].items()):
         if test not in got:
             failures.append(f"{test}: did not run or reported nothing")
@@ -85,7 +89,7 @@ def main():
                 failures.append(f"{test}: no {metric}")
                 rows.append(f"| {test} | {metric} | – | {baseline} | {budget or ''} | missing |")
                 continue
-            value = m["median"]
+            value = m["best"]
             tol = conf["tolerance"]
             slack = tol.get("per_test", {}).get(test, {}).get(metric, tol["absolute"].get(metric, 0))
             verdict = "ok"

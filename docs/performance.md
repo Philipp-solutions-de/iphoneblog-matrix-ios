@@ -1,14 +1,16 @@
 # Performance
 
-The app must scroll at 120 Hz on a ProMotion iPhone without hitches. The budget is in the
-WordPress repository, `docs/chat.md`, "Performance"; this page says how the numbers are
+The app must scroll smoothly at 60 Hz. Thorsten decided on 2026-11-18 that 60 Hz is enough:
+there is no 120 Hz requirement, no 120 Hz gate and no device runner. CI runs a smoke test only
+("The gate" below). MetricKit's numbers from testers are information, not a gate. The budget is
+in the WordPress repository, `docs/chat.md`, "Performance"; this page says how the numbers are
 measured, where they come from, and how to read them.
 
-## 120 Hz is on
+## 120 Hz is allowed, not required
 
 **`CADisableMinimumFrameDurationOnPhone` in Info.plist** (`project.yml`). Without it iOS caps
 every iPhone app at 60 Hz, whatever its views ask for; an iPad needs no key. UIKit's scroll
-views and SwiftUI's animations then run at up to 120 Hz on their own. The app has no
+views and SwiftUI's animations then run at up to 120 Hz on their own; nothing depends on it. The app has no
 `CADisplayLink` of its own apart from the readout below.
 
 **The readout.** A three-finger double tap anywhere shows a small box at the top right:
@@ -46,8 +48,10 @@ warm-up:
 
 **The data.** `scripts/perf.sh` starts its own Synapse (a copy of `scripts/test-homeserver.sh`
 on port 8048, `build/perf-synapse`), seeds it with `scripts/seed-perf-data.py`, and starts the
-blog fixture on 8796. Its own ports and simulator (`perf-iphone-pro`, whose keychain it resets
-each run), so it runs beside other test servers on a shared Mac.
+blog fixture on 8796. Its own ports and its own simulator, always the same model (`PERF_MODEL`,
+"iPhone 17 Pro", as `perf-iphone-17-pro`, whose keychain it resets each run): a missing model
+fails the run rather than measure on another one. So it runs beside other test servers on a
+shared Mac.
 
 **The configuration.** `Perf`: Release's optimisation with the DEBUG condition on the app
 target only, so the tests can point the app at the test server and sign in by themselves.
@@ -61,27 +65,28 @@ frames while a scroll view moves count, as in Apple's metric. It writes the tota
 after each iteration. Through a file, not the accessibility tree: reading the tree makes XCUITest
 snapshot the whole app on its main thread, the very thing being measured.
 
-**The gate.** `scripts/perf-gate.py` takes each metric's median and fails when it is worse than
-its baseline in `scripts/perf-baseline.json` by more than 50 % *and* the absolute slack there.
-A test that did not run, a metric it did not report, a log without numbers and a file without
-baselines fail too. The file can hold hard budgets per test; it holds none, because the
-simulator's hitches are its own.
+**The gate is a smoke test.** It catches a screen that got twice as slow, nothing finer.
+`scripts/perf-gate.py` drops each metric's first iteration (the warm-up: caches, the first
+layout) and takes the best of the other four, because a shared runner only ever adds time. It
+fails when that best is more than twice its baseline in `scripts/perf-baseline.json`
+(`tolerance.relative` 1.0) *and* over the absolute slack there. A test that did not run, a
+metric it did not report, a log without numbers and a file without baselines fail too. The file
+can hold hard budgets per test; it holds none, because the simulator's hitches are its own.
 
-**The baselines are CI's.** The `xcode-27` runner is about four times slower than a Mac Studio
-and noisier: a cold launch there takes 9 to 27 s, and one thread opening in five can take a
-minute. So the baselines are medians of a CI run, written from the `perf` artifact's
-`perf.log`. Five tests get their own slack (`per_test`): launch, gated on its clock time
-because the runner's simulator does not always report Apple's launch metric, 10 s; opening the
-thread, 7.6 s in one run and 12.1 s in the next with the same app, 8 s; the Blog's hitch ratio,
-4 to 417 ms/s within one run and medians of 15 to 90 ms/s from run to run with the same app
-(2026-11-17, ten runs), 100 ms/s, so on this runner it catches only a Blog several times slower; the chat's and the thread's hitch ratios, 92 to 245
-ms/s from run to run, 150 ms/s. A failed test runs once more (`-retry-tests-on-failure`), because
-the loaded runner's XCUITest now and then times out reading the screen. The gate on this runner catches a screen that gets
-twice as slow; the device run is what measures fluidity. The simulator also hides WebKit's
-content from XCUITest there, so the Blog test waits for the web view's scroll bar, not a word
-on the page. Xcode's
-own baselines are tied to one machine's id and cannot follow GitHub's runners. After a change
-that makes the app faster, write new baselines from that change's CI run, and commit the file:
+**Why no finer gate on CI.** The `xcode-27` runner is about four times slower than a Mac Studio
+and far noisier. Measured on 2026-11-17 over ten runs of the same app, best after the warm-up:
+the Blog's hitch ratio 4 to 34 ms/s from run to run (plain medians 15 to 90), the chat 137 to
+289, the thread 116 to 268. The Mac Studio's simulator gives Blog 0 to 4.7, chat 40 to 49 and a
+launch of 3.25 to 3.37 s. No threshold near a good run's number holds on that runner, and the
+simulator draws at 60 Hz anyway.
+
+**The baselines are CI's**: the median of the per-run bests of those ten runs, on the pinned
+model. A failed test runs once more (`-retry-tests-on-failure`), because the loaded runner's
+XCUITest now and then times out reading the screen. The simulator also hides WebKit's content
+from XCUITest there, so the Blog test waits for the web view's scroll bar, not a word on the
+page. Xcode's own baselines are tied to one machine's id and cannot follow GitHub's runners.
+After a change that makes the app faster, write new baselines from that change's CI run, and
+commit the file:
 
 ```bash
 gh run download <run id> -n perf -D build/ci && cp build/ci/perf.log build/perf.log
@@ -112,7 +117,7 @@ device's numbers are not CI's. Read them against the budget in the WordPress `do
 
 `xcrun devicectl list devices` finds the UDID. The device must be unlocked, with developer mode
 on. The iPad Pro (12.9-inch, 5th generation) is registered; the app is universal, so it runs
-there natively at 120 Hz, not in iPhone compatibility mode.
+there natively, not in iPhone compatibility mode.
 
 ## From testers
 
@@ -120,8 +125,7 @@ there natively at 120 Hz, not in iPhone compatibility mode.
 day, hangs as they happen. The app keeps a handful and sends them as the query string of one
 POST to `https://<the Blog tab's host>/rum`, which `edge` answers with 204 itself; the log line
 is the report (infra, `docs/monitoring.md`, the speed reports). Once per build it also sends the
-screen's frame rate, which is how a TestFlight build proves 120 Hz on a Pro iPhone the day it is
-installed.
+screen's frame rate. These numbers are information for reading, not a gate.
 
 **TestFlight only.** An App Store copy reports nothing (GDPR, Thorsten 2026-11-17). The same
 binary moves from TestFlight to the App Store unchanged, so the app asks StoreKit's

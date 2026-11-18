@@ -1,52 +1,35 @@
 {
-  "_comment": "docs/performance.md. baselines: medians of a CI run on the xcode-27 runner (scripts/perf-gate.py --write-baseline on its perf.log artifact); tolerance: how much worse than the baseline fails, relative AND absolute, per_test overrides the absolute slack. budgets: hard limits per test, none for the simulator.",
+  "_comment": "docs/performance.md. A CI smoke test, not a fluidity measure: each metric's best iteration after the warm-up, against a baseline (the median of those bests over ten CI runs of 2026-11-17 on the pinned iPhone 17 Pro simulator); it fails at twice the baseline (tolerance.relative 1.0) and the absolute slack.",
   "gated": [
     "Hitch time ratio",
     "Clock Monotonic Time"
   ],
   "budgets": {},
   "tolerance": {
-    "relative": 0.5,
+    "relative": 1.0,
     "absolute": {
       "Hitch time ratio": 1.0,
       "Clock Monotonic Time": 2.0
-    },
-    "per_test": {
-      "testLaunch": {
-        "Clock Monotonic Time": 10.0
-      },
-      "testOpenThread": {
-        "Clock Monotonic Time": 8.0
-      },
-      "testScrollBlog": {
-        "Hitch time ratio": 100.0
-      },
-      "testScrollOneChat": {
-        "Hitch time ratio": 150.0
-      },
-      "testScrollThread": {
-        "Hitch time ratio": 150.0
-      }
     }
   },
   "baselines": {
     "testLaunch": {
-      "Clock Monotonic Time": 8.8938
+      "Clock Monotonic Time": 9.34
     },
     "testOpenThread": {
-      "Clock Monotonic Time": 12.1337
+      "Clock Monotonic Time": 10.9
     },
     "testScrollBlog": {
-      "Hitch time ratio": 25.3733
+      "Hitch time ratio": 18.72
     },
     "testScrollOneChat": {
-      "Hitch time ratio": 140.6524
+      "Hitch time ratio": 180.04
     },
     "testScrollThread": {
-      "Hitch time ratio": 214.6622
+      "Hitch time ratio": 217.03
     },
     "testSwitchTabs": {
-      "Clock Monotonic Time": 12.263
+      "Clock Monotonic Time": 12.48
     }
   }
 }
