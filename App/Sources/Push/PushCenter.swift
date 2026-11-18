@@ -17,7 +17,7 @@ final class PushCenter: NSObject, ObservableObject {
     private let log = Logger(subsystem: Brand.bundleID, category: "push")
 
     /// Called once the account is signed in. Asks nothing: iOS's question comes from PushPrimer on
-    /// the first visit to #one-Chat (App Review asks for permission requests in context). If
+    /// the first visit to #one (App Review asks for permission requests in context). If
     /// pushes were allowed before, this registers at once.
     func attach(_ session: ChatSession) async {
         self.session = session

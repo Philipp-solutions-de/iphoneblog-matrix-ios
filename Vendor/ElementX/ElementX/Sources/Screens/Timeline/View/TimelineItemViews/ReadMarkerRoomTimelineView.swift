@@ -10,18 +10,24 @@ import Compound
 import SwiftUI
 
 struct ReadMarkerRoomTimelineView: View {
+    // iphoneblog: the web's divider (v0.6.5): a teal line with "Neu" in the middle, above the
+    // first unread message.
     var body: some View {
-        VStack(alignment: .trailing, spacing: 2) {
-            Text(L10n.screenRoomTimelineReadMarkerTitle)
-                .textCase(.uppercase)
-                .font(.compound.bodyXSSemibold)
-                .foregroundColor(.compound.textActionAccent)
-            
+        HStack(spacing: 10) {
             Rectangle()
-                .frame(height: 0.5)
+                .frame(height: 1)
+                .foregroundColor(.compound.borderAccentPrimary)
+            Text(L10n.screenRoomTimelineReadMarkerTitle)
+                .font(.compound.bodySMSemibold)
+                .foregroundColor(.compound.textActionAccent)
+            Rectangle()
+                .frame(height: 1)
                 .foregroundColor(.compound.borderAccentPrimary)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L10n.screenRoomTimelineReadMarkerTitle)
+        .accessibilityIdentifier("timeline.readMarker")
     }
 }

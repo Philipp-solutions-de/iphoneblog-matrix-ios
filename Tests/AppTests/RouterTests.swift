@@ -8,14 +8,25 @@ final class RouterTests: XCTestCase {
         XCTAssertEqual(Router().tab, .blog)
     }
 
-    /// A thread opens over its room in #one-Chat, from any tab, so back leads into the room.
+    /// A thread opens over its room in #one, from any tab, so back leads into the room (the room
+    /// is the one under the room bar, not a pushed screen).
     func testOpenThreadPutsItOverItsRoom() {
         let router = Router()
-        router.tab = .mentions
+        router.tab = .forYou
         router.openThread(roomID: "!a", rootEventID: "$root")
         XCTAssertEqual(router.tab, .chat)
-        XCTAssertEqual(router.chatPath, [.room("!a"), .thread(Router.ThreadRoute(roomID: "!a", rootEventID: "$root"))])
+        XCTAssertEqual(router.chatPath, [.thread(Router.ThreadRoute(roomID: "!a", rootEventID: "$root"))])
         XCTAssertEqual(router.selectedRoomID, "!a")
+    }
+
+    /// A room opens under the room bar and is remembered as the last room read.
+    func testOpenRoomBecomesTheCurrentRoom() {
+        let router = Router()
+        router.openThreadsList()
+        router.openRoom("!b")
+        XCTAssertEqual(router.chatPath, [])
+        XCTAssertEqual(router.currentRoomID, "!b")
+        XCTAssertEqual(Router().currentRoomID, "!b", "the last room read is not remembered")
     }
 
     /// From the Threads list or a search, a thread goes on top, so back returns there.
@@ -32,7 +43,7 @@ final class RouterTests: XCTestCase {
         let router = Router()
         router.openThread(roomID: "!a", rootEventID: "$reply")
         router.correctThread(roomID: "!a", from: "$reply", to: "$root")
-        XCTAssertEqual(router.chatPath, [.room("!a"), .thread(.init(roomID: "!a", rootEventID: "$root"))])
+        XCTAssertEqual(router.chatPath, [.thread(.init(roomID: "!a", rootEventID: "$root"))])
         XCTAssertTrue(router.isOnScreen(roomID: "!a", threadRootEventID: "$root"))
         XCTAssertFalse(router.isOnScreen(roomID: "!a", threadRootEventID: "$reply"))
     }
@@ -41,11 +52,13 @@ final class RouterTests: XCTestCase {
     func testBlogThreadOpensInBlogTab() {
         let router = Router()
         router.blogRoomID = "!blog"
-        router.tab = .mentions
+        router.tab = .forYou
+        let roomBefore = router.currentRoomID
         router.openThread(roomID: "!blog", rootEventID: "$article")
         XCTAssertEqual(router.tab, .blog)
         XCTAssertEqual(router.blogPath, [.thread(rootEventID: "$article")])
-        XCTAssertNil(router.selectedRoomID)
+        XCTAssertEqual(router.chatPath, [])
+        XCTAssertEqual(router.currentRoomID, roomBefore, "#one changed for a Blog thread")
     }
 
     /// Signing out leaves the Blog tab, readable, and nothing of the account.

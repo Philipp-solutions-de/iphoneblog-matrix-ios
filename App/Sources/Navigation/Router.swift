@@ -4,7 +4,7 @@ import Foundation
 /// One per app, signed in or not; the signed-in session borrows it.
 @MainActor
 final class Router: ObservableObject {
-    enum Tab: Hashable { case blog, chat, mentions, me }
+    enum Tab: Hashable { case blog, chat, forYou, me }
 
     struct ThreadRoute: Hashable {
         let roomID: String
@@ -25,17 +25,24 @@ final class Router: ObservableObject {
         /// The threads you take part in, across the #one rooms.
         case threads
         /// Search in these rooms: one room from its header, all from the list's.
-        case search([String])
+        /// Search in these rooms; `current` is the open room, for the "this room" chip.
+        case search([String], current: String?)
     }
 
     @Published var tab: Tab = Router.startTab
-    /// #one-Chat: the room list, then the open room, a thread, the Threads list or a search.
+    /// #one: the open room under its room bar (variant A), then a thread, the Threads list or a
+    /// search on top. `.room` routes are not pushed any more; the room bar switches rooms.
     @Published var chatPath: [ChatRoute] = []
-    /// The room on screen in #one-Chat, if any.
-    var selectedRoomID: String? {
-        for step in chatPath.reversed() { if case .room(let id) = step { return id } }
-        return nil
+    /// The room open in #one, remembered across launches: the tab opens the last room read.
+    @Published var currentRoomID: String? = UserDefaults.standard.string(forKey: Router.lastRoomKey) {
+        didSet {
+            if let currentRoomID { UserDefaults.standard.set(currentRoomID, forKey: Router.lastRoomKey) }
+            else { UserDefaults.standard.removeObject(forKey: Router.lastRoomKey) }
+        }
     }
+    private static let lastRoomKey = "one.lastRoom"
+    /// The room on screen in #one, if any.
+    var selectedRoomID: String? { currentRoomID }
     /// Blog: the open discussion on top of the blog.
     @Published var blogPath: [DiscussionRoute] = []
     /// The Blog room's ID once known, so a push or a link into it opens the Blog tab.
@@ -57,12 +64,12 @@ final class Router: ObservableObject {
     /// The tab badges: #one-Chat's unread messages and unread @Mentions. ChatSession keeps them
     /// current; MainView observes only the router, so they live here.
     @Published var chatBadge = 0
-    @Published var mentionsBadge = 0
+    @Published var forYouBadge = 0
     /// A #one member: only members see #one-Chat and @Mentions (Thorsten, 2026-11-16). Set by
     /// ChatSession whenever membership changes, so the tabs follow without a restart.
     @Published var isMember = false {
         didSet {
-            if !isMember, tab == .mentions || tab == .me { tab = .chat }
+            if !isMember, tab == .forYou || tab == .me { tab = .chat }
         }
     }
 
@@ -78,20 +85,21 @@ final class Router: ObservableObject {
             profile = Person(userID: user, shareNow: env["IPHONEBLOG_START_SHARE"] == "1")
         }
         if let room = env["IPHONEBLOG_START_ROOM"], !room.isEmpty {
-            chatPath = [.room(room)]
+            currentRoomID = room
         }
         if let value = env["IPHONEBLOG_START_THREAD"], case let parts = value.split(separator: "|"), parts.count == 2 {
-            chatPath = [.room(String(parts[0])), .thread(ThreadRoute(roomID: String(parts[0]), rootEventID: String(parts[1])))]
+            currentRoomID = String(parts[0])
+            chatPath = [.thread(ThreadRoute(roomID: String(parts[0]), rootEventID: String(parts[1])))]
         }
         #endif
     }
 
-    /// Blog, except in debug screenshot runs (IPHONEBLOG_START_TAB=blog|chat|mentions|me).
+    /// Blog, except in debug screenshot runs (IPHONEBLOG_START_TAB=blog|chat|foryou|me).
     private static var startTab: Tab {
         #if DEBUG
         switch ProcessInfo.processInfo.environment["IPHONEBLOG_START_TAB"] {
         case "chat": return .chat
-        case "mentions": return .mentions
+        case "mentions", "foryou": return .forYou
         case "me": return .me
         default: return .blog
         }
@@ -107,10 +115,25 @@ final class Router: ObservableObject {
             return
         }
         tab = .chat
-        chatPath = [.room(roomID)]
+        currentRoomID = roomID
+        chatPath = []
     }
 
     func openThreadsList() { chatPath.append(.threads) }
+
+    /// Where a mention was said, from @Mentions and "Für dich" alike: a thread reply opens its
+    /// thread, an article's discussion the Blog tab, a room message the room scrolled to it.
+    func open(_ mention: MentionsModel.Mention) {
+        switch mention.place {
+        case .channel(let roomID, let root?, _):
+            openThread(roomID: roomID, rootEventID: root)
+        case .channel(let roomID, nil, _), .room(let roomID, _):
+            openMessage(roomID: roomID, eventID: mention.id)
+        case .discussion(let root, _):
+            tab = .blog
+            blogPath = [.thread(rootEventID: root)]
+        }
+    }
 
     /// The timeline the reader sees: the top of the visible tab's stack. Only it sends read
     /// receipts ("read up to here" must not reach messages nobody had on screen).
@@ -119,6 +142,7 @@ final class Router: ObservableObject {
         switch tab {
         case .chat:
             switch chatPath.last {
+            case nil: return threadRootEventID == nil && currentRoomID == roomID
             case .room(let id)?: return threadRootEventID == nil && id == roomID
             case .thread(let thread)?: return thread.roomID == roomID && thread.rootEventID == threadRootEventID
             default: return false
@@ -131,7 +155,7 @@ final class Router: ObservableObject {
         }
     }
 
-    func openSearch(in roomIDs: [String]) { chatPath.append(.search(roomIDs)) }
+    func openSearch(in roomIDs: [String], current: String? = nil) { chatPath.append(.search(roomIDs, current: current)) }
 
     /// A search result: the message in its channel, scrolled to and highlighted.
     func openMessage(roomID: String, eventID: String) {
@@ -161,18 +185,20 @@ final class Router: ObservableObject {
         // From the Threads list or a search, the thread goes on top, so back returns there.
         if case .threads? = chatPath.last { chatPath.append(thread); return }
         if case .search? = chatPath.last { chatPath.append(thread); return }
-        // Otherwise over its room, so back leads into the room, then to the list.
-        chatPath = [.room(roomID), thread]
+        // Otherwise over its room, so back leads into the room.
+        currentRoomID = roomID
+        chatPath = [thread]
     }
 
     /// Back to a clean state after signing out; the Blog tab stays readable.
     func reset() {
+        currentRoomID = nil
         tab = .blog
         chatPath = []
         blogPath = []
         blogRoomID = nil
         chatBadge = 0
-        mentionsBadge = 0
+        forYouBadge = 0
         isMember = false
         moderation = nil
         profile = nil

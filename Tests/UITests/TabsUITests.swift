@@ -1,7 +1,7 @@
 import XCTest
 
-/// Who sees which tabs (Thorsten, 2026-11-16): #one members see Blog, #one-Chat, @Mentions and
-/// Ich; everyone else Blog and #one-Chat, which offers the sign-in (signed out) or says
+/// Who sees which tabs (Thorsten, 2026-11-16/17): #one members see Blog, #one, Für dich and
+/// Ich; everyone else Blog and #one, which offers the sign-in (signed out) or says
 /// "Nur für #one-Mitglieder" with Abmelden and Konto löschen (signed in without #one).
 final class TabsUITests: XCTestCase {
     private var env: [String: String] { ProcessInfo.processInfo.environment }
@@ -38,7 +38,7 @@ final class TabsUITests: XCTestCase {
     func testSignedOutSeesBlogAndASignIn() {
         let app = launch(["IPHONEBLOG_SIGNED_OUT": "1"])
         XCTAssertTrue(app.buttons["one.signIn"].waitForExistence(timeout: 30), "no sign-in in #one-Chat")
-        XCTAssertEqual(tabs(app), ["Blog", "#one-Chat"])
+        XCTAssertEqual(tabs(app), ["Blog", "#one"])
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'abonnieren' OR label CONTAINS[c] 'werden'")).firstMatch.exists,
                        "no way to buy")
         attach(app, "tabs-signed-out")
@@ -50,14 +50,14 @@ final class TabsUITests: XCTestCase {
         sleep(10) // membership is checked after sync; it must stay "no"
         XCTAssertTrue(app.staticTexts["Nur für #one-Mitglieder"].exists)
         XCTAssertTrue(app.buttons["one.deleteAccount"].exists, "no Konto löschen")
-        XCTAssertEqual(tabs(app), ["Blog", "#one-Chat"])
+        XCTAssertEqual(tabs(app), ["Blog", "#one"])
         attach(app, "tabs-non-member")
     }
 
     func testMemberSeesAllFour() throws {
         let app = try signIn(env["IPHONEBLOG_TEST_USER"], env["IPHONEBLOG_TEST_PASSWORD"])
-        XCTAssertTrue(app.tabBars.buttons["@Mentions"].waitForExistence(timeout: 120), "no member tabs")
-        XCTAssertEqual(tabs(app), ["Blog", "#one-Chat", "@Mentions", "Ich"])
+        XCTAssertTrue(app.tabBars.buttons["Für dich"].waitForExistence(timeout: 120), "no member tabs")
+        XCTAssertEqual(tabs(app), ["Blog", "#one", "Für dich", "Ich"])
         attach(app, "tabs-member")
     }
 

@@ -24,16 +24,26 @@ final class ChatSearchModel: ObservableObject {
     enum State: Equatable { case idle, searching, done, failed }
 
     private let session: ChatSession
-    private let roomIDs: [String]
+    /// Every #one room; the scope narrows it to the open room ("this room" chip).
+    let allRoomIDs: [String]
+    let currentRoomID: String?
+    @Published var onlyCurrentRoom = false {
+        didSet { if oldValue != onlyCurrentRoom { search(term) } }
+    }
+    private var roomIDs: [String] {
+        if onlyCurrentRoom, let currentRoomID { return [currentRoomID] }
+        return allRoomIDs
+    }
     private var nextBatch: String?
     private var term = ""
     private var task: Task<Void, Never>?
     private var names: [String: String] = [:]
     private let log = Logger(subsystem: Brand.bundleID, category: "search")
 
-    init(session: ChatSession, roomIDs: [String]) {
+    init(session: ChatSession, roomIDs: [String], current: String? = nil) {
         self.session = session
-        self.roomIDs = roomIDs
+        allRoomIDs = roomIDs
+        currentRoomID = current
     }
 
     var canLoadMore: Bool { nextBatch != nil && state == .done }
@@ -145,8 +155,15 @@ struct ChatSearchView: View {
     @ObservedObject var router: Router
     @State private var term = ""
 
+    var roomName: String?
+
     var body: some View {
         List {
+            if model.currentRoomID != nil, model.allRoomIDs.count > 1 {
+                scopeChips
+                    .listRowInsets(EdgeInsets(top: 6, leading: Theme.Space.page, bottom: 6, trailing: Theme.Space.page))
+                    .listRowSeparator(.hidden)
+            }
             ForEach(model.hits) { hit in
                 Button { open(hit) } label: {
                     SearchHitRow(hit: hit, terms: highlightTerms)
@@ -161,10 +178,35 @@ struct ChatSearchView: View {
         }
         .listStyle(.plain)
         .overlay { emptyState }
-        .searchable(text: $term, placement: .navigationBarDrawer(displayMode: .always), prompt: "In #one-Chat suchen")
+        .searchable(text: $term, placement: .navigationBarDrawer(displayMode: .always), prompt: "In #one suchen")
         .onChange(of: term) { _, new in model.search(new) }
         .navigationTitle("Suche")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    /// "Alle Räume" or only the open room (variant A: the search looks in every room, a chip
+    /// narrows it).
+    private var scopeChips: some View {
+        HStack(spacing: 8) {
+            chip("Alle Räume", selected: !model.onlyCurrentRoom) { model.onlyCurrentRoom = false }
+                .accessibilityIdentifier("search.scope.all")
+            chip("# " + (roomName ?? "Dieser Raum"), selected: model.onlyCurrentRoom) { model.onlyCurrentRoom = true }
+                .accessibilityIdentifier("search.scope.room")
+            Spacer()
+        }
+    }
+
+    private func chip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(selected ? .white : Theme.ink2)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 32)
+                .background(selected ? Theme.teal : Theme.line.opacity(0.5), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     /// The server's own highlight words (its stems), and what was typed.

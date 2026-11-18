@@ -139,4 +139,6 @@ public extension EnvironmentValues {
     /// True where the app draws its own header above a thread (the article discussion): the
     /// thread screen then shows no "Thread" title of its own.
     @Entry var chatThreadHeaderHidden = false
+    /// The room screen under the app's room bar: the bar names the room, the title stays the app's.
+    @Entry var chatRoomHeaderHidden = false
 }

@@ -148,6 +148,33 @@ public final class ChatKitSession {
 
     private lazy var threadsModel = ChatThreadsListModel(client: self.clientProxy.client, ownUserID: self.clientProxy.userID)
 
+    /// The threads you take part in, newest activity first, for the app's own lists ("Für dich").
+    /// Starts the thread lists if nothing else has.
+    public func involvedThreads() -> AnyPublisher<[ChatKitThread], Never> {
+        let model = threadsModel
+        Task { await model.start() }
+        return model.$entries
+            .combineLatest(ChatThreadActivity.shared.objectWillChange.prepend(()).map { _ in () })
+            .map { entries, _ in
+                entries.map { entry in
+                    ChatKitThread(roomID: entry.roomID, roomName: entry.roomName, rootEventID: entry.rootEventID,
+                                  rootText: entry.rootText, rootSenderID: entry.rootSender.id,
+                                  rootSenderName: entry.rootSender.displayName,
+                                  latestSenderID: entry.latestSender?.id, latestSenderName: entry.latestSender?.displayName,
+                                  latestText: entry.latestText, latestIsOwn: entry.latestIsOwn,
+                                  replies: ChatThreadCount.replies(server: ChatThreadActivity.shared.thread(roomID: entry.roomID, rootEventID: entry.rootEventID)?.serverReplies,
+                                                                   timeline: entry.replies, repliers: 0),
+                                  lastActivity: entry.lastActivity, isUnread: ChatThreadSeen.isUnread(entry))
+                }
+            }
+            .eraseToAnyPublisher()
+    }
+
+    /// The reader has seen these threads (on this device), as when they are opened.
+    public func markThreadsSeen(_ threads: [(roomID: String, rootEventID: String)]) {
+        for thread in threads { ChatThreadActivity.shared.markSeen(roomID: thread.roomID, rootEventID: thread.rootEventID) }
+    }
+
     func joinedRoomProxy(_ roomID: String) async throws -> JoinedRoomProxyProtocol {
         if let proxy = roomProxies[roomID] { return proxy }
         let room = try roomListService.room(roomId: roomID)
@@ -217,4 +244,23 @@ public enum ChatThreadCount {
     public static func replies(server: Int?, timeline: Int, repliers: Int) -> Int {
         max(server ?? timeline, repliers)
     }
+}
+
+/// One thread you take part in, as the app's own lists show it.
+public struct ChatKitThread: Identifiable, Equatable {
+    public var id: String { roomID + "|" + rootEventID }
+    public let roomID: String
+    public let roomName: String
+    public let rootEventID: String
+    public let rootText: String
+    public let rootSenderID: String
+    public let rootSenderName: String?
+    public let latestSenderID: String?
+    public let latestSenderName: String?
+    public let latestText: String?
+    public let latestIsOwn: Bool
+    public let replies: Int
+    public let lastActivity: Date
+    /// New replies since you last had the thread open on this device.
+    public let isUnread: Bool
 }

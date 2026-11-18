@@ -2,7 +2,7 @@ import XCTest
 
 /// App Review's items in the running app, against scripts/test-homeserver.sh: Ich holds the
 /// blocked list, the moderation contact and "Konto löschen", and the push primer asks on
-/// #one-Chat instead of at sign-in. "Melden" on a message is ReportUITests.
+/// #one instead of at sign-in. "Melden" on a message is ReportUITests.
 final class ModerationUITests: XCTestCase {
     private var env: [String: String] { ProcessInfo.processInfo.environment }
 
@@ -46,13 +46,13 @@ final class ModerationUITests: XCTestCase {
         app.buttons["Abbrechen"].tap()
     }
 
-    /// No system prompt after sign-in; on #one-Chat the primer card, and "Später" puts it away.
+    /// No system prompt after sign-in; on #one the primer card, and "Später" puts it away.
     func testPushPrimerOnOneChat() throws {
         // "-pushPrimerShown NO" resets the card's flag for this launch (the argument domain wins
         // over the stored value), so an earlier run's "Später" does not hide it.
         let app = try launch(["IPHONEBLOG_START_TAB": "chat"], arguments: ["-pushPrimerShown", "NO"])
         let later = app.buttons["Später"]
-        XCTAssertTrue(later.waitForExistence(timeout: 120), "no primer on #one-Chat")
+        XCTAssertTrue(later.waitForExistence(timeout: 120), "no primer on #one")
         attach(app, "push-primer")
         later.tap()
         XCTAssertFalse(later.waitForExistence(timeout: 3), "primer still there")

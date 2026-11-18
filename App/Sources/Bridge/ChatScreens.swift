@@ -6,8 +6,27 @@
 // another kit (exyte/Chat) without touching the shell. docs/architecture.md, "Kept apart".
 //
 
+import Combine
 import MatrixRustSDK
 import SwiftUI
+
+/// A thread you take part in, for "Für dich".
+struct InvolvedThread: Identifiable, Equatable {
+    var id: String { roomID + "|" + rootEventID }
+    let roomID: String
+    let roomName: String
+    let rootEventID: String
+    let rootText: String
+    let rootSenderID: String
+    let rootSenderName: String?
+    let replies: Int
+    let latestSenderID: String?
+    let latestSenderName: String?
+    let latestText: String?
+    let lastActivity: Date
+    /// New replies since you last had it open on this device.
+    let isUnread: Bool
+}
 
 /// What the app gives the conversation views: the signed-in account and a way back into the
 /// app's navigation. Implemented by the app (`ChatSession`).
@@ -59,12 +78,25 @@ protocol ChatScreenProviding: AnyObject {
     func focus(roomID: String, eventID: String)
     /// The "Threads" row at the top of #one-Chat, with the count of your threads that have news.
     func threadsEntry(host: ChatHost, open: @escaping () -> Void) -> AnyView
+    /// The threads you take part in, newest activity first ("Für dich").
+    func involvedThreads() -> AnyPublisher<[InvolvedThread], Never>
+    /// These threads count as seen now (on this device).
+    func markThreadsSeen(_ threads: [InvolvedThread])
+    /// The accounts the chat server lists as bots, marked "Bot" in the conversation views.
+    func setBots(_ ids: Set<String>)
+    /// The room under the app's own header (the #one room bar): no title of its own.
+    func roomScreenUnderBar(roomID: String, host: ChatHost) -> AnyView
     /// An article's thread under the app's own discussion header: the thread screen without
     /// its "Thread" title.
     func discussionScreen(roomID: String, rootEventID: String, host: ChatHost) -> AnyView
 }
 
 extension ChatScreenProviding {
+    /// The room under the app's own header (the #one room bar): no title of its own.
+    func roomScreenUnderBar(roomID: String, host: ChatHost) -> AnyView {
+        roomScreen(roomID: roomID, host: host)
+    }
+
     func discussionScreen(roomID: String, rootEventID: String, host: ChatHost) -> AnyView {
         threadScreen(roomID: roomID, rootEventID: rootEventID, host: host)
     }

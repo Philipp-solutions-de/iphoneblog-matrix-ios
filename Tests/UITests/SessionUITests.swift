@@ -40,7 +40,7 @@ final class SessionUITests: XCTestCase {
         shot.name = "session-lost"
         shot.lifetime = .keepAlways
         add(shot)
-        app.tabBars.buttons["#one-Chat"].tap()
+        app.tabBars.buttons["#one"].tap()
         XCTAssertTrue(app.buttons["one.signIn"].waitForExistence(timeout: 10), "#one-Chat does not offer the sign-in")
         // The next test signs in again with the same password; nothing else to undo.
     }

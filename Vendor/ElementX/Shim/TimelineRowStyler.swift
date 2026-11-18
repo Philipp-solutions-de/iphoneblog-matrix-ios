@@ -109,15 +109,19 @@ struct TimelineItemRowStylerView<Content: View>: View {
         }
     }
 
+    /// Listed by the chat server as a bot (ChatKitBots), never guessed from the name.
+    private var isBot: Bool { ChatKitBots.isBot(timelineItem.sender.id) }
+
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(timelineItem.sender.displayName ?? timelineItem.sender.id)
                 .font(style.fonts.senderName)
-                .foregroundStyle(style.colors.ink)
+                .foregroundStyle(isBot ? style.colors.accent : style.colors.ink)
                 .lineLimit(1)
                 .accessibilityHidden(true) // read by the accessibility modifier below
                 .onTapGesture { context.send(viewAction: .tappedOnSenderDetails(sender: timelineItem.sender)) }
                 .highPriorityGesture(shareContactGesture)
+            if isBot { ChatBotPill().alignmentGuide(.firstTextBaseline) { $0[.bottom] - 3 } }
             Text(ChatTimeLabel.short(timelineItem.timestamp))
                 .font(style.fonts.time)
                 .foregroundStyle(style.colors.ink3)

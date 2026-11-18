@@ -271,6 +271,7 @@ final class ChatRoomCoordinator: ChatScreenCoordinator {
         let title = info.isDirect ? info.displayNameOrID : ChatKitStrings.channel(info.displayNameOrID)
         return AnyView(ChatRoomScreen(context: screenViewModel.context,
                                       timelineContext: timelineViewModel.context,
+                                      unread: roomProxy.infoPublisher.map(\.unreadMessagesCount).removeDuplicates().eraseToAnyPublisher(),
                                       composerToolbar: ComposerToolbar(context: composerViewModel.context),
                                       title: title,
                                       // The room's topic if it has one; no member count, which is the same
@@ -314,44 +315,95 @@ final class ChatRoomCoordinator: ChatScreenCoordinator {
     }
 }
 
+/// The room's name and topic as the title; none under the app's room bar, which names the room.
+private struct RoomHeader: ViewModifier {
+    let hidden: Bool
+    let title: String
+    let subtitle: String?
+    let style: ChatKitStyle
+
+    func body(content: Content) -> some View {
+        if hidden {
+            content
+        } else {
+            content
+                .navigationTitle(title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        VStack(spacing: 0) {
+                            Text(title)
+                                .font(style.fonts.roomTitle)
+                                .foregroundStyle(style.colors.ink)
+                            if let subtitle {
+                                Text(subtitle)
+                                    .font(style.fonts.roomSubtitle)
+                                    .foregroundStyle(style.colors.ink3)
+                            }
+                        }
+                        .lineLimit(1)
+                    }
+                }
+        }
+    }
+}
+
 /// The room screen: Element X's thread screen layout with the room's name as its title.
 private struct ChatRoomScreen: View {
     @ObservedObject var context: ThreadTimelineScreenViewModelType.Context
     @ObservedObject var timelineContext: TimelineViewModelType.Context
+    /// The room's unread count, live, for the jump pill ("137 neue · zur ersten springen"). The
+    /// screen is built once, when the tab bar is; a count taken then would be stale.
+    let unread: AnyPublisher<UInt, Never>
+    @State private var unreadCount: UInt = 0
     let composerToolbar: ComposerToolbar
     let title: String
     let subtitle: String?
 
     private var style: ChatKitStyle { ChatKitStyle.current }
 
+    @Environment(\.chatRoomHeaderHidden) private var headerHidden
+
+    /// The messages after the Neu divider among those loaded, else the room's unread count.
+    private var newCount: UInt {
+        let state = timelineContext.viewState.timelineState
+        if let marker = state.readMarkerUniqueID, let index = state.itemsDictionary.index(forKey: marker) {
+            let values = state.itemsDictionary.values
+            let messages = values[(index + 1)...].filter { $0.identifier.eventID != nil }.count
+            if messages > 0 { return UInt(messages) }
+        }
+        return unreadCount
+    }
+
     var body: some View {
         TimelineView(timelineContext: timelineContext)
             .background(.compound.bgCanvasDefault)
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    VStack(spacing: 0) {
-                        Text(title)
-                            .font(style.fonts.roomTitle)
-                            .foregroundStyle(style.colors.ink)
-                        if let subtitle {
-                            Text(subtitle)
-                                .font(style.fonts.roomSubtitle)
-                                .foregroundStyle(style.colors.ink3)
-                        }
-                    }
-                    .lineLimit(1)
-                }
-            }
+            .modifier(RoomHeader(hidden: headerHidden, title: title, subtitle: subtitle, style: style))
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarBackground(style.colors.background, for: .navigationBar)
             .timelineMediaPreview(viewModel: $context.mediaPreviewViewModel)
+            .onReceive(unread) { unreadCount = $0 }
             .overlay(alignment: .top) {
-                FloatingDateBadge(dateText: timelineContext.floatingDate?.formattedDateSeparator()) {
-                    timelineContext.send(viewAction: .scrollToFirstItemForCurrentDate)
+                if timelineContext.viewState.shouldShowJumpToReadMarker {
+                    // The web's pill (v0.6.5): the first unread message is above, out of sight.
+                    Button { timelineContext.send(viewAction: .scrollToReadMarker) } label: {
+                        Label(ChatKitStrings.jumpToUnread(newCount), systemImage: "arrow.up")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .frame(minHeight: 34)
+                            .background(style.colors.accent, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 10)
+                    .accessibilityLabel(ChatKitStrings.jumpToUnread(newCount))
+                    .accessibilityIdentifier("room.jumpToUnread")
+                } else {
+                    FloatingDateBadge(dateText: timelineContext.floatingDate?.formattedDateSeparator()) {
+                        timelineContext.send(viewAction: .scrollToFirstItemForCurrentDate)
+                    }
+                    .padding(.top, 13)
                 }
-                .padding(.top, 13)
             }
             .overlay(alignment: .bottomTrailing) {
                 TimelineScrollButton(isHidden: !timelineContext.viewState.shouldShowScrollToBottomButton) {
@@ -492,6 +544,11 @@ enum ChatComposer {
 enum ChatKitStrings {
 
     /// "Noch keine Antworten", "1 Antwort", "5 Antworten".
+    /// "137 neue · zur ersten springen"; without a count, "Neue Nachrichten · zur ersten springen".
+    static func jumpToUnread(_ count: UInt) -> String {
+        count > 0 ? "\(count > 999 ? "999+" : "\(count)") neue · zur ersten springen" : "Neue Nachrichten · zur ersten springen"
+    }
+
     static func replies(_ count: Int) -> String {
         count == 0 ? "Noch keine Antworten" : count == 1 ? "1 Antwort" : "\(count) Antworten"
     }

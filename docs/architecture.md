@@ -72,13 +72,13 @@ with the extension. Apple's notification-filtering entitlement is requested for 
 account so the extension may drop pushes it cannot show.
 
 **Four tabs for members, two for everyone else; the blog as the front page.** #one members see
-Blog, #one-Chat, @Mentions and Ich. Everyone else sees Blog and #one-Chat: signed out, a neutral
+Blog, #one, Für dich and Ich (Thorsten, 2026-11-17). Everyone else sees Blog and #one: signed out, a neutral
 sign-in ("Der Chat für #one-Mitglieder", Anmelden); signed in without #one, "Nur für
 #one-Mitglieder" with Abmelden and Konto löschen (App Store 5.1.1(v), since they have no Ich).
 No price, no way to buy, no hint where to get #one; they read discussions without writing
 (Thorsten, 2026-11-16). The tabs follow membership as it changes (`Router.isMember`). For
-members, #one-Chat lists the #one rooms (`GET /_iphoneblog/v1/rooms`, else the space #one's
-children) with Threads on top. every visual value lives in `App/Sources/Theme.swift`, light and
+members, #one shows the #one rooms (`GET /_iphoneblog/v1/rooms`, else the space #one's
+children) in its room bar. every visual value lives in `App/Sources/Theme.swift`, light and
 dark by the system. The Blog tab is a `WKWebView` on WordPress's app view (`?app=1`, which
 drops banner, header, menu and footer), not native article cards: the blog renders articles,
 paywall included, exactly as the site does, and the app adds only the discussion. The web
@@ -109,15 +109,31 @@ their body text ("in der App zu sehen"); reply quotes and link previews are not 
 against `scripts/blog-fixture-server.py`, and `RichMessagesUITests` checks formatting, links,
 replies, pictures, video, files and the composer against the test homeserver.
 
+**#one: a room bar, variant A.** Under the title "#one" (with the open room's topic) a bar of
+chips holds every #one room from the server, each with its unread count, "@" for a mention and
+99+ as the cap; tap only, no swipe; a teal dot at the bar's edge marks a room with news out of
+sight. The open room sits under the bar and shows no title of its own; the tab opens the last
+room read (`Router.currentRoomID`, forgotten on sign-out). When the open room has nothing new
+and another has, "Weiter: # <room> · n neu" leads there. Above the first unread message a teal
+"Neu" divider; when it is out of sight a pill "n neue · zur ersten springen" jumps to it, as on
+the web. Bots the server lists (`GET /_iphoneblog/v1/bots`) get their name in the strong teal
+and a "Bot" pill with a robot, never by name.
+
+**Für dich: what concerns me, in one list.** Mentions of me (@me, @room, replies to my
+messages), threads I take part in with new replies (#one and the Blog's discussions), and the
+#one rooms with unread messages on top of "Alles"; "Alles · Erwähnungen · Threads"; newest
+first; rows with the sender's picture and plain previews (`MemberAvatar`, `PushText.plain`). "Alle
+gelesen" clears exactly what the filter shows; a long press on the tab clears everything, with a
+haptic, while the badge shows something. Threads come from ChatKit's thread lists
+(`ChatKitSession.involvedThreads`); their "new" is per device, like the Threads list was.
+
 **Threads work as in Slack.** Under a message with replies, a row shows up to three repliers,
 "n Antworten" in teal and when the last reply came; unread replies make it bold with a dot. A
 tap on a message opens its thread, also to start one (links, mentions and pictures keep their
-own tap), and the long-press menu offers "Im Thread antworten" first. "Threads" at the top of
-#one-Chat lists the threads you started or wrote in, newest first, with a count of those with
-news; it sits there, beside the channel as in Slack, so @Mentions stays the list of people who
-named you. Counts come from the server's thread relations (`ChatThreadActivity`): the SDK's
+own tap), and the long-press menu offers "Im Thread antworten" first. Für dich › Threads lists the threads you started or wrote in, newest first, with an unread dot
+for news. Counts come from the server's thread relations (`ChatThreadActivity`): the SDK's
 timeline summary and thread list counted 3 and 9 for a thread with 6 replies. Unread is per
-device (`ChatThreadSeen`). Not built: "Auch an #one-Chat senden" (Matrix has no event that is
+device (`ChatThreadSeen`). Not built: "Auch an #one senden" (Matrix has no event that is
 both a thread reply and a channel message; it would take two events), push for replies in
 threads you are in without a mention (Synapse sends none), and thread rows in the Blog tab,
 which shows the website.
@@ -190,22 +206,24 @@ for replies in threads one takes part in need thread subscriptions (MSC4306), ex
 off on the server.
 
 **No direct messages.** The app offers no way to start one (a tap on a person opens nothing),
-and direct rooms stay out of #one-Chat, Threads and @Mentions; the server refuses to create
+and direct rooms stay out of #one, Threads and Für dich; the server refuses to create
 them (Thorsten, 2026-11-16).
 
-**Search is Matrix's own.** The magnifier in #one-Chat sends `POST /_matrix/client/v3/search`
-(room_events, filtered to the channel, newest first, `next_batch` paging); the rooms are
+**Search is Matrix's own.** The magnifier in #one sends `POST /_matrix/client/v3/search`
+(room_events, in every #one room or, with the chip, only the open one; newest first,
+`next_batch` paging); the rooms are
 unencrypted, so Synapse can read them, and there is no index of our own. A hit shows sender,
 time and the words marked; a thread reply opens its thread, a channel message scrolls the
 channel to it (`ChatKitSession.focus`, Element X's focus on an event). Synapse stems in English
 only, hard-coded in its source, so German inflections may not match; the empty state suggests
-the word stem. @Mentions filters its loaded list on the device.
+the word stem.
 
 **Tab badges come from the server's counts.** The SDK counts a room's unread mentions in the
 last few events it holds, so a mention with six or more messages after it dropped out. A room's
-mention count is the larger of the SDK's and the server's notification list (the one @Mentions
-reads); `ChatSession` puts the #one-Chat and @Mentions badges on `Router`, which `MainView`
-observes (before, the @Mentions badge never appeared). iOS 26's tab bar does not expose badges
+mention count is the larger of the SDK's and the server's notification list (the one Für dich
+reads); `ChatSession` puts the #one and Für dich badges on `Router`, which `MainView`
+observes. Für dich counts unread mentions and threads with news; unread room messages count on
+#one. iOS 26's tab bar does not expose badges
 to accessibility, so the sign-in test checks the counts and `BadgesUITests` keeps a screenshot.
 
 **Members read #one articles in the Blog tab.** Once the page shows a blog page, a signed-in
@@ -218,8 +236,8 @@ person; a 401 refreshes the token and asks once more; a used link (410) asks onc
 tokens of the app's static MAS client count, so sign-in must use that fixed client id.
 Signing out removes WordPress's cookies from the web view.
 
-**@Mentions from the server.** The tab lists `GET /notifications?only=highlight`: the server
-already decides what mentions me and keeps the read state across devices. The push switches
+**Mentions from the server.** Für dich lists `GET /notifications?only=highlight`: the server
+already decides what mentions me (read state: see "read up to here" above). The push switches
 on Ich are server push rules for the same reason: "Neue Artikel" is an override rule
 (`de.iphoneblog.new_articles`) on events in the Blog room that carry the bot's
 `de.iphoneblog.article` field, while the Blog room itself stays on mentions only, so replies
@@ -236,7 +254,7 @@ That code is AGPL-3.0, so this app is AGPL-3.0 too; the repository is public, as
 | Sync | `SyncService` | | start and stop with the app's life cycle |
 | Room list | `RoomListService`, filters, diffs, unread and mention counts | | `RoomListModel`, the channel list view (our design) |
 | Timeline | `Timeline`: pagination, local echo, send queue, edits, reactions, receipts | `Screens/Timeline` (cells, list, reactions, replies, thread summaries), `Services/Timeline` (SDK wrapper, view items) | adapters, our colours and type, cells we do not want removed |
-| Threads | thread focus, `ThreadListService`, thread subscriptions | `Screens/ThreadTimelineScreen`, `Screens/RoomThreadListScreen` | the article discussions and the threads in #one-Chat |
+| Threads | thread focus, `ThreadListService`, thread subscriptions | `Screens/ThreadTimelineScreen`, `Screens/RoomThreadListScreen` | the article discussions and the threads in #one |
 | Composer | send queue, replies, edits, `Mentions`, markdown to HTML, media upload | the composer, its formatting toolbar (+ › Textformatierung) and mention suggestions from `Screens/RoomScreen`, `Other/Pills` | no polls, no voice messages |
 | Media | thumbnails, files, upload with progress | `Screens/FilePreviewScreen`, `Screens/MediaPickerScreen`, `Screens/MediaUploadPreviewScreen`; link previews through Apple's `LPMetadataProvider` (the phone fetches the page, not Synapse's preview_url) | the upload progress bar under a sending photo, video or file (`Shim/ChatUploadProgress.swift`); animated GIFs play from the original and go out unchanged (Element X), with Reduce Motion as their first frame (patch) |
 | Design system | | `compound-ios` (needed by the views), recoloured through its override API | our tokens: teal, coral, greys; teal for all content, coral only for #one and sign-in (the colour rule in `App/Sources/Theme.swift`; it overrides the coral badges and mentions in `design/screens.html`) |

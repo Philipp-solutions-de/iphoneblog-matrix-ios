@@ -12,6 +12,8 @@ final class ChatSession: ObservableObject, ChatHost {
     let userID: String
     let rooms = RoomListModel()
     let mentions = MentionsModel()
+    /// "Für dich": mentions, threads you are in, rooms with news.
+    let forYou = ForYouModel()
     let notificationPrefs = NotificationPrefs()
     let router: Router
     /// The Blog room and whether this person may use #one-Chat; set once sync runs.
@@ -93,6 +95,8 @@ final class ChatSession: ObservableObject, ChatHost {
         await resolveRooms()
         try await ChatScreens.provider.start(host: self)
         mentions.attach(to: self)
+        forYou.attach(to: self)
+        await loadBots()
         notificationPrefs.attach(to: self)
         displayName = try? await client.displayName()
         await loadAvatar()
@@ -181,18 +185,19 @@ final class ChatSession: ObservableObject, ChatHost {
             .debounce(for: .seconds(2), scheduler: RunLoop.main)
             .sink { [weak self] _ in Task { await self?.refreshMembership() } }
         // The tab badges and each room's mention count follow the room list and @Mentions.
-        badgeWatch = rooms.$rooms.combineLatest(mentions.$items, $isOneMember)
+        badgeWatch = rooms.$rooms.combineLatest(mentions.$items, $isOneMember, forYou.$threads)
             .receive(on: RunLoop.main)
-            .sink { [weak self] rooms, items, member in
+            .sink { [weak self] rooms, items, member, threads in
                 guard let self else { return }
                 let byRoom = items.filter(\.unread).reduce(into: [String: Int]()) { $0[$1.roomID, default: 0] += 1 }
                 self.rooms.serverMentions = byRoom
                 // Every #one room counts towards the #one-Chat badge.
                 let channels = self.rooms.channelIDs
                 let chat = member ? rooms.filter { channels.contains($0.id) }.reduce(0) { $0 + $1.unreadMessages } : 0
-                let unread = items.filter(\.unread).count
+                // Für dich: unread mentions and threads with new replies.
+                let unread = items.filter(\.unread).count + threads.filter(\.isUnread).count
                 if router.chatBadge != chat { router.chatBadge = chat }
-                if router.mentionsBadge != unread { router.mentionsBadge = unread }
+                if router.forYouBadge != unread { router.forYouBadge = unread }
             }
         membershipTimer = Task { [weak self] in
             while !Task.isCancelled {
@@ -385,6 +390,26 @@ final class ChatSession: ObservableObject, ChatHost {
 
     func showMessage(_ text: String) {
         router.notice = text
+    }
+
+    // MARK: - Bots
+
+    /// The accounts the chat server lists as bots (GET /_iphoneblog/v1/bots): marked "Bot" in the
+    /// timeline. Debug runs against a test server may name them (IPHONEBLOG_BOTS).
+    func loadBots() async {
+        #if DEBUG
+        if let list = ProcessInfo.processInfo.environment["IPHONEBLOG_BOTS"], !list.isEmpty {
+            ChatScreens.provider.setBots(Set(list.split(separator: ",").map(String.init)))
+            return
+        }
+        #endif
+        let base = client.homeserver().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard let url = URL(string: base + "/_iphoneblog/v1/bots"),
+              let (data, response) = try? await URLSession.shared.data(from: url),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let bots = json["bots"] as? [String] else { return }
+        ChatScreens.provider.setBots(Set(bots))
     }
 
     // MARK: - Push

@@ -6,6 +6,7 @@
 // conversation views for another kit means replacing this file and the ChatKit framework.
 
 import ChatKit
+import Combine
 import MatrixRustSDK
 import SwiftUI
 
@@ -47,6 +48,10 @@ final class ElementXChatScreens: ChatScreenProviding {
         return session.threadView(roomID: roomID, rootEventID: rootEventID, host: adapter(for: host))
     }
 
+    func roomScreenUnderBar(roomID: String, host: ChatHost) -> AnyView {
+        AnyView(roomScreen(roomID: roomID, host: host).environment(\.chatRoomHeaderHidden, true))
+    }
+
     func discussionScreen(roomID: String, rootEventID: String, host: ChatHost) -> AnyView {
         AnyView(threadScreen(roomID: roomID, rootEventID: rootEventID, host: host)
             .environment(\.chatThreadHeaderHidden, true))
@@ -59,6 +64,27 @@ final class ElementXChatScreens: ChatScreenProviding {
     func threadsEntry(host: ChatHost, open: @escaping () -> Void) -> AnyView {
         guard let session else { return AnyView(EmptyView()) }
         return session.threadsEntryView(open: open)
+    }
+
+    func involvedThreads() -> AnyPublisher<[InvolvedThread], Never> {
+        guard let session else { return Just([]).eraseToAnyPublisher() }
+        return session.involvedThreads()
+            .map { threads in
+                threads.map {
+                    InvolvedThread(roomID: $0.roomID, roomName: $0.roomName, rootEventID: $0.rootEventID,
+                                   rootText: $0.rootText, rootSenderID: $0.rootSenderID, rootSenderName: $0.rootSenderName,
+                                   replies: $0.replies, latestSenderID: $0.latestSenderID,
+                                   latestSenderName: $0.latestSenderName, latestText: $0.latestText,
+                                   lastActivity: $0.lastActivity, isUnread: $0.isUnread)
+                }
+            }
+            .eraseToAnyPublisher()
+    }
+
+    func setBots(_ ids: Set<String>) { ChatKitBots.ids = ids }
+
+    func markThreadsSeen(_ threads: [InvolvedThread]) {
+        session?.markThreadsSeen(threads.map { (roomID: $0.roomID, rootEventID: $0.rootEventID) })
     }
 
     func threadsScreen(host: ChatHost) -> AnyView {
