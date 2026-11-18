@@ -94,17 +94,23 @@ final class FourTabsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Keine Treffer"].waitForExistence(timeout: 20))
     }
 
-    /// Many new messages: the Neu divider above the first, and the pill that jumps to it.
+    /// Many new messages: the Neu divider above the first, and the pill that jumps to it. In a
+    /// room of its own: thirty messages in the channel would push the seeded GIF and files out of
+    /// sight for the tests that come after (GifUITests, RichMessagesUITests).
     func testNeuDividerAndJumpPill() throws {
+        let me = try TestServer.signIn(1)
         let other = try TestServer.signIn(2)
-        defer { other.signOut() }
-        let app = launch(tab: "foryou")
-        XCTAssertTrue(app.tabBars.buttons["#one"].waitForExistence(timeout: 120), "not signed in")
-        sleep(3)
+        defer { me.signOut(); other.signOut() }
         let stamp = Int(Date().timeIntervalSince1970)
-        for n in 1...30 { try other.send("Neu \(n) \(stamp)", in: room) }
-        sleep(4)
-        app.tabBars.buttons["#one"].tap()
+        let space = try me.resolve(env["IPHONEBLOG_ONE_ALIAS"] ?? "#one:localhost")
+        let busy = try me.createRoom("Neutest \(stamp)")
+        try me.addChild(busy, toSpace: space, order: "y\(stamp)")
+        // The tester has written there, so what comes after counts as new.
+        try me.send("Hallo", in: busy)
+        try other.join(busy)
+        for n in 1...30 { try other.send("Neu \(n) \(stamp)", in: busy) }
+        let app = launch(tab: "chat", room: busy)
+        XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "the room did not open")
         let pill = app.buttons["room.jumpToUnread"]
         if !pill.waitForExistence(timeout: 30) { save(app, "debug-jump-pill") }
         XCTAssertTrue(pill.exists, "no pill for the first unread message out of sight")
