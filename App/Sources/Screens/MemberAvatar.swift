@@ -10,7 +10,6 @@ struct MemberAvatar: View {
     /// The room the person was seen in: its member event is the picture's freshest source.
     var roomID: String?
     var size: CGFloat = Theme.Size.chatAvatar
-    var corner: CGFloat?
 
     @State private var image: UIImage?
 
@@ -29,11 +28,11 @@ struct MemberAvatar: View {
             if let image {
                 Image(uiImage: image).resizable().scaledToFill()
                     .frame(width: size, height: size)
-                    .clipShape(RoundedRectangle(cornerRadius: corner ?? size / 2))
+                    .clipShape(AvatarShape.of(size))
                     .accessibilityHidden(!Self.exposedForTests)
                     .accessibilityIdentifier("avatar-image")
             } else {
-                InitialsAvatar(name: name, size: size, corner: corner)
+                InitialsAvatar(name: name, size: size)
             }
         }
         .task(id: userID) { image = await AvatarStore.shared.image(for: userID, in: roomID, size: size) }

@@ -21,6 +21,16 @@ final class MessageTextView: UITextView, PillAttachmentViewProviderDelegate, UIG
         super.addGestureRecognizer(gestureRecognizer)
     }
     
+    /// iphoneblog: a double tap on a message starts no selection and no Writing Tools (Philip,
+    /// 2026-11-18). Links and mentions keep their single tap; "Text auswählen" in the long-press
+    /// menu selects text on purpose (ChatTextSelection).
+    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        if let tap = gestureRecognizer as? UITapGestureRecognizer, tap.numberOfTapsRequired > 1 {
+            return false
+        }
+        return super.gestureRecognizerShouldBegin(gestureRecognizer)
+    }
+    
     /// This prevents the magnifying glass from showing up
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
         if otherGestureRecognizer is UILongPressGestureRecognizer {
@@ -183,6 +193,8 @@ struct MessageText: UIViewRepresentable {
         }
         textView.isEditable = false
         textView.isScrollEnabled = false
+        // iphoneblog: no Writing Tools over a message (Philip, 2026-11-18).
+        textView.writingToolsBehavior = .none
         textView.adjustsFontForContentSizeCategory = true
         
         // Required to allow tapping links

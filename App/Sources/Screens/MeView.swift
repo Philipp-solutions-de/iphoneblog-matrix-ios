@@ -112,7 +112,7 @@ struct MeView: View {
                     if let avatar = session.avatar {
                         Image(uiImage: avatar).resizable().scaledToFill()
                             .frame(width: Theme.Size.profileAvatar, height: Theme.Size.profileAvatar)
-                            .clipShape(Circle())
+                            .clipShape(AvatarShape.of(Theme.Size.profileAvatar))
                     } else {
                         InitialsAvatar(name: session.displayName ?? MentionsModel.localpart(session.userID), size: Theme.Size.profileAvatar)
                     }

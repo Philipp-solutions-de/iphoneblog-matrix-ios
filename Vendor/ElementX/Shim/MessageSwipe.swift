@@ -22,6 +22,8 @@ struct MessageSwipe<Leading: View, Trailing: View>: ViewModifier {
     private let feedback = UIImpactFeedbackGenerator(style: .medium)
 
     let isEnabled: () -> Bool
+    /// False inside a thread (Philip, 2026-11-18): the row does not move right and shows no icon.
+    var allowsRight: () -> Bool = { true }
     let leading: () -> Leading
     let trailing: () -> Trailing
     let swipedRight: () -> Void
@@ -48,17 +50,14 @@ struct MessageSwipe<Leading: View, Trailing: View>: ViewModifier {
                 case .began:
                     feedback.prepare()
                 case .ended:
-                    if xOffset > actionThreshold { swipedRight() }
+                    if xOffset > actionThreshold, allowsRight() { swipedRight() }
                     if xOffset < -actionThreshold { swipedLeft() }
                     reset()
                 case .cancelled, .failed:
                     reset()
                 default:
                     let dx = recognizer.translation(in: nil).x
-                    let normalised = max(-travel, min(dx, travel)) / travel
-                    // Slower the further it goes: a circular ease-out, as Element X's swipe.
-                    let eased = sqrt((2 - abs(normalised)) * abs(normalised)) * (normalised < 0 ? -1 : 1)
-                    xOffset = eased * maxOffset
+                    xOffset = MessageSwipeMath.offset(dx: dx, travel: travel, maxOffset: maxOffset, allowsRight: allowsRight())
                     let past = abs(xOffset) > actionThreshold
                     if past, !passedThreshold { feedback.impactOccurred() }
                     passedThreshold = past
@@ -72,13 +71,25 @@ struct MessageSwipe<Leading: View, Trailing: View>: ViewModifier {
     }
 }
 
+/// How far a row moves for a pan of `dx` points (MessageSwipeTests).
+public enum MessageSwipeMath {
+    /// Slower the further it goes (a circular ease-out, as Element X's swipe); never to the right
+    /// when the right swipe is off (inside a thread), so no icon shows there.
+    nonisolated public static func offset(dx: CGFloat, travel: CGFloat = 1000, maxOffset: CGFloat = 100, allowsRight: Bool) -> CGFloat {
+        let normalised = max(-travel, min(dx, travel)) / travel
+        let eased = sqrt((2 - abs(normalised)) * abs(normalised)) * (normalised < 0 ? -1 : 1)
+        return allowsRight ? eased * maxOffset : min(0, eased * maxOffset)
+    }
+}
+
 extension View {
     func messageSwipe(isEnabled: @escaping () -> Bool,
+                      allowsRight: @escaping () -> Bool = { true },
                       leading: @escaping () -> some View,
                       trailing: @escaping () -> some View,
                       swipedRight: @escaping () -> Void,
                       swipedLeft: @escaping () -> Void) -> some View {
-        modifier(MessageSwipe(isEnabled: isEnabled, leading: leading, trailing: trailing,
+        modifier(MessageSwipe(isEnabled: isEnabled, allowsRight: allowsRight, leading: leading, trailing: trailing,
                               swipedRight: swipedRight, swipedLeft: swipedLeft))
     }
 }

@@ -247,7 +247,7 @@ final class MentionsModel: ObservableObject {
         return title
     }
 
-    private func name(of userID: String, session: ChatSession) async -> String {
+    func name(of userID: String, session: ChatSession) async -> String {
         if let known = names[userID] { return known }
         let name = (try? await session.client.getProfile(userId: userID))?.displayName ?? Self.localpart(userID)
         names[userID] = name

@@ -104,7 +104,7 @@ struct ThreadNewsRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             MemberAvatar(userID: thread.rootSenderID, name: starter, roomID: thread.roomID,
-                         size: Theme.Size.chatAvatar, corner: Theme.Size.chatAvatarCorner)
+                         size: Theme.Size.chatAvatar)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text("# \(thread.roomName) · Thread")
