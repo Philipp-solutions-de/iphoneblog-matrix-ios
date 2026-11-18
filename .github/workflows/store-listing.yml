@@ -1,0 +1,35 @@
+name: App Store listing
+
+# Run by hand on main: uploads the App Store texts (fastlane/metadata) and screenshots
+# (fastlane/screenshots) to the app record of the team in the `apple` environment. No build,
+# no submission: a person submits in App Store Connect. docs/app-store.md, "Upload".
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  listing:
+    if: github.ref == 'refs/heads/main'
+    environment: apple
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BUNDLE_FROZEN: "true"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+      - name: Texts and screenshots to App Store Connect
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: bundle exec fastlane ios store_listing

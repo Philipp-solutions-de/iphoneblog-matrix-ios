@@ -197,30 +197,54 @@ All within Apple's 30 characters (counted with spaces). Category: **primary News
 Social Networking would invite the reviewer to judge the app as a social network first, and
 the reader-app case rests on it being a publication.
 
-**Screenshots** (6.9" iPhone, German, the demo account, no prices, no "Chat" in captions):
+**Screenshots**: `scripts/store-screenshots.sh` takes six on an iPhone 17 Pro Max (1320 × 2868,
+Apple's 6.9" size, which App Store Connect scales down for smaller iPhones), German, light, with
+Apple's status bar (9:41), into `fastlane/screenshots/de-DE`. Articles come from live www's app
+view; the signed-in shots from the test server (`scripts/test-homeserver.sh`).
 
-1. Blog: the article list. "Alle Artikel von iPhoneBlog.de"
-2. One article, open. "Lesen ohne Anmeldung"
-3. The discussion under that article. "Unter jedem Artikel: die Diskussion"
-4. A #one article, open for a member. "#one: die Inhalte für Mitglieder"
-5. The members' room with a thread about an article. "Mit anderen Mitgliedern über die News reden"
-6. Ich: notifications, blocked users, report. "Mitteilungen, Melden und Blockieren"
+1. `1_artikel`: the article list, signed out.
+2. `2_artikel-offen`: one public article, open.
+3. `3_diskussion`: the discussion under an article.
+4. `4_one`: #one, the members' area.
+5. `5_thread`: a thread in the members' room.
+6. `6_ich`: Ich, with notifications, the blocked list, the moderation contact and "Konto löschen".
 
-**The tab label shows in shot 5:** the app calls the tab "#one-Chat". To keep "Chat" out of the
-screenshots the tab becomes "#one" (or "#one-connect") in the app itself; the app session owns
-that label.
+No prices, no "Chat" in a caption. Before the shots that go to Apple:
+- **The tab label** shows in shots 4 and 5: the app calls the tab "#one-Chat". To keep "Chat" out
+  of the screenshots, the tab becomes "#one" (or "#one-connect") in the app itself; the app
+  session owns that label.
+- **The chat's content** in shots 3 to 6 is the test server's: colour-bar test images, "Meine
+  antwort4843", and "tester @tester:localhost" in Ich. For Apple it needs a staged conversation
+  about a real article, in German, with the posters' consent (or members' real posts with
+  theirs), and a demo member with a real-looking name and picture. A seed for that is not built
+  yet.
+- **The navigation** may still change (four tabs, "Für dich"); take the shots from the build
+  that is submitted.
+
+A #one article open for a member is not among them: the screenshot run has no signed-in session
+on www.
 
 ## Review notes and demo account
 
 `fastlane/metadata/review_information/notes.txt` (English). Before submitting, replace
-`CONTACT_NAME` and `CONTACT_PHONE`; add a line on the word filter if it is on by then. The demo account (`demo_user.txt`, `demo_password.txt`, never in git: CI writes
-them from the `apple` environment's secrets) must be a #one member **on live**: Apple reviews
+`CONTACT_NAME` and `CONTACT_PHONE`; add a line on the word filter if it is on by then. The demo
+account (entered by hand in App Store Connect, never in git) must be a #one member **on live**: Apple reviews
 against the App Store build, which signs in through live. That needs the chat on live (launch
 step, Thorsten's yes).
 
 ## Upload
 
-`fastlane ios beta` uploads to TestFlight only. The App Store needs a lane that runs `deliver`
-with `fastlane/metadata`, the store screenshots (6.9" iPhone at least) and `submit_for_review`
-off by default, on Alex's team, which publishes (2026-11-16), with his Admin API key in the
-`apple` environment.
+`fastlane ios beta` uploads a build to TestFlight. `fastlane ios store_listing` uploads the App
+Store page: `fastlane/metadata` (texts, categories, review notes) and `fastlane/screenshots`, no
+binary, and it **never submits**. A person picks the build and presses "Submit for Review" in App
+Store Connect. The workflow "App Store listing" runs the lane by hand on `main`, with the `apple`
+environment's key. The demo account goes in by hand in App Store Connect (App Review
+Information), so its password is in no file and no secret.
+
+Not through the lane, because Apple's API does not take them with an API key: the App Privacy
+labels and the age rating. Thorsten answers them as Admin in App Store Connect, from the sections
+above.
+
+The lane runs only against the team in the `apple` environment, today Thorsten's, which has no
+App Store record for this app. It is for Alex's team after the switch (the bundle-id plan,
+iphoneblog-wordpress `docs/TODO.md`).
