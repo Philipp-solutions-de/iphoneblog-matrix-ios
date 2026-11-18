@@ -113,6 +113,43 @@ struct TestServer {
                           method: "POST", token: token, body: thread.map { ["thread_id": $0] } ?? [:])
     }
 
+    /// A room push rule for this account: "notify" for every event in the room, as the app's
+    /// "Alle Nachrichten" for a room writes it; nil removes it.
+    func setRoomRule(_ room: String, notify: Bool?) throws {
+        let path = "/_matrix/client/v3/pushrules/global/room/\(Self.encode(room))"
+        guard let notify else {
+            _ = try? Self.call(base, path, method: "DELETE", token: token, body: nil)
+            return
+        }
+        _ = try Self.call(base, path, method: "PUT", token: token, body: ["actions": notify ? ["notify"] : []])
+    }
+
+    /// Reacts to an event and returns the reaction's ID.
+    func react(_ key: String, to event: String, in room: String) throws -> String {
+        let path = "/_matrix/client/v3/rooms/\(Self.encode(room))/send/m.reaction/r\(UInt64(Date().timeIntervalSince1970 * 1000))\(Int.random(in: 0..<1000))"
+        let result = try Self.call(base, path, method: "PUT", token: token,
+                                   body: ["m.relates_to": ["rel_type": "m.annotation", "event_id": event, "key": key]])
+        return try XCTUnwrap(result["event_id"] as? String, "reaction failed")
+    }
+
+    /// Redacts an event and returns the redaction's ID.
+    func redact(_ event: String, in room: String) throws -> String {
+        let path = "/_matrix/client/v3/rooms/\(Self.encode(room))/redact/\(Self.encode(event))/x\(UInt64(Date().timeIntervalSince1970 * 1000))"
+        let result = try Self.call(base, path, method: "PUT", token: token, body: [:])
+        return try XCTUnwrap(result["event_id"] as? String, "redaction failed")
+    }
+
+    /// The server's notification count for this account in the room (the push badge's source).
+    func notificationCount(in room: String) throws -> Int {
+        let filter = #"{"room":{"rooms":["\#(room)"],"timeline":{"limit":1},"state":{"lazy_load_members":true}},"presence":{"not_types":["*"]},"account_data":{"not_types":["*"]}}"#
+        // A distinct timeout per call: Synapse answers an identical /sync from its cache for two
+        // minutes, so polling the same request would read the first count again and again.
+        let sync = try Self.call(base, "/_matrix/client/v3/sync?timeout=\(Int.random(in: 1...999))&filter=\(filter.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "")",
+                                 method: "GET", token: token, body: nil)
+        let joined = ((sync["rooms"] as? [String: Any])?["join"] as? [String: Any])?[room] as? [String: Any]
+        return (joined?["unread_notifications"] as? [String: Any])?["notification_count"] as? Int ?? 0
+    }
+
     /// Sends a message with any content (an article root, a formatted body). Returns its ID.
     @discardableResult
     func sendContent(_ content: [String: Any], in room: String) throws -> String {

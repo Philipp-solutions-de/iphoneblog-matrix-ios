@@ -32,6 +32,32 @@ final class ReceiptsUITests: XCTestCase {
         XCTAssertEqual(try storedReceipt(me.userID, in: room, thread: "main"), last, "the main receipt is not on the newest message")
     }
 
+    /// Philip's #bugs (2026-11-18): a room rule "notify" counts every event, and a reaction's
+    /// redaction after the last message stayed counted, because no timeline shows it. Read to
+    /// the end, the room's count on the server is 0.
+    func testHiddenEventsAfterTheLastMessageAreReadToo() throws {
+        let me = try TestServer.signIn(1), other = try TestServer.signIn(2)
+        // A teardown block, not defer: a failed assertion stops the test with an exception that
+        // skips defer, and the rule would stay for every test after.
+        let channel = room
+        addTeardownBlock { try? me.setRoomRule(channel, notify: nil); me.signOut(); other.signOut() }
+        try me.setRoomRule(room, notify: true)
+        let stamp = Int(Date().timeIntervalSince1970)
+        let before = try other.send("Quittung vorher C \(stamp)", in: room)
+        try me.readReceipt(before, in: room, thread: nil)
+        let last = try other.send("Quittung letzte C \(stamp)", in: room)
+        let reaction = try other.react("👍", to: last, in: room)
+        let redaction = try other.redact(reaction, in: room)
+        XCTAssertGreaterThan(try me.notificationCount(in: room), 0, "the room rule counts nothing; the test proves nothing")
+
+        let app = launch(["IPHONEBLOG_START_TAB": "chat", "IPHONEBLOG_START_ROOM": room])
+        XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "room did not open")
+        XCTAssertTrue(waitFor(30) { (try? self.storedReceipt(me.userID, in: room, thread: nil)) == redaction },
+                      "the unthreaded receipt is not on the redaction after the last message")
+        XCTAssertTrue(waitFor(30) { (try? me.notificationCount(in: room)) == 0 },
+                      "the server still counts the room: \((try? me.notificationCount(in: room)) ?? -1), main receipt \((try? self.storedReceipt(me.userID, in: room, thread: "main")) ?? "none"), last \(last), redaction \(redaction)")
+    }
+
     func testOpeningAThreadSendsNoReceiptTheServerRefuses() throws {
         let me = try TestServer.signIn(1), other = try TestServer.signIn(2)
         defer { me.signOut(); other.signOut() }

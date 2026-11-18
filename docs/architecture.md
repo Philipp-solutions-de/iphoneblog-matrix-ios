@@ -147,9 +147,13 @@ thread and per room timeline on the newest listed mention, says when one fails, 
 **A room read to its end also gets an unthreaded receipt.** The timelines send threaded
 receipts only ("main" and one per thread), but the Rust SDK counts a room's unread messages from
 the main and unthreaded receipts, so thread replies kept a room's badge at 1 while the server
-had 0 (Alex's #entertainment, 2026-11-17). When the room's timeline shows the room's newest
-event, an unthreaded receipt follows on it (`ChatSession+Receipts.swift`). It waits while a
-thread mention in the room is unread, because it would mark that mention read too. The badge
+had 0 (Alex's #entertainment, 2026-11-17). When the room's timeline has shown its newest
+message, an unthreaded receipt goes on the room's newest event (`ChatSession+Receipts.swift`),
+hidden ones included: a room push rule "notify" counts redactions, reactions and edits that no
+timeline shows, so no receipt ever reached them (Philip's #bugs, 2026-11-18). The main receipt
+follows to the newest of those the server files under "main" (never a thread's reaction, which
+the server refuses). Neither passes a message or thread reply not yet seen, and the unthreaded
+one waits while a thread mention in the room is unread, because it would mark that mention read. The badge
 does not take the server's counts instead: they follow push rules, and the app turns
 `.m.rule.message` off for members who want no message pushes.
 
