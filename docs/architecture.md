@@ -144,6 +144,19 @@ Synapse's own `read` flag in /notifications is not used: it takes one receipt ro
 whichever the database returns last, of any thread. "Alle als gelesen" sends one receipt per
 thread and per room timeline on the newest listed mention, says when one fails, and reloads.
 
+**A room read to its end also gets an unthreaded receipt.** The timelines send threaded
+receipts only ("main" and one per thread), but the Rust SDK counts a room's unread messages from
+the main and unthreaded receipts, so thread replies kept a room's badge at 1 while the server
+had 0 (Alex's #entertainment, 2026-11-17). When the room's timeline shows the room's newest
+event, an unthreaded receipt follows on it (`ChatSession+Receipts.swift`). It waits while a
+thread mention in the room is unread, because it would mark that mention read too. The badge
+does not take the server's counts instead: they follow push rules, and the app turns
+`.m.rule.message` off for members who want no message pushes.
+
+**A thread opens only on its root.** A thread timeline built on a reply's ID sends receipts
+naming that reply as the thread, and Synapse refuses each with 400 (Alex's #bugs, 2026-11-17).
+`ResolvedThreadScreen` asks the server first and moves the route to the real root.
+
 **Contact details go by mail, not into the chat.** A tap on a name, an avatar or a mention
 opens the person's profile; a long press on a name or avatar opens "Kontaktdaten teilen" at
 once. Members choose their email address (the blog account's, held by the server) and/or a phone

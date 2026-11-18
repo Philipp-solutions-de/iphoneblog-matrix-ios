@@ -173,7 +173,7 @@ final class MentionsModel: ObservableObject {
     }
 
     /// An event's server time, from @Mentions itself or the server, kept for the app's run.
-    private func eventTime(_ eventID: String, roomID: String, session: ChatSession) async -> Date? {
+    func eventTime(_ eventID: String, roomID: String, session: ChatSession) async -> Date? {
         if let known = eventTimes[eventID] { return known }
         if let listed = items.first(where: { $0.id == eventID }) { return listed.date }
         let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/?#"))

@@ -26,6 +26,17 @@ final class RouterTests: XCTestCase {
         XCTAssertEqual(router.chatPath, [.threads, .thread(.init(roomID: "!b", rootEventID: "$r"))])
     }
 
+    /// A thread opened on a reply moves to its real root, in place, and the receipts' screen
+    /// check then matches the root (ResolvedThreadScreen).
+    func testCorrectThreadMovesTheRouteToItsRoot() {
+        let router = Router()
+        router.openThread(roomID: "!a", rootEventID: "$reply")
+        router.correctThread(roomID: "!a", from: "$reply", to: "$root")
+        XCTAssertEqual(router.chatPath, [.room("!a"), .thread(.init(roomID: "!a", rootEventID: "$root"))])
+        XCTAssertTrue(router.isOnScreen(roomID: "!a", threadRootEventID: "$root"))
+        XCTAssertFalse(router.isOnScreen(roomID: "!a", threadRootEventID: "$reply"))
+    }
+
     /// A push or link into an article thread opens it in the Blog tab, not in #one-Chat.
     func testBlogThreadOpensInBlogTab() {
         let router = Router()

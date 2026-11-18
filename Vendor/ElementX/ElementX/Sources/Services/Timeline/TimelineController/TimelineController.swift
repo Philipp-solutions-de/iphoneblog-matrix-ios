@@ -137,11 +137,11 @@ class TimelineController: TimelineControllerProtocol {
         }
         
         let result = await activeTimeline.sendReadReceipt(for: eventID, type: receiptType)
-        // iphoneblog: tell the app what was seen, so @Mentions follows (ChatKitReads).
+        // iphoneblog: tell the app what was seen, so @Mentions and the room count follow (ChatKitReads).
         if case .success = result {
             var threadRootEventID: String?
             if case let .thread(rootEventID) = timelineKind { threadRootEventID = rootEventID }
-            ChatKitReads.seen?(roomProxy.id, threadRootEventID, eventID)
+            ChatKitReads.seen?(roomProxy.id, threadRootEventID, eventID, receiptType == .readPrivate)
         }
     }
     

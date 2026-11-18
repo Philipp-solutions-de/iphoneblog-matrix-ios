@@ -15,8 +15,10 @@ cd "$here"
 mkdir -p build
 action="${1:-build}"
 
-# The newest available iPhone simulator, by runtime version.
-device="$(xcrun simctl list devices available -j | python3 -c '
+# The newest available iPhone simulator, by runtime version; DEVICE=<udid> picks one (the
+# 393 pt screenshots for design pages).
+device="${DEVICE:-}"
+[[ -n "$device" ]] || device="$(xcrun simctl list devices available -j | python3 -c '
 import json, sys, re
 data = json.load(sys.stdin)["devices"]
 best = None
@@ -103,7 +105,7 @@ case "$action" in
         trap 'kill "$fixture" 2>/dev/null' EXIT
         sleep 1
         export TEST_RUNNER_IPHONEBLOG_FIXTURE="http://127.0.0.1:8793"
-        for name in TEST_HOMESERVER TEST_USER TEST_PASSWORD TEST_USER2 TEST_PASSWORD2 TEST_USER3 TEST_PASSWORD3 TEST_ADMIN TEST_ADMIN_PASSWORD ONE_ALIAS BLOG_ALIAS CHANNEL_ALIAS TEST_CHANNEL_ROOM TEST_ROOM2 TEST_BLOG_ROOM TEST_CHANNEL_THREAD TEST_ARTICLE_ROOT; do
+        for name in TEST_HOMESERVER TEST_USER TEST_PASSWORD TEST_USER2 TEST_PASSWORD2 TEST_USER3 TEST_PASSWORD3 TEST_ADMIN TEST_ADMIN_PASSWORD ONE_ALIAS BLOG_ALIAS CHANNEL_ALIAS TEST_CHANNEL_ROOM TEST_ROOM2 TEST_BLOG_ROOM TEST_CHANNEL_THREAD TEST_ARTICLE_ROOT TEST_SYNAPSE_LOG; do
             var="IPHONEBLOG_$name"
             [[ -n "${!var:-}" ]] && export "TEST_RUNNER_$var=${!var}"
         done

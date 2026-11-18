@@ -174,5 +174,6 @@ IPHONEBLOG_TEST_ROOM2=$raum2
 IPHONEBLOG_TEST_BLOG_ROOM=$blog
 IPHONEBLOG_TEST_CHANNEL_THREAD='$hello'
 IPHONEBLOG_TEST_ARTICLE_ROOT='$root'
+IPHONEBLOG_TEST_SYNAPSE_LOG=$dir/homeserver.log
 EOF
 echo "test-homeserver: running at $url with user $user and rooms ${rooms[*]}"
