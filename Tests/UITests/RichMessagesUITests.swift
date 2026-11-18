@@ -123,6 +123,23 @@ final class RichMessagesUITests: XCTestCase {
         XCTAssertNil(event["m.relates_to"], "a channel photo should not be in a thread: \(event)")
     }
 
+    /// One's own picture shows once it is on the server, even when the local copy the timeline
+    /// showed while sending cannot be read (Philip's picture in #bugs, 2026-11-18, stayed a
+    /// blurhash: the timeline kept loading the local copy and never asked the server). The app is
+    /// told to fail every local copy; the picture must still appear.
+    func testOwnPhotoShowsWhenTheLocalCopyFails() throws {
+        let app = try launch(["IPHONEBLOG_START_TAB": "chat", "IPHONEBLOG_START_ROOM": env["IPHONEBLOG_TEST_CHANNEL_ROOM"] ?? "",
+                              "IPHONEBLOG_FAIL_LOCAL_MEDIA": "1"])
+        XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "channel did not open")
+        _ = try sendPhoto(app, shotPrefix: "local-fail-")
+        let waiting = app.descendants(matching: .any).matching(identifier: "timeline-image.waiting")
+        let until = Date().addingTimeInterval(60)
+        while Date() < until, waiting.count > 0 { sleep(1) }
+        attach(app, "local-fail-after")
+        XCTAssertEqual(waiting.count, 0, "a picture in the timeline still shows only its blurhash")
+        XCTAssertTrue(app.descendants(matching: .any)["timeline-image.loaded"].exists, "no loaded picture in sight")
+    }
+
     /// The same in a thread: the picture arrives as a thread reply.
     func testPhotoInThreadIsSent() throws {
         guard let room = env["IPHONEBLOG_TEST_CHANNEL_ROOM"], let root = env["IPHONEBLOG_TEST_CHANNEL_THREAD"] else {

@@ -23,3 +23,71 @@
              case (.none, _), (_, false):
                  if let blurHashView {
                      if shouldRender {
+@@ -153,12 +160,34 @@
+         .animation(mediaType == .avatar ? .noAnimation : .elementDefault, value: contentLoader.content)
+         .animation(.elementDefault, value: loadManually)
+         .task(id: mediaSource.url.absoluteString + "\(shouldRender)") {
++            // iphoneblog: a timeline item keeps this view (and its loader) from its local echo to
++            // the event the server returns, so the loader must follow the new source: it kept the
++            // local file, which can be gone by then, and never asked the server (Philip's own
++            // picture in #bugs, 2026-11-18, only ever showed the blurhash).
++            contentLoader.use(mediaSource)
+             guard shouldRender, contentLoader.content == nil else {
+                 return
+             }
+             
++            // iphoneblog: a failed load is tried again, not left as a blurhash for good.
++            for delay in [2.0, 5.0, 15.0, 30.0] {
++                await contentLoader.load()
++                if contentLoader.content != nil || Task.isCancelled { return }
++                try? await Task.sleep(for: .seconds(delay))
++                if Task.isCancelled { return }
++            }
+             await contentLoader.load()
+         }
++        #if DEBUG
++        .overlay {
++            // iphoneblog: for UI tests (RichMessagesUITests), whether a timeline picture has loaded.
++            if case .timelineItem = mediaType {
++                Color.clear.frame(width: 1, height: 1)
++                    .accessibilityElement()
++                    .accessibilityIdentifier(contentLoader.content == nil ? "timeline-image.waiting" : "timeline-image.loaded")
++            }
++        }
++        #endif
+         .onDisappear {
+             guard contentLoader.content == nil else {
+                 return
+@@ -259,7 +288,7 @@
+     }
+     
+     private let mediaProvider: MediaProviderProtocol?
+-    private let mediaSource: MediaSourceProxy
++    private var mediaSource: MediaSourceProxy
+     private let size: CGSize?
+     private var imageLoadingCancellable: AnyCancellable?
+     
+@@ -288,7 +317,23 @@
+         self.mediaProvider = mediaProvider
+     }
+     
++    /// iphoneblog: the view's current source; a new one (the server's, after the local echo)
++    /// replaces the old, and a load in flight for the old one is dropped.
++    func use(_ source: MediaSourceProxy) {
++        guard source.url != mediaSource.url else { return }
++        imageLoadingCancellable?.cancel()
++        mediaSource = source
++    }
++    
+     func load() async {
++        #if DEBUG
++        // iphoneblog: UI tests make the local echo's copy fail to load, as it did on Philip's
++        // iPhone. The SDK's send queue names it mxc://send-queue.localhost/… until the upload ends.
++        if ProcessInfo.processInfo.environment["IPHONEBLOG_FAIL_LOCAL_MEDIA"] == "1",
++           mediaSource.url.scheme != "mxc" || mediaSource.url.host()?.hasPrefix("send-queue") == true {
++            return
++        }
++        #endif
+         if isGIF {
+             if case let .success(data) = await mediaProvider?.loadImageDataFromSource(mediaSource) {
+                 cachedContent = .gifData(data)
