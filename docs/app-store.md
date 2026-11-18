@@ -41,27 +41,33 @@ Enter the same as the manifest: **Data Linked to You**, purpose **App Functional
 | Category | Type | Why |
 |---|---|---|
 | Contact Info | Name, Email Address | the account, from iphoneblog.de's sign-in |
+| Contact Info | Phone Number | "Kontaktdaten teilen" (`ContactShare.swift`): typed, mailed once through Mailjet, not stored by us; declared because the mail service and the recipient keep it |
 | Identifiers | User ID | `@name:iphoneblog.de` |
-| User Content | Emails or Text Messages, Photos or Videos, Audio Data, Other User Content | messages, pictures, voice messages, reactions and reports |
-
-**When the app offers "Kontaktdaten teilen"** (the server's `POST /_iphoneblog/v1/contact-share`,
-infra `docs/matrix.md`, "Sharing contact details"; no screen in the app yet), the same build adds
-**Contact Info → Phone Number** to the labels (typed, mailed once through Mailjet, not stored by
-us; declared because the mail service and the recipient keep it), and this paragraph to
-`review_information/notes.txt` under "USER-GENERATED CONTENT":
-
-> - "Kontaktdaten teilen": a #one member can send their own email address and/or a phone number they type, with a short note, to one other member. It goes as a single email from chat@iphoneblog.de to that member's address on file; nothing appears in the chat, there is no reply in the app, and the recipient's address is never shown. Limits: 5 an hour, 20 a day, 2 a day to the same person. Unwanted mails can be forwarded to ao@iphoneblog.de.
+| User Content | Emails or Text Messages, Photos or Videos, Audio Data, Other User Content | messages, pictures, voice messages, reactions, reports and the contact-share note |
 
 **Data Used to Track You**: none. **Not collected**: purchases (Stripe on the website, not in the
-app), location, contacts, browsing history, diagnostics, usage data. Privacy policy URL
-`https://www.iphoneblog.de/datenschutz/`, once the chat's section is there.
+app), location, contacts, browsing history, search history (the chat search sends the term to
+our server and keeps nothing), usage data, and diagnostics: `MetricsReporter` reports only from
+TestFlight and Xcode builds, and the labels describe the App Store build. The push token is not a
+label type. The blog loads no analytics; articles may embed YouTube, Vimeo or X players, which
+are web content, not code in the app. Privacy policy URL `https://www.iphoneblog.de/datenschutz/`.
 
 ## Age rating
 
-App Store Connect's questionnaire: **user-generated content and messaging: yes**; **unrestricted
-web access: no**, because `BlogURLPolicy` keeps the web view on iphoneblog.de; every content
-question (violence, sexual content, gambling, contests, medical) **none**; no location sharing
-(the SDK's live location is not offered in the composer). Expected rating 13+.
+App Store Connect → App Information → Age Rating. Apple's questionnaire (tiers 4+, 9+, 13+, 16+,
+18+) has a list of in-app controls and capabilities, then content questions by frequency.
+
+- **Capabilities**: User-Generated Content and Messaging and Chat: **yes** (both alone give 4+).
+  Unrestricted Web Access: **no**, because `BlogURLPolicy` keeps the web view on iphoneblog.de
+  (yes would give 16+). Social Media: **no**: Apple means "a social feed or similar discovery
+  method that visibly spreads content to many users"; #one's rooms are a group chat and "Für dich"
+  lists only one's own mentions and threads (yes would give 13+ and a Social Media label).
+  Advertising, Parental Controls, Age Assurance: **no**.
+- **Content** (mature themes, medical or wellness, sexuality or nudity, violence, chance-based
+  activities including contests and loot boxes): **none** everywhere; no location sharing (the
+  SDK's live location is not offered in the composer).
+- **Result**: 4+. Whether to raise it with "Override to Higher Age Rating" is Thorsten's call:
+  member conversations have no word filter, and no page of iphoneblog.de sets a minimum age.
 
 ## Export compliance
 
