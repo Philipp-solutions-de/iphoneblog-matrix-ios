@@ -43,7 +43,7 @@ final class RouterTests: XCTestCase {
         let router = Router()
         router.openThread(roomID: "!a", rootEventID: "$reply")
         router.correctThread(roomID: "!a", from: "$reply", to: "$root")
-        XCTAssertEqual(router.chatPath, [.room("!a"), .thread(.init(roomID: "!a", rootEventID: "$root"))])
+        XCTAssertEqual(router.chatPath, [.thread(.init(roomID: "!a", rootEventID: "$root"))])
         XCTAssertTrue(router.isOnScreen(roomID: "!a", threadRootEventID: "$root"))
         XCTAssertFalse(router.isOnScreen(roomID: "!a", threadRootEventID: "$reply"))
     }
