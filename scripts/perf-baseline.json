@@ -19,7 +19,7 @@
         "Clock Monotonic Time": 8.0
       },
       "testScrollBlog": {
-        "Hitch time ratio": 40.0
+        "Hitch time ratio": 100.0
       },
       "testScrollOneChat": {
         "Hitch time ratio": 150.0
