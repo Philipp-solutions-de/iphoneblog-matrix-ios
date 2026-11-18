@@ -1,0 +1,36 @@
+--- a/ElementX/Sources/Screens/MediaUploadPreviewScreen/View/MediaUploadPreviewScreen.swift
++++ b/ElementX/Sources/Screens/MediaUploadPreviewScreen/View/MediaUploadPreviewScreen.swift
+@@ -17,6 +17,8 @@
+ 
+ struct MediaUploadPreviewScreen: View {
+     @Bindable var context: MediaUploadPreviewScreenViewModel.Context
++    /// iphoneblog: for the pictures in the caption's @ suggestions.
++    var mediaProvider: MediaProviderProtocol?
+     
+     @State private var captionWarningFrame: CGRect = .zero
+     @State private var currentIndex = 0
+@@ -38,10 +40,23 @@
+             .ignoresSafeArea(edges: [.horizontal])
+             .overlay(alignment: .top) { galleryBadge }
+             .safeAreaInset(edge: .bottom, spacing: 0) {
++                VStack(spacing: 0) {
++                // iphoneblog: the same @ suggestions as the message composer (Philip, 2026-11-18).
++                if !context.viewState.suggestions.isEmpty {
++                    CompletionSuggestionView(mediaProvider: mediaProvider,
++                                             items: context.viewState.suggestions,
++                                             showBackgroundShadow: false) { suggestion in
++                        context.send(viewAction: .selectedSuggestion(suggestion))
++                    }
++                    .padding(.horizontal, 12)
++                }
+                 composer
+                     .padding(.horizontal, 12)
+                     .padding(.vertical, 16)
+-                    .background() // Don't use compound so we match the QLPreviewController.
++                }
++                .background() // Don't use compound so we match the QLPreviewController.
++                .onChange(of: context.caption) { context.send(viewAction: .captionChanged) }
++                .onChange(of: context.selectedRange) { context.send(viewAction: .captionChanged) }
+             }
+             .navigationTitle(title)
+             .navigationBarTitleDisplayMode(.inline)

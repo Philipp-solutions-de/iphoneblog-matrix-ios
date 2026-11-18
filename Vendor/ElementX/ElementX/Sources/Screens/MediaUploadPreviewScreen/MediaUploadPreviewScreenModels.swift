@@ -20,6 +20,8 @@ struct MediaUploadPreviewScreenViewState: BindableState {
     var shouldDisableInteraction = false
     
     var mediaEditVersion = 0
+    /// iphoneblog: @ suggestions for the caption, as the message composer offers them.
+    var suggestions: [SuggestionItem] = []
     
     var bindings: MediaUploadPreviewScreenBindings
 }
@@ -43,4 +45,7 @@ enum MediaUploadPreviewScreenViewAction {
     case send
     case cancel
     case editedMedia(image: UIImage, index: Int)
+    /// iphoneblog: the caption's text or cursor changed, or a suggestion was picked.
+    case captionChanged
+    case selectedSuggestion(SuggestionItem)
 }

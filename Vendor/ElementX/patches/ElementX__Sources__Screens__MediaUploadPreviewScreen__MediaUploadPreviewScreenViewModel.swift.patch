@@ -1,0 +1,79 @@
+--- a/ElementX/Sources/Screens/MediaUploadPreviewScreen/MediaUploadPreviewScreenViewModel.swift
++++ b/ElementX/Sources/Screens/MediaUploadPreviewScreen/MediaUploadPreviewScreenViewModel.swift
+@@ -23,6 +23,10 @@
+     private var requestHandle: SendAttachmentJoinHandleProtocol?
+     private let clientProxy: ClientProxyProtocol
+     private let galleryEnabled: Bool
++    /// iphoneblog: @ mentions in the caption (Philip, 2026-11-18: a caption's "@Dominic" reached nobody).
++    private let completionSuggestionService: CompletionSuggestionServiceProtocol?
++    private let mentionBuilder = MentionBuilder()
++    private var suggestionsCancellable: AnyCancellable?
+     
+     private var actionsSubject: PassthroughSubject<MediaUploadPreviewScreenViewModelAction, Never> = .init()
+     
+@@ -38,13 +42,15 @@
+          mediaUploadingPreprocessor: MediaUploadingPreprocessor,
+          timelineController: TimelineControllerProtocol,
+          clientProxy: ClientProxyProtocol,
+-         userIndicatorController: UserIndicatorControllerProtocol) {
++         userIndicatorController: UserIndicatorControllerProtocol,
++         completionSuggestionService: CompletionSuggestionServiceProtocol? = nil) {
+         self.mediaURLs = mediaURLs
+         self.mediaUploadingPreprocessor = mediaUploadingPreprocessor
+         self.timelineController = timelineController
+         self.clientProxy = clientProxy
+         self.userIndicatorController = userIndicatorController
+         self.galleryEnabled = galleryEnabled
++        self.completionSuggestionService = completionSuggestionService
+         
+         // Start processing the media whilst the user is reviewing it/adding a caption.
+         processingTask = Self.processMedia(at: mediaURLs, preprocessor: mediaUploadingPreprocessor, clientProxy: clientProxy)
+@@ -53,11 +59,18 @@
+                                                                        title: title,
+                                                                        shouldShowCaptionWarning: shouldShowCaptionWarning,
+                                                                        bindings: .init(caption: caption ?? NSAttributedString())))
++        
++        completionSuggestionService?.setSuggestionTrigger(nil)
++        suggestionsCancellable = completionSuggestionService?.suggestionsPublisher
++            .receive(on: DispatchQueue.main)
++            .sink { [weak self] in self?.state.suggestions = $0 }
+     }
+     
+     override func process(viewAction: MediaUploadPreviewScreenViewAction) {
+         // Get the current caption before all the processing starts.
+-        let caption = state.bindings.caption.nonBlankString
++        // iphoneblog: its pills as markdown links, so the send can mention them (ComposerText.caption).
++        let captionMarkdown = ComposerPills.markdown(state.bindings.caption).trimmingCharacters(in: .whitespacesAndNewlines)
++        let caption: String? = captionMarkdown.isEmpty ? nil : captionMarkdown
+         
+         switch viewAction {
+         case .send:
+@@ -101,6 +114,10 @@
+                     showError(label: L10n.screenMediaUploadPreviewErrorFailedProcessing)
+                 }
+             }
++        case .captionChanged:
++            completionSuggestionService?.processTextMessage(state.bindings.caption.string, selectedRange: state.bindings.selectedRange)
++        case .selectedSuggestion(let suggestion):
++            insert(suggestion)
+         case .cancel:
+             requestHandle?.cancel()
+             actionsSubject.send(.dismiss)
+@@ -156,6 +173,17 @@
+                                                     inReplyToEventID: nil)
+     }
+     
++    /// iphoneblog: a picked person becomes a pill in the caption, as in the message composer.
++    private func insert(_ suggestion: SuggestionItem) {
++        guard case let .user(user) = suggestion.suggestionType,
++              let url = try? URL(string: matrixToUserPermalink(userId: user.id)) else { return }
++        let text = NSMutableAttributedString(attributedString: state.bindings.caption)
++        mentionBuilder.handleUserMention(for: text, in: suggestion.range, url: url, userID: user.id, userDisplayName: user.displayName)
++        state.bindings.caption = text
++        state.bindings.selectedRange = NSRange(location: state.bindings.selectedRange.location - suggestion.rawSuggestionText.count, length: 0)
++        state.suggestions = []
++    }
++    
+     func stopProcessing() {
+         processingTask.cancel()
+     }

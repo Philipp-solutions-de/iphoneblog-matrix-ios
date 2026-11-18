@@ -282,9 +282,9 @@ final class TimelineProxy: TimelineProxyProtocol {
         
         do {
             let handle = try timeline.sendAudio(params: .init(source: .file(filename: url.path(percentEncoded: false)),
-                                                              caption: caption,
-                                                              formattedCaption: nil, // Rust will build this from the caption's markdown.
-                                                              mentions: nil,
+                                                              caption: ComposerText.caption(caption)?.body,
+                                                              formattedCaption: ComposerText.caption(caption)?.html.map { FormattedBody(format: .html, body: $0) },
+                                                              mentions: ComposerText.caption(caption).flatMap { $0.userIDs.isEmpty ? nil : Mentions(userIds: $0.userIDs, room: false) },
                                                               inReplyTo: nil),
                                                 audioInfo: audioInfo)
             
@@ -310,9 +310,9 @@ final class TimelineProxy: TimelineProxyProtocol {
         
         do {
             let handle = try timeline.sendFile(params: .init(source: .file(filename: url.path(percentEncoded: false)),
-                                                             caption: caption,
-                                                             formattedCaption: nil, // Rust will build this from the caption's markdown.
-                                                             mentions: nil,
+                                                             caption: ComposerText.caption(caption)?.body,
+                                                             formattedCaption: ComposerText.caption(caption)?.html.map { FormattedBody(format: .html, body: $0) },
+                                                             mentions: ComposerText.caption(caption).flatMap { $0.userIDs.isEmpty ? nil : Mentions(userIds: $0.userIDs, room: false) },
                                                              inReplyTo: nil),
                                                fileInfo: fileInfo)
             
@@ -339,9 +339,9 @@ final class TimelineProxy: TimelineProxyProtocol {
         
         do {
             let handle = try timeline.sendImage(params: .init(source: .file(filename: url.path(percentEncoded: false)),
-                                                              caption: caption,
-                                                              formattedCaption: nil, // Rust will build this from the caption's markdown.
-                                                              mentions: nil,
+                                                              caption: ComposerText.caption(caption)?.body,
+                                                              formattedCaption: ComposerText.caption(caption)?.html.map { FormattedBody(format: .html, body: $0) },
+                                                              mentions: ComposerText.caption(caption).flatMap { $0.userIDs.isEmpty ? nil : Mentions(userIds: $0.userIDs, room: false) },
                                                               inReplyTo: nil),
                                                 thumbnailSource: .file(filename: thumbnailURL.path(percentEncoded: false)),
                                                 imageInfo: imageInfo)
@@ -393,9 +393,9 @@ final class TimelineProxy: TimelineProxyProtocol {
         
         do {
             let handle = try timeline.sendVideo(params: .init(source: .file(filename: url.path(percentEncoded: false)),
-                                                              caption: caption,
-                                                              formattedCaption: nil,
-                                                              mentions: nil,
+                                                              caption: ComposerText.caption(caption)?.body,
+                                                              formattedCaption: ComposerText.caption(caption)?.html.map { FormattedBody(format: .html, body: $0) },
+                                                              mentions: ComposerText.caption(caption).flatMap { $0.userIDs.isEmpty ? nil : Mentions(userIds: $0.userIDs, room: false) },
                                                               inReplyTo: nil),
                                                 thumbnailSource: .file(filename: thumbnailURL.path(percentEncoded: false)),
                                                 videoInfo: videoInfo)
@@ -420,9 +420,9 @@ final class TimelineProxy: TimelineProxyProtocol {
         MXLog.info("Sending gallery with \(itemInfos.count) items")
         
         do {
-            let handle = try timeline.sendGallery(params: .init(caption: caption,
-                                                                formattedCaption: nil, // Rust will build this from the caption's markdown.
-                                                                mentions: nil,
+            let handle = try timeline.sendGallery(params: .init(caption: ComposerText.caption(caption)?.body,
+                                                                formattedCaption: ComposerText.caption(caption)?.html.map { FormattedBody(format: .html, body: $0) },
+                                                                mentions: ComposerText.caption(caption).flatMap { $0.userIDs.isEmpty ? nil : Mentions(userIds: $0.userIDs, room: false) },
                                                                 inReplyTo: inReplyToEventID),
                                                   itemInfos: itemInfos)
             try await handle.join()

@@ -44,6 +44,8 @@ enum ThreadTimelineScreenCoordinatorAction {
 final class ThreadTimelineScreenCoordinator: CoordinatorProtocol {
     private let viewModel: ThreadTimelineScreenViewModelProtocol
     private let timelineViewModel: TimelineViewModelProtocol
+    /// iphoneblog: the timeline's context, for sheets that draw pills (the caption's mentions).
+    var timelineContext: TimelineViewModel.Context { timelineViewModel.context }
     private var composerViewModel: ComposerToolbarViewModelProtocol
     private let userSettings: UserSettings
     

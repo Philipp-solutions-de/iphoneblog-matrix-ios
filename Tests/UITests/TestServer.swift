@@ -44,6 +44,15 @@ struct TestServer {
         return try XCTUnwrap(result["event_id"] as? String, "send failed")
     }
 
+    /// Whether this user has a highlight notification (a mention) whose body contains `text`.
+    func hasMention(containing text: String) throws -> Bool {
+        let page = try Self.call(base, "/_matrix/client/v3/notifications?only=highlight&limit=50", method: "GET", token: token, body: nil)
+        return (page["notifications"] as? [[String: Any]] ?? []).contains { entry in
+            let content = (entry["event"] as? [String: Any])?["content"] as? [String: Any]
+            return (content?["body"] as? String ?? "").contains(text)
+        }
+    }
+
     /// Whether this user's highlight notification for the event counts as read on the server.
     func mentionIsRead(_ eventID: String) throws -> Bool? {
         let page = try Self.call(base, "/_matrix/client/v3/notifications?only=highlight&limit=50", method: "GET", token: token, body: nil)
