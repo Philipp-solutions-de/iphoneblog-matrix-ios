@@ -24,42 +24,38 @@ port="${PERF_HOMESERVER_PORT:-8048}"
 fixture_port="${PERF_FIXTURE_PORT:-8796}"
 result=build/perf.xcresult
 
-# **Its own simulator**, "perf-iphone-pro": the newest "iPhone NN Pro" device type on the
-# newest iOS runtime, made on first use. Its keychain is reset before every run, which must
-# never happen to a simulator somebody else uses. PERF_DEVICE (a UDID) overrides it.
-device="${PERF_DEVICE:-$(xcrun simctl list -j | python3 -c '
-import json, re, subprocess, sys
+# **Its own simulator, always the same model** (PERF_MODEL, "iPhone 17 Pro"): a run on another
+# model is not comparable with the baselines, so a missing model fails instead of falling back.
+# Named after the model, made on first use on the newest iOS runtime that has it. Its keychain is
+# reset before every run, which must never happen to a simulator somebody else uses.
+# PERF_DEVICE (a UDID) overrides it.
+model="${PERF_MODEL:-iPhone 17 Pro}"
+device="${PERF_DEVICE:-$(xcrun simctl list -j | PERF_MODEL="$model" python3 -c '
+import json, os, re, subprocess, sys
+model = os.environ["PERF_MODEL"]
+name = "perf-" + model.lower().replace(" ", "-")
 data = json.load(sys.stdin)
 for runtime, devices in data["devices"].items():
     for d in devices:
-        if d["name"] == "perf-iphone-pro" and d["isAvailable"]:
+        if d["name"] == name and d["isAvailable"]:
             print(d["udid"]); sys.exit()
 runtimes = [r for r in data["runtimes"] if r["isAvailable"] and r.get("platform", "iOS") == "iOS"
             and r["name"].startswith("iOS")]
 runtimes.sort(key=lambda r: [int(x) for x in re.findall(r"\d+", r["version"])], reverse=True)
-number = lambda t: int(re.search(r"\d+", t["name"]).group())
-# The newest runtime with an "iPhone NN Pro"; failing that, the newest numbered iPhone. A runtime
-# may list no supported types (a CI image), so fall back to every type Xcode knows.
-for pattern in (r"iPhone \d+ Pro", r"iPhone \d+( Pro)?( Max)?"):
-    found = [(r, t) for r in runtimes for t in (r.get("supportedDeviceTypes") or data["devicetypes"])
-             if re.fullmatch(pattern, t["name"])]
-    if found:
-        break
-else:
-    sys.exit("perf.sh: no iPhone simulator type; runtimes: %s; types: %s" % (
-        [r["name"] for r in runtimes], [t["name"] for t in data["devicetypes"]][:40]))
-# Newest runtime first, newest model first; a type the runtime cannot run is refused by simctl.
-found.sort(key=lambda rt: ([int(x) for x in re.findall(r"\d+", rt[0]["version"])], number(rt[1])), reverse=True)
+kind = next((t for t in data["devicetypes"] if t["name"] == model), None)
+if kind is None:
+    sys.exit("perf.sh: no simulator type %r; types: %s" % (model, [t["name"] for t in data["devicetypes"]][:40]))
 errors = []
-for runtime, kind in found:
-    out = subprocess.run(["xcrun", "simctl", "create", "perf-iphone-pro", kind["identifier"], runtime["identifier"]],
+for runtime in runtimes:
+    out = subprocess.run(["xcrun", "simctl", "create", name, kind["identifier"], runtime["identifier"]],
                          capture_output=True, text=True)
     if out.returncode == 0:
         print(out.stdout.strip()); sys.exit()
-    errors.append("%s on %s: %s" % (kind["name"], runtime["name"], out.stderr.strip()[:120]))
-sys.exit("perf.sh: no simulator could be made:\n" + "\n".join(errors[:8]))
+    errors.append("%s: %s" % (runtime["name"], out.stderr.strip()[:120]))
+sys.exit("perf.sh: no %s simulator could be made:\n%s" % (model, "\n".join(errors[:8])))
 ')}"
-[[ -n "$device" ]] || { echo "perf.sh: no iPhone Pro simulator" >&2; exit 1; }
+[[ -n "$device" ]] || { echo "perf.sh: no $model simulator" >&2; exit 1; }
+echo "perf.sh: $model, simulator $device"
 
 # **A real device** (docs/performance.md, "On a device"): signed with the team, no simulator
 # flags, and the servers reached over the Mac's LAN address through scripts/lan-forward.py.
