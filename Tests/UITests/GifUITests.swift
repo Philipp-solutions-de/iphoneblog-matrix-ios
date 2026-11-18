@@ -33,7 +33,14 @@ final class GifUITests: XCTestCase {
         return app
     }
 
+    /// Sends a GIF of its own first: other tests write into the channel, and the seeded GIF
+    /// scrolls out of sight.
     func testGifPlaysInTheChannel() throws {
+        let me = try TestServer.signIn(1)
+        defer { me.signOut() }
+        let room = try XCTUnwrap(env["IPHONEBLOG_TEST_CHANNEL_ROOM"].flatMap { $0.isEmpty ? nil : $0 })
+        try me.sendContent(["msgtype": "m.image", "body": "animation.gif", "url": try me.uploadGIF(),
+                            "info": ["mimetype": "image/gif", "w": 240, "h": 160]], in: room)
         let app = try openChannel()
         sleep(6) // the GIF near the bottom loads
         let first = app.screenshot()

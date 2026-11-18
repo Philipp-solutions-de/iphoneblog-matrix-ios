@@ -152,7 +152,7 @@ final class FourTabsUITests: XCTestCase {
         let app = launch(tab: "foryou")
         let mentionRow = row(app, "Fd Erwähnung \(stamp)"), threadRow = row(app, "Fd Thread \(stamp)")
         XCTAssertTrue(mentionRow.waitForExistence(timeout: 120) && threadRow.waitForExistence(timeout: 30), "Alles lacks a mention or a thread")
-        XCTAssertGreaterThanOrEqual(badge(app) ?? 0, 2, "the badge does not count mention and thread")
+        XCTAssertTrue(waitForBadge(app, atLeast: 2), "the badge does not count mention and thread: \(badge(app) ?? 0)")
         save(app, "fuer-dich-alles")
 
         app.segmentedControls.buttons["Erwähnungen"].tap()
@@ -208,6 +208,12 @@ final class FourTabsUITests: XCTestCase {
         let label = app.descendants(matching: .any)["debug.badges"].label
         guard let part = label.split(separator: " ").first(where: { $0.hasPrefix("foryou=") }) else { return nil }
         return Int(part.dropFirst("foryou=".count))
+    }
+
+    /// The thread's count reaches the badge a sync after the mention's.
+    private func waitForBadge(_ app: XCUIApplication, atLeast value: Int) -> Bool {
+        for _ in 0..<20 { if let b = badge(app), b >= value { return true }; sleep(1) }
+        return false
     }
 
     private func waitForBadge(_ app: XCUIApplication, atMost value: Int) -> Bool {

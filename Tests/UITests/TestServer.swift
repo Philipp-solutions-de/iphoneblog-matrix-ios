@@ -1,4 +1,6 @@
+import ImageIO
 import UIKit
+import UniformTypeIdentifiers
 import XCTest
 
 /// The test homeserver's client API, for UI tests that need another person to write: sign in as
@@ -48,6 +50,37 @@ struct TestServer {
         let entries = page["notifications"] as? [[String: Any]] ?? []
         let entry = entries.first { ($0["event"] as? [String: Any])?["event_id"] as? String == eventID }
         return entry?["read"] as? Bool
+    }
+
+    /// Uploads an endless animated GIF of eight coloured frames, 0.1 s each, and returns its mxc
+    /// URL. Two screenshots 0.4 s apart always show different frames.
+    func uploadGIF(width: Int = 240, height: Int = 160) throws -> String {
+        let colors: [UIColor] = [.red, .orange, .yellow, .green, .cyan, .blue, .purple, .magenta]
+        let data = NSMutableData()
+        let destination = try XCTUnwrap(CGImageDestinationCreateWithData(data, UTType.gif.identifier as CFString, colors.count, nil))
+        CGImageDestinationSetProperties(destination, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        for color in colors {
+            let image = UIGraphicsImageRenderer(size: CGSize(width: width, height: height), format: format).image { context in
+                color.setFill()
+                context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+            }
+            CGImageDestinationAddImage(destination, try XCTUnwrap(image.cgImage),
+                                       [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 0.1]] as CFDictionary)
+        }
+        XCTAssertTrue(CGImageDestinationFinalize(destination), "GIF not written")
+        var request = URLRequest(url: try XCTUnwrap(URL(string: base + "/_matrix/media/v3/upload?filename=animation.gif")))
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("image/gif", forHTTPHeaderField: "Content-Type")
+        request.httpBody = data as Data
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: Data?
+        URLSession.shared.dataTask(with: request) { data, _, _ in result = data; semaphore.signal() }.resume()
+        _ = semaphore.wait(timeout: .now() + 20)
+        let json = (try? JSONSerialization.jsonObject(with: result ?? Data())) as? [String: Any]
+        return try XCTUnwrap(json?["content_uri"] as? String, "upload failed")
     }
 
     /// Uploads a small square picture and makes it this user's avatar; "" removes it.
