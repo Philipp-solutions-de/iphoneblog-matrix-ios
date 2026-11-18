@@ -352,23 +352,35 @@ final class ChatSession: ObservableObject, ChatHost {
     }
 
     /// The thread an event replies in, from the event itself (GET /rooms/{id}/event/{id}).
-    private func threadRoot(of eventID: String, in roomID: String) async -> String? {
+    /// The root of the thread `eventID` is a reply in, from its m.thread relation; nil for an
+    /// event in no thread (a root among them) and when the event cannot be fetched.
+    func threadRoot(of eventID: String, in roomID: String) async -> String? {
+        guard case .some(.some(let root)) = await threadRelation(of: eventID, in: roomID) else { return nil }
+        return root
+    }
+
+    /// nil: the server could not be asked. .some(nil): the event is in no thread. .some(root):
+    /// a reply in the thread of `root`.
+    func threadRelation(of eventID: String, in roomID: String) async -> String?? {
         let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/?#"))
         guard let room = roomID.addingPercentEncoding(withAllowedCharacters: allowed),
               let event = eventID.addingPercentEncoding(withAllowedCharacters: allowed),
               let data = try? await api("GET", "/_matrix/client/v3/rooms/\(room)/event/\(event)"),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let relates = (json["content"] as? [String: Any])?["m.relates_to"] as? [String: Any],
-              relates["rel_type"] as? String == "m.thread" else { return nil }
-        return relates["event_id"] as? String
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        guard let relates = (json["content"] as? [String: Any])?["m.relates_to"] as? [String: Any],
+              relates["rel_type"] as? String == "m.thread" else { return .some(nil) }
+        return .some(relates["event_id"] as? String)
     }
 
     func isOnScreen(roomID: String, threadRootEventID: String?) -> Bool {
         router.isOnScreen(roomID: roomID, threadRootEventID: threadRootEventID)
     }
 
-    func didSee(roomID: String, threadRootEventID: String?, eventID: String) {
+    func didSee(roomID: String, threadRootEventID: String?, eventID: String, isPrivate: Bool) {
         Task { await mentions.didSee(roomID: roomID, threadRoot: threadRootEventID, eventID: eventID) }
+        if threadRootEventID == nil {
+            Task { await catchUpUnthreadedReceipt(roomID: roomID, eventID: eventID, isPrivate: isPrivate) }
+        }
     }
 
     func showMessage(_ text: String) {

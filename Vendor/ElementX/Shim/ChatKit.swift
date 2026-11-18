@@ -190,7 +190,8 @@ public enum ChatKitLinks {
 /// @Mentions in step: the server marks mentions up to the receipt read, but a thread's receipt
 /// changes no room count the list would otherwise follow.
 public enum ChatKitReads {
-    public static var seen: ((String, String?, String) -> Void)?
+    /// Room, thread root (nil for the room's timeline), event, and whether the receipt was private.
+    public static var seen: ((String, String?, String, Bool) -> Void)?
     /// Whether this timeline (room, thread root or nil) is the screen the reader sees now: a
     /// timeline kept alive behind another tab or screen sends no read receipt.
     public static var isOnScreen: ((String, String?) -> Bool)?

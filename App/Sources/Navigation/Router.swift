@@ -139,6 +139,17 @@ final class Router: ObservableObject {
         ChatScreens.provider.focus(roomID: roomID, eventID: eventID)
     }
 
+    /// A thread was opened on one of its replies: the route takes the real root, so the timeline
+    /// and its receipts name the thread the server knows (ResolvedThreadScreen).
+    func correctThread(roomID: String, from wrong: String, to root: String) {
+        chatPath = chatPath.map { route in
+            if case .thread(let thread) = route, thread.roomID == roomID, thread.rootEventID == wrong {
+                return .thread(ThreadRoute(roomID: roomID, rootEventID: root))
+            }
+            return route
+        }
+    }
+
     func openThread(roomID: String, rootEventID: String) {
         if roomID == blogRoomID {
             tab = .blog

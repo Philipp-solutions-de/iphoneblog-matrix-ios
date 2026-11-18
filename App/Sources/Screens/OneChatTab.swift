@@ -141,7 +141,7 @@ struct OneChatTab: View {
                     }
                 }
         case .thread(let thread):
-            ChatScreens.provider.threadScreen(roomID: thread.roomID, rootEventID: thread.rootEventID, host: session)
+            ResolvedThreadScreen(thread: thread, session: session, router: router)
         case .threads:
             ChatScreens.provider.threadsScreen(host: session)
                 .navigationTitle("Threads")

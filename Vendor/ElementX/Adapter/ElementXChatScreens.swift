@@ -32,8 +32,8 @@ final class ElementXChatScreens: ChatScreenProviding {
         ChatKitReads.isOnScreen = { [weak host] roomID, threadRoot in
             host?.isOnScreen(roomID: roomID, threadRootEventID: threadRoot) ?? false
         }
-        ChatKitReads.seen = { [weak host] roomID, threadRoot, eventID in
-            host?.didSee(roomID: roomID, threadRootEventID: threadRoot, eventID: eventID)
+        ChatKitReads.seen = { [weak host] roomID, threadRoot, eventID, isPrivate in
+            host?.didSee(roomID: roomID, threadRootEventID: threadRoot, eventID: eventID, isPrivate: isPrivate)
         }
     }
 
