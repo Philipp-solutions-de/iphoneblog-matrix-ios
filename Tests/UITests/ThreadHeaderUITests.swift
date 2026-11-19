@@ -85,10 +85,11 @@ final class ThreadHeaderUITests: XCTestCase {
         let header = app.descendants(matching: .any)["thread.header"]
         XCTAssertTrue(header.waitForExistence(timeout: 120), "thread did not open")
         sleep(2)
-        // From the screen's edge a third of the way, slowly, and let go: the pop cancels.
+        // From the screen's edge a fifth of the way, slowly, hold still, and let go: the pop
+        // cancels. A third of the way with a short hold completed the pop on CI's slower runner.
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.005, dy: 0.5))
-            .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)),
-                   withVelocity: .slow, thenHoldForDuration: 0.3)
+            .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)),
+                   withVelocity: .slow, thenHoldForDuration: 1.0)
         sleep(2)
         XCTAssertTrue(header.exists, "the swipe left the thread instead of cancelling")
         save(app, "cancelled-swipe")
