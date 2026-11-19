@@ -43,13 +43,21 @@ final class ThreadsUITests: XCTestCase {
     /// On screen means inside the window, below the Threads row and above the composer; the list
     /// keeps rows it has scrolled away, with frames outside.
     private func scrollTo(_ target: XCUIElement, in app: XCUIApplication) {
-        func visible() -> Bool {
-            guard target.exists else { return false }
+        // Inside the band between the header and the composer. A target below the band, such
+        // as a message just sent, needs a swipe up; one not loaded yet, a swipe down.
+        func place() -> Int {
+            guard target.exists else { return -1 }
             let frame = target.frame, window = app.windows.firstMatch.frame
-            return frame.minY > window.minY + 160 && frame.maxY < window.maxY - 180
+            if frame.minY <= window.minY + 160 { return -1 }
+            if frame.maxY >= window.maxY - 180 { return 1 }
+            return 0
         }
-        for _ in 0..<20 where !visible() {
-            app.swipeDown(velocity: .slow)
+        for _ in 0..<20 {
+            switch place() {
+            case 0: return
+            case 1: app.swipeUp(velocity: .slow)
+            default: app.swipeDown(velocity: .slow)
+            }
             sleep(1) // older messages page in
         }
     }
