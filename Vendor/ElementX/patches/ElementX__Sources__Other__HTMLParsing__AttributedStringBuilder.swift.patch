@@ -1,0 +1,19 @@
+--- a/ElementX/Sources/Other/HTMLParsing/AttributedStringBuilder.swift
++++ b/ElementX/Sources/Other/HTMLParsing/AttributedStringBuilder.swift
+@@ -330,6 +330,16 @@
+     // swiftlint:disable:next cyclomatic_complexity
+     private func addLinksAndMentions(_ attributedString: NSMutableAttributedString) {
+         let string = attributedString.string
++        
++        // iPhoneBlog: a link the HTML brought (an <a href="mailto:…">) on a masked address goes;
++        // the server masked the address, not the link around it.
++        attributedString.enumerateAttribute(.link, in: NSRange(location: 0, length: attributedString.length)) { value, range, _ in
++            let target = (value as? URL)?.absoluteString.removingPercentEncoding ?? (value as? String) ?? ""
++            let text = (string as NSString).substring(with: range)
++            if (target.contains("***") && target.contains("@")) || (text.contains("***") && text.contains("@")) {
++                attributedString.removeAttribute(.link, range: range)
++            }
++        }
+         
+         // Event identifiers and room aliases and identifiers detected in plain text are techincally incomplete
+         // without via parameters and we won't bother detecting them

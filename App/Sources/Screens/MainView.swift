@@ -21,6 +21,7 @@ struct MainView: View {
 
     @EnvironmentObject private var model: AppModel
     @Environment(\.scenePhase) private var scenePhase
+    @State private var confirmReadAll = false
     @ObservedObject var router: Router
     /// Nil while signed out.
     let session: ChatSession?
@@ -55,13 +56,22 @@ struct MainView: View {
                 TabLongPress(index: 2) {
                     guard router.forYouBadge > 0 else { return }
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    Task {
-                        await session.forYou.markAllRead(.all)
-                        router.notice = "Alles als gelesen markiert."
-                    }
+                    confirmReadAll = true
                 }
                 .frame(width: 0, height: 0)
             }
+        }
+        // Asked first (Thorsten, 2026-11-19): a long press by accident cleared everything.
+        .confirmationDialog("Alle als gelesen markieren?", isPresented: $confirmReadAll, titleVisibility: .visible) {
+            Button("Alle als gelesen markieren") {
+                guard let session else { return }
+                Task {
+                    await session.forYou.markAllRead(.all)
+                    router.notice = "Alles als gelesen markiert."
+                }
+            }
+            .accessibilityIdentifier("foryou.confirmReadAll")
+            Button("Abbrechen", role: .cancel) { }
         }
         // Sync stops in the background and starts again in front (ChatSession).
         .onChange(of: scenePhase) { _, phase in
