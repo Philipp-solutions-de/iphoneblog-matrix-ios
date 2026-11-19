@@ -82,9 +82,11 @@ enum Theme {
 
     enum Size {
         static let avatar: CGFloat = 34
-        /// #one-Chat uses rounded squares, the discussion circles.
         static let chatAvatar: CGFloat = 36
-        static let chatAvatarCorner: CGFloat = 9
+        /// Every person's picture is a squircle (Philip, 2026-11-18): a rounded square with
+        /// continuous corners, the radius this share of its side, close to an app icon. The web
+        /// uses the same share (border-radius: 22.5%). Room icons keep their own shape.
+        static let avatarCornerFraction: CGFloat = 0.225
         static let profileAvatar: CGFloat = 58
         static let signInLogo: CGFloat = 96
         static let rowIcon: CGFloat = 28
@@ -116,4 +118,11 @@ extension UIColor {
 
 extension Color {
     init(hex: UInt32) { self.init(uiColor: UIColor(hex: hex)) }
+}
+
+/// The shape of a person's picture or initials, at any size (Theme.Size.avatarCornerFraction).
+enum AvatarShape {
+    static func of(_ size: CGFloat) -> RoundedRectangle {
+        RoundedRectangle(cornerRadius: size * Theme.Size.avatarCornerFraction, style: .continuous)
+    }
 }

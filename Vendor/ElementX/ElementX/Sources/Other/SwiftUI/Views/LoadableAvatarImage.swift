@@ -12,6 +12,8 @@ struct LoadableAvatarImage: View {
     enum Shape {
         case circle
         case roundedRect
+        /// iphoneblog: a person's picture, a continuous-corner square (ChatKitStyle.Metrics.avatarCornerFraction).
+        case squircle
     }
     
     private let url: URL?
@@ -113,6 +115,9 @@ private struct AvatarShapeModifier: ViewModifier {
         switch shape {
         case .circle:
             content.clipShape(Circle())
+        case .squircle:
+            content.clipShape(RoundedRectangle(cornerRadius: scaledSize * ChatKitStyle.current.metrics.avatarCornerFraction,
+                                               style: .continuous))
         case .roundedRect:
             let shape = RoundedRectangle(cornerRadius: scaledSize / 4)
             content

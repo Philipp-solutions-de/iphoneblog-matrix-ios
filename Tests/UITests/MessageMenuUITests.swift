@@ -85,7 +85,7 @@ final class MessageMenuUITests: XCTestCase {
         composer.clearText()
         app.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: app.frame.width * 0.4, dy: composer.frame.minY - 24)).tap()
-        XCTAssertTrue(app.staticTexts["Thread"].waitForExistence(timeout: 20), "the message's thread did not open")
+        XCTAssertTrue(app.descendants(matching: .any)["thread.header"].waitForExistence(timeout: 20), "the message's thread did not open")
         let reply = app.textViews["room-message_composer"].firstMatch
         _ = try sendAndLongPress(app, composer: reply, body: "Antwort \(Int(Date().timeIntervalSince1970))")
         let replyLink = try copyLink(app, into: reply)
@@ -96,14 +96,14 @@ final class MessageMenuUITests: XCTestCase {
         let room = try launch(openURL: roomLink, startInRoom: false)
         XCTAssertTrue(room.buttons["room-send_button"].waitForExistence(timeout: 60), "the room did not open")
         sleep(2)
-        XCTAssertFalse(room.staticTexts["Thread"].exists, "a room message's link opened a thread")
+        XCTAssertFalse(room.descendants(matching: .any)["thread.header"].exists, "a room message's link opened a thread")
         XCTAssertTrue(room.buttons["room-send_button"].isHittable, "something covers the room")
         save(room, "link-opened-room")
 
         // The reply's link: its thread, found from the event itself.
         room.terminate()
         let thread = try launch(openURL: replyLink, startInRoom: false)
-        XCTAssertTrue(thread.staticTexts["Thread"].waitForExistence(timeout: 60), "a thread reply's link did not open its thread")
+        XCTAssertTrue(thread.descendants(matching: .any)["thread.header"].waitForExistence(timeout: 60), "a thread reply's link did not open its thread")
         save(thread, "link-opened-thread")
     }
 

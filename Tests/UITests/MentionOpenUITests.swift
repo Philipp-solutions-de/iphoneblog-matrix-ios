@@ -36,7 +36,7 @@ final class MentionOpenUITests: XCTestCase {
         let threadRow = row(app, "Zweiter Raum Thread \(stamp)")
         XCTAssertTrue(threadRow.waitForExistence(timeout: 120), "the thread mention is not in @Mentions")
         threadRow.tap()
-        XCTAssertTrue(app.staticTexts["Thread"].waitForExistence(timeout: 30), "a thread mention in another room opened no thread")
+        XCTAssertTrue(app.descendants(matching: .any)["thread.header"].waitForExistence(timeout: 30), "a thread mention in another room opened no thread")
         XCTAssertTrue(message(app, "Zweiter Raum Thread \(stamp)").waitForExistence(timeout: 30), "the reply is not on screen")
         save(app, "mention-thread-room2")
 

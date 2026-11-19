@@ -92,7 +92,10 @@ struct TimelineItemRowStylerView<Content: View>: View {
     @ViewBuilder
     private var avatarColumn: some View {
         if showsSender {
+            // A fixed frame: Element X scales its pictures with Dynamic Type, while the empty
+            // column under a follow-up message does not, so the text wobbled (Philip, 2026-11-18).
             ChatAvatar(sender: timelineItem.sender, size: style.metrics.avatar, mediaProvider: context.mediaProvider)
+                .frame(width: style.metrics.avatar, height: style.metrics.avatar)
                 .onTapGesture { context.send(viewAction: .tappedOnSenderDetails(sender: timelineItem.sender)) }
                 .highPriorityGesture(shareContactGesture)
                 .accessibilityHidden(true)
@@ -119,6 +122,12 @@ struct TimelineItemRowStylerView<Content: View>: View {
                 .foregroundStyle(isBot ? style.colors.accent : style.colors.ink)
                 .lineLimit(1)
                 .accessibilityHidden(true) // read by the accessibility modifier below
+                #if DEBUG
+                // For UI tests (ThreadHeaderUITests): where the name starts, to line the text up with it.
+                .overlay {
+                    Color.clear.accessibilityElement().accessibilityIdentifier("row.senderName")
+                }
+                #endif
                 .onTapGesture { context.send(viewAction: .tappedOnSenderDetails(sender: timelineItem.sender)) }
                 .highPriorityGesture(shareContactGesture)
             if isBot { ChatBotPill().alignmentGuide(.firstTextBaseline) { $0[.bottom] - 3 } }
@@ -184,9 +193,10 @@ struct TimelineItemRowStylerView<Content: View>: View {
             context.send(viewAction: .displayTimelineItemMenu(itemID: timelineItem.id))
         }
         // Right: answer in the thread; left: the message's menu with its reaction bar (Alex's
-        // request). Not inside a thread, where right would only reopen it. MessageSwipe keeps
-        // the screen's left edge free for swipe-back.
-        .messageSwipe(isEnabled: { !isMessageSelectionActive && timelineItem.canBeRepliedTo }) {
+        // request). Inside a thread the right swipe does nothing at all, no icon either (Philip,
+        // 2026-11-18). MessageSwipe keeps the screen's left edge free for swipe-back.
+        .messageSwipe(isEnabled: { !isMessageSelectionActive && timelineItem.canBeRepliedTo },
+                      allowsRight: { !context.viewState.timelineKind.isThread }) {
             CompoundIcon(\.threads)
                 .foregroundColor(style.colors.accent)
                 .accessibilityHidden(true)
@@ -267,16 +277,21 @@ struct ChatAvatar: View {
 
     private var style: ChatKitStyle { ChatKitStyle.current }
 
+    /// A squircle, as every person's picture in the app (ChatKitStyle.Metrics.avatarCornerFraction).
+    static func shape(_ size: CGFloat) -> RoundedRectangle {
+        RoundedRectangle(cornerRadius: size * ChatKitStyle.current.metrics.avatarCornerFraction, style: .continuous)
+    }
+
     var body: some View {
         if sender.avatarURL != nil {
             LoadableAvatarImage(url: sender.avatarURL, name: sender.displayName, contentID: sender.id,
-                                avatarSize: .custom(size), mediaProvider: mediaProvider)
+                                shape: .squircle, avatarSize: .custom(size), mediaProvider: mediaProvider)
         } else {
             Text(initials)
                 .font(.system(size: size * 0.38, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: size, height: size)
-                .background(Circle().fill(color))
+                .background(Self.shape(size).fill(color))
         }
     }
 
@@ -345,7 +360,7 @@ struct ChatThreadSummary: View {
                 HStack(spacing: -6) {
                     ForEach(repliers, id: \.id) { sender in
                         ChatAvatar(sender: sender, size: style.metrics.summaryAvatar, mediaProvider: mediaProvider)
-                            .overlay(Circle().stroke(style.colors.background, lineWidth: 1.5))
+                            .overlay(ChatAvatar.shape(style.metrics.summaryAvatar).stroke(style.colors.background, lineWidth: 1.5))
                     }
                 }
                 Text(ChatKitStrings.replies(count))

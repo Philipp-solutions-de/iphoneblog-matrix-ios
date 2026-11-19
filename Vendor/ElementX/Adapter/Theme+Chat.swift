@@ -50,7 +50,8 @@ extension ChatKitStyle {
             metrics: .init(page: Theme.Space.page - 4, avatarGap: Theme.Chat.avatarGap, avatar: Theme.Chat.avatar,
                            summaryAvatar: Theme.Chat.summaryAvatar, groupSpacing: Theme.Chat.groupSpacing,
                            messageSpacing: Theme.Chat.messageSpacing,
-                           mediaWidth: Theme.Chat.mediaWidth, corner: Theme.Size.corner)
+                           mediaWidth: Theme.Chat.mediaWidth, corner: Theme.Size.corner,
+                           avatarCornerFraction: Theme.Size.avatarCornerFraction)
         )
     }
 }

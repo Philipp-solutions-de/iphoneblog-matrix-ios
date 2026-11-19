@@ -1,0 +1,18 @@
+--- a/ElementX/Sources/Screens/Timeline/View/TimelineItemViews/FormattedBodyText.swift
++++ b/ElementX/Sources/Screens/Timeline/View/TimelineItemViews/FormattedBodyText.swift
+@@ -101,9 +101,14 @@
+                         .padding(.horizontal, 4)
+                         .timelineBubbleLayoutSize(.natural)
+                 case .plainText:
++                    // iphoneblog: no inset, so the text starts at the sender name's x as on the
++                    // web (Philip, 2026-11-18); the 4 pt belonged to Element X's bubbles.
+                     MessageText(attributedString: component.attributedString,
+                                 trailingReservedSize: index == lastPlainTextIndex ? trailingReservedSize : .zero)
+-                        .padding(.horizontal, 4)
++                        #if DEBUG
++                        // For UI tests (ThreadHeaderUITests): where the text itself starts.
++                        .overlay { Color.clear.accessibilityElement().accessibilityIdentifier("row.text") }
++                        #endif
+                         .fixedSize(horizontal: false, vertical: true)
+                         .timelineBubbleLayoutSize(.natural)
+                 }

@@ -92,6 +92,25 @@ struct TestServer {
         return try XCTUnwrap(json?["content_uri"] as? String, "upload failed")
     }
 
+    /// Uploads a plain coloured PNG and returns its mxc URI.
+    func uploadPNG(colored color: UIColor, width: CGFloat = 96, height: CGFloat = 96) throws -> String {
+        let png = UIGraphicsImageRenderer(size: CGSize(width: width, height: height)).pngData { context in
+            color.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        var request = URLRequest(url: try XCTUnwrap(URL(string: base + "/_matrix/media/v3/upload?filename=picture.png")))
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("image/png", forHTTPHeaderField: "Content-Type")
+        request.httpBody = png
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: Data?
+        URLSession.shared.dataTask(with: request) { data, _, _ in result = data; semaphore.signal() }.resume()
+        _ = semaphore.wait(timeout: .now() + 20)
+        let json = (try? JSONSerialization.jsonObject(with: result ?? Data())) as? [String: Any]
+        return try XCTUnwrap(json?["content_uri"] as? String, "upload failed")
+    }
+
     /// Uploads a small square picture and makes it this user's avatar; "" removes it.
     func setAvatar(colored color: UIColor?) throws {
         var url = ""

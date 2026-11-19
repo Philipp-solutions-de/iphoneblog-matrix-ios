@@ -17,7 +17,13 @@ struct ResolvedThreadScreen: View {
     var body: some View {
         Group {
             if checked == thread.rootEventID {
-                ChatScreens.provider.threadScreen(roomID: thread.roomID, rootEventID: thread.rootEventID, host: session)
+                // Element X's own header (the room's coloured letter) gives way to ThreadHeader.
+                ChatScreens.provider.discussionScreen(roomID: thread.roomID, rootEventID: thread.rootEventID, host: session)
+                    .toolbar {
+                        ToolbarItem(placement: .principal) {
+                            ThreadHeader(thread: thread, session: session, router: router)
+                        }
+                    }
             } else {
                 ProgressView()
             }

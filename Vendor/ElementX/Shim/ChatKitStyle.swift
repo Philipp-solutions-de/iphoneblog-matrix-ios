@@ -89,11 +89,15 @@ public struct ChatKitStyle {
         /// Widest a picture or video may be, and the rounding of its corners.
         public var mediaWidth: CGFloat
         public var corner: CGFloat
+        /// A person's picture is a squircle: its corner radius is this share of its side.
+        public var avatarCornerFraction: CGFloat
 
         public init(page: CGFloat, avatarGap: CGFloat, avatar: CGFloat, summaryAvatar: CGFloat,
-                    groupSpacing: CGFloat, messageSpacing: CGFloat, mediaWidth: CGFloat, corner: CGFloat) {
+                    groupSpacing: CGFloat, messageSpacing: CGFloat, mediaWidth: CGFloat, corner: CGFloat,
+                    avatarCornerFraction: CGFloat = 0.225) {
             self.mediaWidth = mediaWidth
             self.corner = corner
+            self.avatarCornerFraction = avatarCornerFraction
             self.page = page
             self.avatarGap = avatarGap
             self.avatar = avatar

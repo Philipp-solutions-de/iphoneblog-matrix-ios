@@ -1,13 +1,10 @@
 import SafariServices
 import SwiftUI
 
-/// A coloured circle (discussions) or rounded square (#one-Chat) with initials, the same colour
-/// for the same name every time.
+/// Initials on a colour that stays the same for the same name, in the avatar squircle.
 struct InitialsAvatar: View {
     let name: String
     var size: CGFloat = Theme.Size.avatar
-    /// Nil: a circle.
-    var corner: CGFloat?
 
     var body: some View {
         let initials = name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
@@ -16,7 +13,7 @@ struct InitialsAvatar: View {
             .font(.system(size: size * 0.37, weight: .semibold))
             .foregroundStyle(.white)
             .frame(width: size, height: size)
-            .background(Theme.avatarColors[index], in: RoundedRectangle(cornerRadius: corner ?? size / 2))
+            .background(Theme.avatarColors[index], in: AvatarShape.of(size))
             .accessibilityHidden(true)
     }
 }
