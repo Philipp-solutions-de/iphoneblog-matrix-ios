@@ -195,6 +195,8 @@ struct TestServer {
         URLSession.shared.dataTask(with: request) { data, _, _ in result = data; semaphore.signal() }.resume()
         _ = semaphore.wait(timeout: .now() + 20)
         return try XCTUnwrap(result, "no download")
+    }
+
     /// This account's push rules of one kind ("override", "underride", "room"), by rule ID.
     func pushRules(_ kind: String) throws -> [String: [String: Any]] {
         let all = try Self.call(base, "/_matrix/client/v3/pushrules/", method: "GET", token: token, body: nil)
