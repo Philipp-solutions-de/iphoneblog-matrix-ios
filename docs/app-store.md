@@ -30,7 +30,7 @@ Three files, one per bundle that runs code: `App/Resources/PrivacyInfo.xcprivacy
 - **Tracking**: none, no tracking domains. Element X's PostHog and Sentry are cut
   (`Vendor/ElementX/Shim/Analytics.swift`).
 - **Collected** (the app's file only), all linked to the person, for app functionality, none for
-  tracking: name, email address, user ID, messages, photos or videos, audio (voice messages),
+  tracking: email address, user ID, messages, photos or videos, audio (voice messages),
   other user content (reactions, reports).
 - Of the 21 packages only Kingfisher and Mantis ship their own manifest.
 
@@ -40,12 +40,20 @@ Enter the same as the manifest: **Data Linked to You**, purpose **App Functional
 
 | Category | Type | Why |
 |---|---|---|
-| Contact Info | Name, Email Address | the account, from iphoneblog.de's sign-in |
-| Contact Info | Phone Number | "Kontaktdaten teilen" (`ContactShare.swift`): typed, mailed once through Mailjet, not stored by us; declared because the mail service and the recipient keep it |
-| Identifiers | User ID | `@name:iphoneblog.de` |
-| User Content | Emails or Text Messages, Photos or Videos, Audio Data, Other User Content | messages, pictures, voice messages, reactions, reports and the contact-share note |
+| Contact Info | Email Address | the account, from iphoneblog.de's sign-in |
+| Identifiers | User ID | `@name:iphoneblog.de` and the nickname shown with it; Apple counts a screen name or handle as a user ID |
+| User Content | Emails or Text Messages, Photos or Videos, Audio Data, Other User Content | messages, pictures, voice messages, reactions and reports, kept on the chat server |
 
-**Data Used to Track You**: none. **Not collected**: purchases (Stripe on the website, not in the
+**The rule behind them** (Thorsten, 2026-11-19): we store no personal data beyond the email
+address and the nickname, plus what WordPress and Stripe already hold. What members write,
+send and react with is kept on the chat server so the conversation can be shown; Apple counts
+that as collected, so it is declared.
+
+**Data Used to Track You**: none. **Not collected**: a name (members have a nickname, under User
+ID); the phone number of "Kontaktdaten teilen" (`ContactShare.swift`), which is typed for one
+share, passed to the recipient by mail and stored nowhere, and which Apple's optional-disclosure
+exception also covers (optional, rare, not the app's purpose, typed in a form that shows the
+sender's account); purchases (Stripe on the website, not in the
 app), location, contacts, browsing history, search history (the chat search sends the term to
 our server and keeps nothing), usage data, and diagnostics: `MetricsReporter` reports only from
 TestFlight and Xcode builds, and the labels describe the App Store build. The push token is not a
