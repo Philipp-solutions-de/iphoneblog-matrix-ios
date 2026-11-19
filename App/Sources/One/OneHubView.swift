@@ -238,7 +238,7 @@ private struct HeroCard: View {
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 10) {
-                Label(resume, systemImage: "play.fill")
+                Label(resume, systemImage: entry?.finished == true ? "checkmark" : "play.fill")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.teal)
                     .accessibilityIdentifier("hub.hero.resume")
@@ -250,8 +250,10 @@ private struct HeroCard: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// As the Videos list says it: "Weiter ab 6:12", "Gesehen" (from 95 %), else "Ansehen".
     private var resume: String {
         if let entry, entry.started { return "Weiter ab \(Episode.duration(entry.position))" }
+        if entry?.finished == true { return "Gesehen" }
         return "Ansehen"
     }
 }

@@ -31,6 +31,12 @@ final class OneHubUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["episode.progress"].exists, "no progress bar on a started episode")
         XCTAssertFalse(app.descendants(matching: .any)["episode.new"].exists, "Neu on a started episode")
         save(app, "hub-started")
+        app.terminate()
+
+        // Watched to 95 %: the hero says Gesehen, as the Videos list does.
+        app = try launch(["IPHONEBLOG_PLAYBACK_RESET": "1", "IPHONEBLOG_PLAYBACK_SEED": "\(newest)=1500/1532"])
+        XCTAssertTrue(app.buttons["hub.hero"].waitForExistence(timeout: 120))
+        XCTAssertTrue(app.buttons["hub.hero"].label.contains("Gesehen"), "a watched episode does not say Gesehen: \(app.buttons["hub.hero"].label)")
     }
 
     func testChatFromTheTileAndFromAnActiveRow() throws {
