@@ -145,8 +145,9 @@ final class FourTabsUITests: XCTestCase {
         let other = try TestServer.signIn(2)
         defer { me.signOut(); other.signOut() }
         let stamp = Int(Date().timeIntervalSince1970)
-        try other.send("Fd Erwähnung \(stamp)", in: room, mention: me.userID)
+        // My own message first: sending moves my read receipt, which would read an older mention.
         let root = try me.send("Fd Thread \(stamp)", in: room)
+        try other.send("Fd Erwähnung \(stamp)", in: room, mention: me.userID)
         try other.send("Fd Antwort \(stamp)", in: room, thread: root)
 
         let app = launch(tab: "foryou")

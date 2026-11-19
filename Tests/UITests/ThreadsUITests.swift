@@ -43,13 +43,21 @@ final class ThreadsUITests: XCTestCase {
     /// On screen means inside the window, below the Threads row and above the composer; the list
     /// keeps rows it has scrolled away, with frames outside.
     private func scrollTo(_ target: XCUIElement, in app: XCUIApplication) {
-        func visible() -> Bool {
-            guard target.exists else { return false }
+        // Inside the band between the header and the composer. A target below the band, such
+        // as a message just sent, needs a swipe up; one not loaded yet, a swipe down.
+        func place() -> Int {
+            guard target.exists else { return -1 }
             let frame = target.frame, window = app.windows.firstMatch.frame
-            return frame.minY > window.minY + 160 && frame.maxY < window.maxY - 180
+            if frame.minY <= window.minY + 160 { return -1 }
+            if frame.maxY >= window.maxY - 180 { return 1 }
+            return 0
         }
-        for _ in 0..<20 where !visible() {
-            app.swipeDown(velocity: .slow)
+        for _ in 0..<20 {
+            switch place() {
+            case 0: return
+            case 1: app.swipeUp(velocity: .slow)
+            default: app.swipeDown(velocity: .slow)
+            }
             sleep(1) // older messages page in
         }
     }
@@ -111,9 +119,20 @@ final class ThreadsUITests: XCTestCase {
         attach(app, "thread-count")
     }
 
+    /// Sends its own message first: other tests write into the channel, and the seeded ones
+    /// scroll out of reach.
     func testTapOnMessageOpensItsThread() throws {
+        let other = try TestServer.signIn(2)
+        addTeardownBlock { other.signOut() }
+        let room = try XCTUnwrap(env["IPHONEBLOG_TEST_CHANNEL_ROOM"])
+        let text = "Tipptest \(Int(Date().timeIntervalSince1970))"
+        try other.send(text, in: room)
+        // Two more below it, so it sits clear of the composer: the newest row's lower half is
+        // where a tap lands on the composer.
+        try other.send("Tipptest danach 1", in: room)
+        try other.send("Tipptest danach 2", in: room)
         let app = try openChannel()
-        let message = app.otherElements.matching(NSPredicate(format: "label == 'Nachricht 5 im vollen Kanal'")).firstMatch
+        let message = app.otherElements.matching(NSPredicate(format: "label == %@", text)).firstMatch
         scrollTo(message, in: app)
         XCTAssertTrue(message.exists, "message not found")
         message.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)).tap()
