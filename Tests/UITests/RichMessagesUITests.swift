@@ -1,3 +1,5 @@
+import ImageIO
+import UniformTypeIdentifiers
 import XCTest
 
 /// Rich messages in #one-Chat and in an article's Diskussion: what the timeline shows and what
@@ -180,6 +182,49 @@ final class RichMessagesUITests: XCTestCase {
     }
 
     /// + › Fotos, the first library picture, Senden in the upload preview; returns the server's event.
+    /// A GIF pasted from a keyboard app or copied in Safari arrives animated (Thorsten, 2026-11-19).
+    /// Gboard and Safari put a still JPEG beside the GIF on the pasteboard; the JPEG used to win.
+    func testPastedGifIsSentAsAGif() throws {
+        let app = try openChannel()
+        let before = Date()
+        UIPasteboard.general.items = [[UTType.gif.identifier: try gifData(), UTType.jpeg.identifier: try stillJPEG()]]
+        let composer = app.textViews["room-message_composer"].firstMatch
+        XCTAssertTrue(composer.waitForExistence(timeout: 10))
+        composer.tap()
+        composer.typeKey("v", modifierFlags: .command)
+        let caption = app.textViews["Bildunterschrift hinzufügen"]
+        XCTAssertTrue(caption.waitForExistence(timeout: 60), "the paste opened no upload preview")
+        attach(app, "gif-paste-preview")
+        app.buttons.matching(NSPredicate(format: "label == 'Senden' AND identifier != 'room-send_button'")).firstMatch.tap()
+        let event = try latestOwnMessage(msgtype: "m.image", after: before)
+        let info = event["info"] as? [String: Any] ?? [:]
+        XCTAssertEqual(info["mimetype"] as? String, "image/gif", "the pasted GIF was sent as \(info["mimetype"] ?? "nothing"): \(event)")
+    }
+
+    /// Eight coloured frames, an endless loop: an animated GIF as Gboard copies one.
+    private func gifData() throws -> Data {
+        let data = NSMutableData()
+        let destination = try XCTUnwrap(CGImageDestinationCreateWithData(data, UTType.gif.identifier as CFString, 8, nil))
+        CGImageDestinationSetProperties(destination, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
+        for index in 0..<8 {
+            let frame = UIGraphicsImageRenderer(size: CGSize(width: 120, height: 80)).image { context in
+                UIColor(hue: CGFloat(index) / 8, saturation: 0.8, brightness: 0.9, alpha: 1).setFill()
+                context.fill(CGRect(x: 0, y: 0, width: 120, height: 80))
+            }
+            CGImageDestinationAddImage(destination, try XCTUnwrap(frame.cgImage),
+                                       [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 0.1]] as CFDictionary)
+        }
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+        return data as Data
+    }
+
+    private func stillJPEG() throws -> Data {
+        try XCTUnwrap(UIGraphicsImageRenderer(size: CGSize(width: 120, height: 80)).image { context in
+            UIColor.systemTeal.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 120, height: 80))
+        }.jpegData(compressionQuality: 0.8))
+    }
+
     private func sendPhoto(_ app: XCUIApplication, shotPrefix: String = "",
                            caption typed: String? = nil, mention pick: String? = nil) throws -> [String: Any] {
         let before = Date()

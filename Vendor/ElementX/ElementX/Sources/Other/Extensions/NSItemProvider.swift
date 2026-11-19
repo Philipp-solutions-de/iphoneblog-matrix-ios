@@ -161,6 +161,12 @@ extension NSItemProvider {
             return nil
         }
         
+        // iPhoneBlog: a GIF stays a GIF. Gboard and Safari put a still JPEG or PNG beside it on the
+        // pasteboard, and the JPEG won, so a pasted GIF arrived as a still (Thorsten, 2026-11-19).
+        if supportedContentTypes.contains(where: { $0.conforms(to: .gif) }) {
+            return .init(type: .gif, fileExtension: "gif")
+        }
+        
         // Have .jpeg take priority over .heic
         if supportedContentTypes.contains(.jpeg) {
             guard let fileExtension = preferredFileExtension(for: .jpeg) else {
