@@ -111,9 +111,20 @@ final class ThreadsUITests: XCTestCase {
         attach(app, "thread-count")
     }
 
+    /// Sends its own message first: other tests write into the channel, and the seeded ones
+    /// scroll out of reach.
     func testTapOnMessageOpensItsThread() throws {
+        let other = try TestServer.signIn(2)
+        addTeardownBlock { other.signOut() }
+        let room = try XCTUnwrap(env["IPHONEBLOG_TEST_CHANNEL_ROOM"])
+        let text = "Tipptest \(Int(Date().timeIntervalSince1970))"
+        try other.send(text, in: room)
+        // Two more below it, so it sits clear of the composer: the newest row's lower half is
+        // where a tap lands on the composer.
+        try other.send("Tipptest danach 1", in: room)
+        try other.send("Tipptest danach 2", in: room)
         let app = try openChannel()
-        let message = app.otherElements.matching(NSPredicate(format: "label == 'Nachricht 5 im vollen Kanal'")).firstMatch
+        let message = app.otherElements.matching(NSPredicate(format: "label == %@", text)).firstMatch
         scrollTo(message, in: app)
         XCTAssertTrue(message.exists, "message not found")
         message.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)).tap()
