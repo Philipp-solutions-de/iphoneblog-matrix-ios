@@ -579,19 +579,33 @@ final class ChatSession: ObservableObject, ChatHost {
         avatar = UIImage(data: data)
     }
 
-    /// Sets the profile picture: square, at most 512 points, JPEG. The display name stays the
-    /// blog's; only the picture is the person's own choice.
-    func setAvatar(_ image: UIImage) async throws {
-        let side = min(image.size.width, image.size.height)
-        let crop = CGRect(x: (image.size.width - side) / 2, y: (image.size.height - side) / 2, width: side, height: side)
-        let target = CGSize(width: min(side, 512), height: min(side, 512))
-        let square = UIGraphicsImageRenderer(size: target).image { _ in
-            image.draw(in: CGRect(x: -crop.minX * target.width / side, y: -crop.minY * target.height / side,
-                                  width: image.size.width * target.width / side, height: image.size.height * target.height / side))
+    /// Sets the profile picture from the placed square (AvatarCrop): the JPEG goes to the media
+    /// store with its progress reported, then the profile points at it. The display name stays
+    /// the blog's; only the picture is the person's own choice.
+    func setAvatar(jpeg: Data, image: UIImage, progress: @escaping @MainActor @Sendable (Double) -> Void) async throws {
+        #if DEBUG
+        // UI tests see the progress on a local server that takes 50 KB at once.
+        if let delay = ProcessInfo.processInfo.environment["IPHONEBLOG_AVATAR_UPLOAD_DELAY"].flatMap(Double.init) {
+            progress(0)
+            try await Task.sleep(for: .seconds(delay))
         }
-        guard let data = square.jpegData(compressionQuality: 0.85) else { return }
-        try await client.uploadAvatar(mimeType: "image/jpeg", data: data)
-        avatar = square
+        #endif
+        let base = client.homeserver().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard let url = URL(string: base + "/_matrix/media/v3/upload?filename=avatar.jpg") else { throw URLError(.badURL) }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(try client.session().accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
+        let (data, response) = try await URLSession.shared.upload(for: request, from: jpeg, delegate: UploadProgress(progress))
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+              let uri = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["content_uri"] as? String else {
+            throw URLError(.badServerResponse)
+        }
+        let user = userID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "/?#"))) ?? userID
+        _ = try await api("PUT", "/_matrix/client/v3/profile/\(user)/avatar_url",
+                          body: JSONSerialization.data(withJSONObject: ["avatar_url": uri]))
+        progress(1)
+        avatar = image
     }
 
     func removeAvatar() async throws {
@@ -610,4 +624,17 @@ private final class SyncStateObserver: SyncServiceStateObserver, @unchecked Send
     let onChange: (SyncServiceState) -> Void
     init(_ onChange: @escaping (SyncServiceState) -> Void) { self.onChange = onChange }
     func onUpdate(state: SyncServiceState) { onChange(state) }
+}
+
+/// Reports how much of an upload has gone out, on the main actor.
+private final class UploadProgress: NSObject, URLSessionTaskDelegate, Sendable {
+    private let report: @MainActor @Sendable (Double) -> Void
+    init(_ report: @escaping @MainActor @Sendable (Double) -> Void) { self.report = report }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64,
+                    totalBytesSent: Int64, totalBytesExpectedToSend: Int64) {
+        guard totalBytesExpectedToSend > 0 else { return }
+        let share = Double(totalBytesSent) / Double(totalBytesExpectedToSend)
+        Task { @MainActor in report(min(0.99, share)) }
+    }
 }

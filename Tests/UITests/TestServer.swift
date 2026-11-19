@@ -185,6 +185,18 @@ struct TestServer {
         _ = try Self.call(base, path, method: "PUT", token: token, body: ["actions": notify ? ["notify"] : []])
     }
 
+    /// The bytes behind an mxc:// URL, through the authenticated media API.
+    func download(_ mxc: String) throws -> Data {
+        let path = try XCTUnwrap(mxc.hasPrefix("mxc://") ? String(mxc.dropFirst(6)) : nil, "not an mxc URL: \(mxc)")
+        var request = URLRequest(url: try XCTUnwrap(URL(string: base + "/_matrix/client/v1/media/download/\(path)")))
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: Data?
+        URLSession.shared.dataTask(with: request) { data, _, _ in result = data; semaphore.signal() }.resume()
+        _ = semaphore.wait(timeout: .now() + 20)
+        return try XCTUnwrap(result, "no download")
+    }
+
     /// Reacts to an event and returns the reaction's ID.
     func react(_ key: String, to event: String, in room: String) throws -> String {
         let path = "/_matrix/client/v3/rooms/\(Self.encode(room))/send/m.reaction/r\(UInt64(Date().timeIntervalSince1970 * 1000))\(Int.random(in: 0..<1000))"
