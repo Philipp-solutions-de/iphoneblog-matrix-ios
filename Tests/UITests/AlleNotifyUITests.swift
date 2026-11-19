@@ -22,6 +22,7 @@ final class AlleNotifyUITests: XCTestCase {
             me.signOut(); other.signOut()
         }
         me.deleteRule("underride", alle); me.deleteRule("room", room); me.deleteRule("override", room)
+        try other.join(room) // a fresh test server has only the tester in Raum 2
 
         let app = launch()
         let menu = roomRow(app)
