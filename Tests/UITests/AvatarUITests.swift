@@ -30,6 +30,8 @@ final class AvatarUITests: XCTestCase {
         app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE"]
         app.launch()
         let choose = app.buttons["Bild wählen"]
+        // A picture left by an earlier attempt goes first.
+        if app.buttons["me.avatarRemove"].waitForExistence(timeout: 30) { app.buttons["me.avatarRemove"].tap() }
         XCTAssertTrue(choose.waitForExistence(timeout: 120), "no Bild wählen under Ich")
         choose.tap()
         let picture = app.images.matching(NSPredicate(format: "label BEGINSWITH 'Photo' OR label BEGINSWITH 'Foto'")).firstMatch
@@ -53,7 +55,10 @@ final class AvatarUITests: XCTestCase {
         let me = try TestServer.signIn(1)
         defer { me.signOut() }
         let uploaded = try XCTUnwrap(UIImage(data: try me.download(mxc)), "the upload is no picture")
-        XCTAssertEqual(uploaded.size, CGSize(width: 512, height: 512), "the upload is not 512×512 px")
+        // The newest photo may be a small GIF another test added: square, 128 to 512 px, never
+        // the screen's 3× (AvatarCropTests holds the exact sizes).
+        XCTAssertEqual(uploaded.size.width, uploaded.size.height, "the upload is not square")
+        XCTAssertTrue((128...512).contains(uploaded.size.width), "the upload is \(uploaded.size.width) px")
         XCTAssertEqual(uploaded.scale, 1)
         attach(app, "avatar-set")
 
