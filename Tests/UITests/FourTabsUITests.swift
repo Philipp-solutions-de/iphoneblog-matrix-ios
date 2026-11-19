@@ -141,6 +141,7 @@ final class FourTabsUITests: XCTestCase {
 
     /// Alles · Erwähnungen · Threads, the badge, and "Alle gelesen" for exactly the filter.
     func testFuerDichFiltersBadgeAndAlleGelesen() throws {
+        closeRunningApp()
         let me = try TestServer.signIn(1)
         let other = try TestServer.signIn(2)
         defer { me.signOut(); other.signOut() }
@@ -173,6 +174,7 @@ final class FourTabsUITests: XCTestCase {
 
     /// A long press on the Für dich tab marks everything read.
     func testLongPressOnFuerDichReadsEverything() throws {
+        closeRunningApp()
         let me = try TestServer.signIn(1)
         let other = try TestServer.signIn(2)
         defer { me.signOut(); other.signOut() }
@@ -185,6 +187,11 @@ final class FourTabsUITests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    /// The previous test's app still runs until the next launch. With the channel open it reads
+    /// what a test sends before launching, and the Für dich badge counts one short. Not for every
+    /// test: the Neu test needs the running app to have synced its room.
+    private func closeRunningApp() { XCUIApplication().terminate() }
 
     private func launch(tab: String, room: String? = nil, extra: [String: String] = [:]) -> XCUIApplication {
         let app = XCUIApplication()

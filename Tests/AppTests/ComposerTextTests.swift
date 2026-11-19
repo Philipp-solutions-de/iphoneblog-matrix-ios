@@ -27,4 +27,19 @@ final class ComposerTextTests: XCTestCase {
         XCTAssertEqual(ComposerText.html(markdown),
                        #"<a href="https://matrix.to/#/@kyrios:iphoneblog.de">Kyrios</a> Wir könnten das so machen"#)
     }
+
+    /// A picture's caption with a mention (Philip, 2026-11-18): plain body, a link in HTML, and
+    /// the person in m.mentions; a caption without one stays as typed.
+    func testCaptionWithAMention() throws {
+        let caption = try XCTUnwrap(ComposerText.caption("Bild für [Anna K.](https://matrix.to/#/@anna:localhost) und [Anna K.](https://matrix.to/#/@anna:localhost)"))
+        XCTAssertEqual(caption.body, "Bild für Anna K. und Anna K.")
+        XCTAssertEqual(caption.userIDs, ["@anna:localhost"])
+        XCTAssertEqual(caption.html?.contains(#"<a href="https://matrix.to/#/@anna:localhost">Anna K.</a>"#), true)
+        let plain = try XCTUnwrap(ComposerText.caption("Nur ein **Bild**"))
+        XCTAssertEqual(plain.body, "Nur ein **Bild**")
+        XCTAssertNil(plain.html)
+        XCTAssertEqual(plain.userIDs, [])
+        XCTAssertNil(ComposerText.caption(nil))
+        XCTAssertNil(ComposerText.caption(""))
+    }
 }

@@ -140,6 +140,32 @@ final class RichMessagesUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["timeline-image.loaded"].exists, "no loaded picture in sight")
     }
 
+    /// "@Anna" in a picture's caption (Philip, 2026-11-18: a caption's mention reached nobody):
+    /// picked from the @ suggestions, sent as a mention (m.mentions, a link in formatted_body,
+    /// the name as plain text in body), and Anna gets a mention.
+    func testCaptionMentionReachesThePerson() throws {
+        let anna = try TestServer.signIn(2)
+        addTeardownBlock { anna.signOut() }
+        let app = try openChannel()
+        let stamp = Int(Date().timeIntervalSince1970)
+        let event = try sendPhoto(app, shotPrefix: "caption-mention-", caption: "Bild \(stamp) für @Ann", mention: "Anna K.")
+        let mentions = (event["m.mentions"] as? [String: Any])?["user_ids"] as? [String] ?? []
+        XCTAssertEqual(mentions, [anna.userID], "m.mentions: \(event)")
+        let html = event["formatted_body"] as? String ?? ""
+        XCTAssertTrue(html.contains("https://matrix.to/#/\(anna.userID)"), "no mention link in formatted_body: \(event)")
+        let body = event["body"] as? String ?? ""
+        XCTAssertTrue(body.contains("Bild \(stamp) für") && body.contains("Anna K.") && !body.contains("]("),
+                      "body is not plain text with the name: \(body)")
+        var mentioned = false
+        for _ in 0..<20 where !mentioned {
+            mentioned = (try? anna.hasMention(containing: "Bild \(stamp)")) ?? false
+            if !mentioned { sleep(1) }
+        }
+        XCTAssertTrue(mentioned, "Anna got no mention")
+        sleep(2)
+        attach(app, "caption-mention-timeline")
+    }
+
     /// The same in a thread: the picture arrives as a thread reply.
     func testPhotoInThreadIsSent() throws {
         guard let room = env["IPHONEBLOG_TEST_CHANNEL_ROOM"], let root = env["IPHONEBLOG_TEST_CHANNEL_THREAD"] else {
@@ -154,7 +180,8 @@ final class RichMessagesUITests: XCTestCase {
     }
 
     /// + › Fotos, the first library picture, Senden in the upload preview; returns the server's event.
-    private func sendPhoto(_ app: XCUIApplication, shotPrefix: String = "") throws -> [String: Any] {
+    private func sendPhoto(_ app: XCUIApplication, shotPrefix: String = "",
+                           caption typed: String? = nil, mention pick: String? = nil) throws -> [String: Any] {
         let before = Date()
         app.buttons["composer_toolbar-open_compose_options"].tap()
         let photos = app.buttons["room-attachment_picker_photo_library"]
@@ -174,6 +201,17 @@ final class RichMessagesUITests: XCTestCase {
         // (room-send_button) waits behind the sheet with the same label.
         let caption = app.textViews["Bildunterschrift hinzufügen"]
         XCTAssertTrue(caption.waitForExistence(timeout: 60), "no upload preview")
+        if let typed {
+            caption.tap()
+            caption.typeText(typed)
+            if let pick {
+                // The caption's @ suggestions, as in the message composer.
+                let suggestion = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", pick)).firstMatch
+                XCTAssertTrue(suggestion.waitForExistence(timeout: 15), "no @ suggestion for \(pick) in the caption")
+                attach(app, shotPrefix + "caption-suggestion")
+                suggestion.tap()
+            }
+        }
         attach(app, shotPrefix + "upload-preview")
         let send = app.buttons.matching(NSPredicate(format: "label == 'Senden' AND identifier != 'room-send_button'")).firstMatch
         XCTAssertTrue(send.isHittable, "upload preview's Senden not hittable")

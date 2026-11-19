@@ -127,6 +127,10 @@ private struct ChatSheets {
     let session: ChatKitSession
     let presenter: ChatScreenPresenter
     let timelineController: TimelineControllerProtocol
+    /// The room, for the caption's @ suggestions.
+    let roomProxy: JoinedRoomProxyProtocol
+    /// The screen's timeline context, set once its timeline exists: pills in a caption need it.
+    let timeline = ChatTimelineContextBox()
 
     func emojiPicker(selectedEmojis: Set<String>, continuation: EmojiPickerScreenContinuation) {
         let coordinator = EmojiPickerScreenCoordinator(parameters: .init(mode: .reaction,
@@ -168,7 +172,11 @@ private struct ChatSheets {
                                                                         mediaUploadingPreprocessor: MediaUploadingPreprocessor(userSettings: session.userSession.userSettings),
                                                                         timelineController: timelineController,
                                                                         clientProxy: session.clientProxy,
-                                                                        userIndicatorController: presenter.userIndicatorController)
+                                                                        userIndicatorController: presenter.userIndicatorController,
+                                                                        completionSuggestionService: CompletionSuggestionService(roomProxy: roomProxy,
+                                                                                                                                 roomListPublisher: Just([]).eraseToAnyPublisher()),
+                                                                        mediaProvider: session.userSession.mediaProvider,
+                                                                        timelineContext: timeline.context)
         let coordinator = MediaUploadPreviewScreenCoordinator(parameters: parameters)
         var cancellable: AnyCancellable?
         cancellable = coordinator.actions.sink { [presenter] action in
@@ -217,7 +225,7 @@ final class ChatRoomCoordinator: ChatScreenCoordinator {
                                                                                             initialFocussedEventID: nil,
                                                                                             timelineItemFactory: itemFactory,
                                                                                             mediaProvider: session.userSession.mediaProvider)
-        sheets = ChatSheets(session: session, presenter: presenter, timelineController: timelineController)
+        sheets = ChatSheets(session: session, presenter: presenter, timelineController: timelineController, roomProxy: roomProxy)
 
         // The thread screen's view model holds what a conversation screen needs: title, avatar,
         // whether the reader may write, the media preview. It is not specific to threads.
@@ -237,6 +245,7 @@ final class ChatRoomCoordinator: ChatScreenCoordinator {
 
         composerViewModel = ChatComposer.make(roomProxy: roomProxy, threadRootEventID: nil, session: session,
                                               itemFactory: itemFactory, timelineContext: timelineViewModel.context)
+        sheets.timeline.context = timelineViewModel.context
     }
 
     func start() {
@@ -451,7 +460,7 @@ final class ChatThreadCoordinator: ChatScreenCoordinator {
                                                                                             timelineItemFactory: itemFactory,
                                                                                             mediaProvider: session.userSession.mediaProvider)
         guard case let .success(timelineController) = result else { throw ChatKitError.threadUnavailable }
-        sheets = ChatSheets(session: session, presenter: presenter, timelineController: timelineController)
+        sheets = ChatSheets(session: session, presenter: presenter, timelineController: timelineController, roomProxy: roomProxy)
 
         let parameters = ThreadTimelineScreenCoordinatorParameters(userSession: session.userSession,
                                                                    roomProxy: roomProxy,
@@ -470,6 +479,7 @@ final class ChatThreadCoordinator: ChatScreenCoordinator {
                                                                    timelineControllerFactory: session.timelineControllerFactory,
                                                                    userIndicatorController: presenter.userIndicatorController)
         coordinator = ThreadTimelineScreenCoordinator(parameters: parameters)
+        sheets.timeline.context = coordinator.timelineContext
     }
 
     func start() {
@@ -587,4 +597,10 @@ extension EnvironmentValues {
     @Entry var chatComposerPlaceholder: String?
     /// Whether the composer says the room is not end-to-end encrypted: in direct messages only.
     @Entry var chatShowsEncryptionNote = false
+}
+
+/// Holds a screen's timeline context for its sheets, which are made before the timeline.
+@MainActor
+final class ChatTimelineContextBox {
+    weak var context: TimelineViewModel.Context?
 }

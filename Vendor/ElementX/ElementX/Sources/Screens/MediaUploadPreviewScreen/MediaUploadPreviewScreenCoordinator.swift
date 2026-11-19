@@ -20,6 +20,11 @@ struct MediaUploadPreviewScreenCoordinatorParameters {
     let timelineController: TimelineControllerProtocol
     let clientProxy: ClientProxyProtocol
     let userIndicatorController: UserIndicatorControllerProtocol
+    /// iphoneblog: @ suggestions for the caption, and the pictures beside them.
+    var completionSuggestionService: CompletionSuggestionServiceProtocol?
+    var mediaProvider: MediaProviderProtocol?
+    /// iphoneblog: pills in the caption are drawn with the room's timeline context.
+    var timelineContext: TimelineViewModel.Context?
 }
 
 enum MediaUploadPreviewScreenCoordinatorAction {
@@ -28,6 +33,8 @@ enum MediaUploadPreviewScreenCoordinatorAction {
 
 final class MediaUploadPreviewScreenCoordinator: CoordinatorProtocol {
     private var viewModel: MediaUploadPreviewScreenViewModelProtocol
+    private let mediaProvider: MediaProviderProtocol?
+    private let timelineContext: TimelineViewModel.Context?
     private let actionsSubject: PassthroughSubject<MediaUploadPreviewScreenCoordinatorAction, Never> = .init()
     private var cancellables = Set<AnyCancellable>()
     
@@ -44,7 +51,10 @@ final class MediaUploadPreviewScreenCoordinator: CoordinatorProtocol {
                                                       mediaUploadingPreprocessor: parameters.mediaUploadingPreprocessor,
                                                       timelineController: parameters.timelineController,
                                                       clientProxy: parameters.clientProxy,
-                                                      userIndicatorController: parameters.userIndicatorController)
+                                                      userIndicatorController: parameters.userIndicatorController,
+                                                      completionSuggestionService: parameters.completionSuggestionService)
+        mediaProvider = parameters.mediaProvider
+        timelineContext = parameters.timelineContext
     }
     
     func start() {
@@ -65,6 +75,7 @@ final class MediaUploadPreviewScreenCoordinator: CoordinatorProtocol {
     }
     
     func toPresentable() -> AnyView {
-        AnyView(MediaUploadPreviewScreen(context: viewModel.context))
+        AnyView(MediaUploadPreviewScreen(context: viewModel.context, mediaProvider: mediaProvider)
+            .environment(\.timelineContext, timelineContext))
     }
 }

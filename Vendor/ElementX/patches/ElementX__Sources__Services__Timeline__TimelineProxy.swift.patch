@@ -1,6 +1,6 @@
 --- a/ElementX/Sources/Services/Timeline/TimelineProxy.swift
 +++ b/ElementX/Sources/Services/Timeline/TimelineProxy.swift
-@@ -276,6 +276,8 @@
+@@ -276,13 +276,15 @@
                     audioInfo: AudioInfo,
                     caption: String?,
                     requestHandle: @MainActor (SendAttachmentJoinHandleProtocol) -> Void) async -> Result<Void, TimelineProxyError> {
@@ -9,7 +9,17 @@
          MXLog.info("Sending audio")
          
          do {
-@@ -302,6 +304,8 @@
+             let handle = try timeline.sendAudio(params: .init(source: .file(filename: url.path(percentEncoded: false)),
+-                                                              caption: caption,
+-                                                              formattedCaption: nil, // Rust will build this from the caption's markdown.
+-                                                              mentions: nil,
++                                                              caption: ComposerText.caption(caption)?.body,
++                                                              formattedCaption: ComposerText.caption(caption)?.html.map { FormattedBody(format: .html, body: $0) },
++                                                              mentions: ComposerText.caption(caption).flatMap { $0.userIDs.isEmpty ? nil : Mentions(userIds: $0.userIDs, room: false) },
+                                                               inReplyTo: nil),
+                                                 audioInfo: audioInfo)
+             
+@@ -302,13 +304,15 @@
                    fileInfo: FileInfo,
                    caption: String?,
                    requestHandle: @MainActor (SendAttachmentJoinHandleProtocol) -> Void) async -> Result<Void, TimelineProxyError> {
@@ -18,7 +28,17 @@
          MXLog.info("Sending file")
          
          do {
-@@ -329,6 +333,8 @@
+             let handle = try timeline.sendFile(params: .init(source: .file(filename: url.path(percentEncoded: false)),
+-                                                             caption: caption,
+-                                                             formattedCaption: nil, // Rust will build this from the caption's markdown.
+-                                                             mentions: nil,
++                                                             caption: ComposerText.caption(caption)?.body,
++                                                             formattedCaption: ComposerText.caption(caption)?.html.map { FormattedBody(format: .html, body: $0) },
++                                                             mentions: ComposerText.caption(caption).flatMap { $0.userIDs.isEmpty ? nil : Mentions(userIds: $0.userIDs, room: false) },
+                                                              inReplyTo: nil),
+                                                fileInfo: fileInfo)
+             
+@@ -329,13 +333,15 @@
                     imageInfo: ImageInfo,
                     caption: String?,
                     requestHandle: @MainActor (SendAttachmentJoinHandleProtocol) -> Void) async -> Result<Void, TimelineProxyError> {
@@ -27,7 +47,17 @@
          MXLog.info("Sending image")
          
          do {
-@@ -381,6 +387,8 @@
+             let handle = try timeline.sendImage(params: .init(source: .file(filename: url.path(percentEncoded: false)),
+-                                                              caption: caption,
+-                                                              formattedCaption: nil, // Rust will build this from the caption's markdown.
+-                                                              mentions: nil,
++                                                              caption: ComposerText.caption(caption)?.body,
++                                                              formattedCaption: ComposerText.caption(caption)?.html.map { FormattedBody(format: .html, body: $0) },
++                                                              mentions: ComposerText.caption(caption).flatMap { $0.userIDs.isEmpty ? nil : Mentions(userIds: $0.userIDs, room: false) },
+                                                               inReplyTo: nil),
+                                                 thumbnailSource: .file(filename: thumbnailURL.path(percentEncoded: false)),
+                                                 imageInfo: imageInfo)
+@@ -381,13 +387,15 @@
                     videoInfo: VideoInfo,
                     caption: String?,
                     requestHandle: @MainActor (SendAttachmentJoinHandleProtocol) -> Void) async -> Result<Void, TimelineProxyError> {
@@ -36,7 +66,17 @@
          MXLog.info("Sending video")
          
          do {
-@@ -407,6 +415,8 @@
+             let handle = try timeline.sendVideo(params: .init(source: .file(filename: url.path(percentEncoded: false)),
+-                                                              caption: caption,
+-                                                              formattedCaption: nil,
+-                                                              mentions: nil,
++                                                              caption: ComposerText.caption(caption)?.body,
++                                                              formattedCaption: ComposerText.caption(caption)?.html.map { FormattedBody(format: .html, body: $0) },
++                                                              mentions: ComposerText.caption(caption).flatMap { $0.userIDs.isEmpty ? nil : Mentions(userIds: $0.userIDs, room: false) },
+                                                               inReplyTo: nil),
+                                                 thumbnailSource: .file(filename: thumbnailURL.path(percentEncoded: false)),
+                                                 videoInfo: videoInfo)
+@@ -407,12 +415,14 @@
      func sendGallery(itemInfos: [GalleryItemInfo],
                       caption: String?,
                       inReplyToEventID: String?) async -> Result<Void, TimelineProxyError> {
@@ -45,6 +85,15 @@
          MXLog.info("Sending gallery with \(itemInfos.count) items")
          
          do {
+-            let handle = try timeline.sendGallery(params: .init(caption: caption,
+-                                                                formattedCaption: nil, // Rust will build this from the caption's markdown.
+-                                                                mentions: nil,
++            let handle = try timeline.sendGallery(params: .init(caption: ComposerText.caption(caption)?.body,
++                                                                formattedCaption: ComposerText.caption(caption)?.html.map { FormattedBody(format: .html, body: $0) },
++                                                                mentions: ComposerText.caption(caption).flatMap { $0.userIDs.isEmpty ? nil : Mentions(userIds: $0.userIDs, room: false) },
+                                                                 inReplyTo: inReplyToEventID),
+                                                   itemInfos: itemInfos)
+             try await handle.join()
 @@ -430,6 +440,8 @@
                            waveform: [Float],
                            inReplyToEventID: String?,
