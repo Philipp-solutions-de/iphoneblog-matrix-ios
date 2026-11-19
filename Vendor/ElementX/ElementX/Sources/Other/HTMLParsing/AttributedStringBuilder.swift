@@ -331,12 +331,12 @@ nonisolated struct AttributedStringBuilder: AttributedStringBuilderProtocol {
     private func addLinksAndMentions(_ attributedString: NSMutableAttributedString) {
         let string = attributedString.string
         
-        // iPhoneBlog: a link the HTML brought (an <a href="mailto:…">) on a masked address goes;
-        // the server masked the address, not the link around it.
+        // iPhoneBlog: a link to a masked address (<a href="mailto:p***@***.de">) goes; the server
+        // masked the address, not the link around it. A web link stays, whatever its text, as
+        // in the web app (v0.6.23).
         attributedString.enumerateAttribute(.link, in: NSRange(location: 0, length: attributedString.length)) { value, range, _ in
             let target = (value as? URL)?.absoluteString.removingPercentEncoding ?? (value as? String) ?? ""
-            let text = (string as NSString).substring(with: range)
-            if (target.contains("***") && target.contains("@")) || (text.contains("***") && text.contains("@")) {
+            if target.contains("***@***.") {
                 attributedString.removeAttribute(.link, range: range)
             }
         }
