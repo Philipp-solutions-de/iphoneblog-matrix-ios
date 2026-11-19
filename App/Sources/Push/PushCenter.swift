@@ -110,4 +110,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         PushCenter.shared.didFailToRegister(error)
     }
+
+    /// Portrait, except a #one video in full screen (OrientationGate).
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        OrientationGate.mask
+    }
 }

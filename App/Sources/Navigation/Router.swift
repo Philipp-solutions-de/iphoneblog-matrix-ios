@@ -18,8 +18,14 @@ final class Router: ObservableObject {
         case thread(rootEventID: String)
     }
 
-    /// One step in the #one-Chat tab, on top of its list of rooms.
+    /// One step in the #one tab, on top of the hub (variant A, Thorsten 2026-11-18).
     enum ChatRoute: Hashable {
+        /// The #one chat: the room bar and the open room (`currentRoomID`).
+        case chat
+        /// All episodes, newest first.
+        case videos
+        /// One episode's page with its player.
+        case episode(Episode)
         case room(String)
         case thread(ThreadRoute)
         /// The threads you take part in, across the #one rooms.
@@ -30,8 +36,9 @@ final class Router: ObservableObject {
     }
 
     @Published var tab: Tab = Router.startTab
-    /// #one: the open room under its room bar (variant A), then a thread, the Threads list or a
-    /// search on top. `.room` routes are not pushed any more; the room bar switches rooms.
+    /// #one: the hub at the root; Chat (the room bar and the open room), Videos or an episode
+    /// pushed on it; in Chat a thread, the Threads list or a search on top. `.room` routes are
+    /// not pushed any more; the room bar switches rooms.
     @Published var chatPath: [ChatRoute] = []
     /// The room open in #one, remembered across launches: the tab opens the last room read.
     @Published var currentRoomID: String? = UserDefaults.standard.string(forKey: Router.lastRoomKey) {
@@ -87,9 +94,14 @@ final class Router: ObservableObject {
         if let room = env["IPHONEBLOG_START_ROOM"], !room.isEmpty {
             currentRoomID = room
         }
+        // Runs that start in #one land in Chat, as before the hub; IPHONEBLOG_START_HUB=1 stays
+        // on the hub.
+        if env["IPHONEBLOG_START_TAB"] == "chat", env["IPHONEBLOG_START_HUB"] != "1" {
+            chatPath = [.chat]
+        }
         if let value = env["IPHONEBLOG_START_THREAD"], case let parts = value.split(separator: "|"), parts.count == 2 {
             currentRoomID = String(parts[0])
-            chatPath = [.thread(ThreadRoute(roomID: String(parts[0]), rootEventID: String(parts[1])))]
+            chatPath = [.chat, .thread(ThreadRoute(roomID: String(parts[0]), rootEventID: String(parts[1])))]
         }
         #endif
     }
@@ -116,7 +128,14 @@ final class Router: ObservableObject {
         }
         tab = .chat
         currentRoomID = roomID
-        chatPath = []
+        chatPath = [.chat]
+    }
+
+    /// Chat from the hub: the tile, "Alle", or a row of "Gerade aktiv" (that room).
+    func openChat(roomID: String? = nil) {
+        if let roomID { currentRoomID = roomID }
+        tab = .chat
+        chatPath = [.chat]
     }
 
     func openThreadsList() { chatPath.append(.threads) }
@@ -142,7 +161,7 @@ final class Router: ObservableObject {
         switch tab {
         case .chat:
             switch chatPath.last {
-            case nil: return threadRootEventID == nil && currentRoomID == roomID
+            case .chat?: return threadRootEventID == nil && currentRoomID == roomID
             case .room(let id)?: return threadRootEventID == nil && id == roomID
             case .thread(let thread)?: return thread.roomID == roomID && thread.rootEventID == threadRootEventID
             default: return false
@@ -187,7 +206,7 @@ final class Router: ObservableObject {
         if case .search? = chatPath.last { chatPath.append(thread); return }
         // Otherwise over its room, so back leads into the room.
         currentRoomID = roomID
-        chatPath = [thread]
+        chatPath = [.chat, thread]
     }
 
     /// Back to a clean state after signing out; the Blog tab stays readable.

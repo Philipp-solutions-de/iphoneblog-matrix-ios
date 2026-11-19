@@ -2,7 +2,8 @@ import XCTest
 
 /// Who sees which tabs (Thorsten, 2026-11-16/17): #one members see Blog, #one, Für dich and
 /// Ich; everyone else Blog and #one, which offers the sign-in (signed out) or says
-/// "Nur für #one-Mitglieder" with Abmelden and Konto löschen (signed in without #one).
+/// "Kein Zugang zu #one" with another account's sign-in and Konto löschen (signed in without
+/// #one). Neither gate shows a price or a way to buy (spec-ios.md, App Store reader rule).
 final class TabsUITests: XCTestCase {
     private var env: [String: String] { ProcessInfo.processInfo.environment }
 
@@ -39,8 +40,8 @@ final class TabsUITests: XCTestCase {
         let app = launch(["IPHONEBLOG_SIGNED_OUT": "1"])
         XCTAssertTrue(app.buttons["one.signIn"].waitForExistence(timeout: 30), "no sign-in in #one-Chat")
         XCTAssertEqual(tabs(app), ["Blog", "#one"])
-        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'abonnieren' OR label CONTAINS[c] 'werden'")).firstMatch.exists,
-                       "no way to buy")
+        XCTAssertEqual(app.staticTexts["one.gate.text"].label, "Melde dich mit deinem iPhoneBlog-Konto an, um #one zu öffnen.")
+        assertNoBuyWording(app)
         attach(app, "tabs-signed-out")
     }
 
@@ -48,8 +49,11 @@ final class TabsUITests: XCTestCase {
         let app = try signIn(env["IPHONEBLOG_TEST_USER2"], env["IPHONEBLOG_TEST_PASSWORD2"]) // Anna: no #one
         XCTAssertTrue(app.buttons["one.signOut"].waitForExistence(timeout: 120), "not signed in")
         sleep(10) // membership is checked after sync; it must stay "no"
-        XCTAssertTrue(app.staticTexts["Nur für #one-Mitglieder"].exists)
+        XCTAssertTrue(app.staticTexts["Kein Zugang zu #one"].exists)
+        XCTAssertTrue(app.staticTexts["one.gate.text"].label.hasSuffix("hat keinen Zugang zu #one."), app.staticTexts["one.gate.text"].label)
+        XCTAssertEqual(app.buttons["one.signOut"].label, "Mit anderem Konto anmelden")
         XCTAssertTrue(app.buttons["one.deleteAccount"].exists, "no Konto löschen")
+        assertNoBuyWording(app)
         XCTAssertEqual(tabs(app), ["Blog", "#one"])
         attach(app, "tabs-non-member")
     }
@@ -59,6 +63,16 @@ final class TabsUITests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons["Für dich"].waitForExistence(timeout: 120), "no member tabs")
         XCTAssertEqual(tabs(app), ["Blog", "#one", "Für dich", "Ich"])
         attach(app, "tabs-member")
+    }
+
+    /// No price, no buy hint, no "Mitglied werden", no link to the offer.
+    private func assertNoBuyWording(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let words = ["abonnieren", "werden", "kaufen", "Preis", "€", "Angebot", "Mitgliedschaft"]
+        for element in app.staticTexts.allElementsBoundByIndex + app.buttons.allElementsBoundByIndex {
+            for word in words where element.label.localizedCaseInsensitiveContains(word) {
+                XCTFail("buy wording on the gate: \(element.label)", file: file, line: line)
+            }
+        }
     }
 
     private func attach(_ app: XCUIApplication, _ name: String) {

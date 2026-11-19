@@ -18,81 +18,115 @@ struct OneChatGate: View {
     }
 }
 
-/// Signed out: what #one is, and the way in.
+/// Signed out (spec-ios.md "Screens (not a member)"): the "#" mark, "#one", one line and the
+/// sign-in. No price, no buy hint, no "Mitglied werden", no link to the offer (App Store
+/// reader rule).
 struct OneSignIn: View {
     @ObservedObject var router: Router
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 0) {
+            OneGateTitle()
             Spacer()
-            OneChatTitle()
-            Text("Der Chat für #one-Mitglieder.")
-                .font(Theme.Font.reading)
-                .foregroundStyle(Theme.ink2)
-                .multilineTextAlignment(.center)
-            Button { router.showSignIn = true } label: {
-                Text("Anmelden").frame(maxWidth: .infinity, minHeight: Theme.Size.buttonHeight)
+            VStack(spacing: 14) {
+                OneMark()
+                Text("#one").font(.system(size: 24, weight: .bold)).foregroundStyle(Theme.ink)
+                Text("Melde dich mit deinem iPhoneBlog-Konto an, um #one zu öffnen.")
+                    .font(Theme.Font.reading)
+                    .foregroundStyle(Theme.ink2)
+                    .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("one.gate.text")
+                Button { router.showSignIn = true } label: {
+                    Text("Anmelden").frame(maxWidth: .infinity, minHeight: Theme.Size.buttonHeight)
+                }
+                .buttonStyle(FilledButton(fill: Theme.coralButton))
+                .accessibilityIdentifier("one.signIn")
+                .padding(.top, 8)
             }
-            .buttonStyle(FilledButton(fill: Theme.coralButton))
-            .accessibilityIdentifier("one.signIn")
-            .padding(.top, 8)
+            .padding(.horizontal, 28)
             Spacer()
             LegalLinks(router: router)
         }
-        .padding(.horizontal, 28)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.background)
     }
 }
 
-/// Signed in without #one: said plainly, with sign-out and account deletion (App Store 5.1.1(v)).
+/// Signed in without #one (spec): "Kein Zugang zu #one", the account's name, and a way to use
+/// another account. Account deletion stays reachable as a quiet link: there is no Ich tab
+/// for them (App Store 5.1.1(v)).
 struct OneMembersOnly: View {
     @EnvironmentObject private var model: AppModel
     @ObservedObject var session: ChatSession
     @ObservedObject var router: Router
-    @State private var confirmSignOut = false
+    @State private var confirmSwitch = false
     @State private var deleting = false
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 0) {
+            OneGateTitle()
             Spacer()
-            OneChatTitle()
-            Text("Nur für #one-Mitglieder")
-                .font(.system(size: 22))
-                .foregroundStyle(Theme.ink)
-            Text("Angemeldet als \(session.displayName ?? MentionsModel.localpart(session.userID)).")
+            VStack(spacing: 14) {
+                OneMark()
+                Text("Kein Zugang zu #one").font(.system(size: 24, weight: .bold)).foregroundStyle(Theme.ink)
+                Text("Das Konto \(session.displayName ?? MentionsModel.localpart(session.userID)) hat keinen Zugang zu #one.")
+                    .font(Theme.Font.reading)
+                    .foregroundStyle(Theme.ink2)
+                    .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("one.gate.text")
+                Button { confirmSwitch = true } label: {
+                    Text("Mit anderem Konto anmelden").frame(maxWidth: .infinity, minHeight: Theme.Size.smallButtonHeight)
+                }
+                .buttonStyle(OutlineButton(stroke: Theme.line, text: Theme.ink))
+                .accessibilityIdentifier("one.signOut")
+                .padding(.top, 8)
+            }
+            .padding(.horizontal, 28)
+            Spacer()
+            Button("Konto löschen") { deleting = true }
                 .font(Theme.Font.footnote)
                 .foregroundStyle(Theme.ink3)
-            Spacer()
-            VStack(spacing: 10) {
-                Button { confirmSignOut = true } label: {
-                    Text("Abmelden").frame(maxWidth: .infinity, minHeight: Theme.Size.smallButtonHeight)
-                }
-                .buttonStyle(OutlineButton(stroke: Theme.line, text: Theme.coralText))
-                .accessibilityIdentifier("one.signOut")
-                Button { deleting = true } label: {
-                    Text("Konto löschen").frame(maxWidth: .infinity, minHeight: Theme.Size.smallButtonHeight)
-                }
-                .buttonStyle(OutlineButton(stroke: Theme.line, text: Theme.ink2))
                 .accessibilityIdentifier("one.deleteAccount")
-            }
+                .padding(.bottom, 10)
             LegalLinks(router: router)
         }
-        .padding(.horizontal, 28)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.background)
-        .confirmationDialog("Auf diesem Gerät abmelden?", isPresented: $confirmSignOut, titleVisibility: .visible) {
-            Button("Abmelden", role: .destructive) { Task { await model.signOut() } }
+        .confirmationDialog("Auf diesem Gerät abmelden und mit einem anderen Konto anmelden?", isPresented: $confirmSwitch, titleVisibility: .visible) {
+            Button("Abmelden", role: .destructive) {
+                Task {
+                    await model.signOut()
+                    router.tab = .chat
+                    router.showSignIn = true
+                }
+            }
         }
         .sheet(isPresented: $deleting) { AccountDeletionSheet(model: model, router: router) }
     }
 }
 
-/// "#one" as a title, in the #one colour.
-private struct OneChatTitle: View {
+/// The large title "#one" at the top of the gates, as the hub has it.
+private struct OneGateTitle: View {
     var body: some View {
-        Text("#one").foregroundStyle(Theme.coral)
-            .font(.system(size: 30, weight: .semibold))
+        Text("#one")
+            .font(Theme.Font.screenTitle)
+            .foregroundStyle(Theme.coralText)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Theme.Space.page)
+            .padding(.top, 6)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// The "#" mark in the #one colour.
+private struct OneMark: View {
+    var body: some View {
+        Text("#")
+            .font(.system(size: 40, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: Theme.Size.lockCircle, height: Theme.Size.lockCircle)
+            .background(Theme.coralButton, in: RoundedRectangle(cornerRadius: 20))
+            .accessibilityHidden(true)
     }
 }
 
@@ -111,16 +145,27 @@ private struct LegalLinks: View {
     }
 }
 
-/// #one for members, variant A (Thorsten, 2026-11-17): a bar with the #one rooms under the title,
-/// each with its unread count, and the open room below it. A tap switches rooms; the tab opens
+/// #one for members: the hub at the root (variant A, Thorsten 2026-11-18), with Chat, Videos and
+/// an episode pushed on it. Chat is the room bar from room-nav variant A (Thorsten, 2026-11-17):
+/// the #one rooms with their unread counts, the open room below. A tap switches rooms; Chat opens
 /// the last room read; "Weiter" leads to the next room with news; the search looks in all rooms.
 struct OneChatTab: View {
     @ObservedObject var router: Router
     @ObservedObject var session: ChatSession
+    @StateObject private var episodes: EpisodesModel
+    @StateObject private var players = EpisodePlayers()
+
+    init(router: Router, session: ChatSession) {
+        self.router = router
+        self.session = session
+        _episodes = StateObject(wrappedValue: EpisodesModel(source: EpisodesModel.source { [weak session] in
+            await MainActor.run { try? session?.client.session().accessToken }
+        }))
+    }
 
     var body: some View {
         NavigationStack(path: $router.chatPath) {
-            OneRoomView(session: session, router: router)
+            OneHubView(session: session, router: router, episodes: episodes)
                 .safeAreaInset(edge: .top) { PushPrimerSlot() }
                 .navigationDestination(for: Router.ChatRoute.self) { route in
                     destination(route)
@@ -132,6 +177,15 @@ struct OneChatTab: View {
     @ViewBuilder
     private func destination(_ route: Router.ChatRoute) -> some View {
         switch route {
+        case .chat:
+            OneRoomView(session: session, router: router)
+        case .videos:
+            VideosView(episodes: episodes, router: router)
+        case .episode(let episode):
+            EpisodeView(episode: episode, player: players.player(for: episode)) { [players] in
+                // Only when the page left the stack, not when something covers it.
+                if !router.chatPath.contains(.episode(episode)) { players.close(episode) }
+            }
         case .room(let roomID):
             ChatScreens.provider.roomScreen(roomID: roomID, host: session).id(roomID)
         case .thread(let thread):
@@ -210,18 +264,13 @@ private struct OneRoomView: View {
             }
         }
         .background(Theme.background)
-        .navigationTitle("#one")
+        .navigationTitle("Chat")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            // "#one", and the open room's topic under it (the bar names the room).
+            // "Chat" alone: the app shows no room topic anywhere (Thorsten, 2026-11-19); the bar
+            // names the room.
             ToolbarItem(placement: .principal) {
-                VStack(spacing: 0) {
-                    Text("#one").font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.ink)
-                    if let topic = session.oneRooms.first(where: { $0.id == current })?.topic, !topic.isEmpty {
-                        Text(topic).font(.system(size: 12)).foregroundStyle(Theme.ink3)
-                    }
-                }
-                .lineLimit(1)
+                Text("Chat").font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.ink).lineLimit(1)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { router.openSearch(in: session.oneRooms.map(\.id), current: current) } label: {

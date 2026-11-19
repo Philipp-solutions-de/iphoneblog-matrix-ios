@@ -1,0 +1,106 @@
+{
+  "total": 525,
+  "next": "2026-11-03T18:30:00Z",
+  "episodes": [
+    {
+      "post_id": 91234,
+      "number": 527,
+      "title": "Fokus-Modi, die wirklich helfen",
+      "published": "2026-11-17T06:00:00Z",
+      "duration_s": 1532,
+      "video_id": "iphoneblog_one_527_kalenderwochen",
+      "poster": "https://www.iphoneblog.de/img/w1250/video/iphoneblog_one_527_kalenderwochen/poster.jpg",
+      "link": "https://www.iphoneblog.de/2026/11/17/gewusst-wie-fokus-modi/",
+      "notes_html": "<p>Welche Fokus-Modi wir nutzen und wie man sie <a href=\"https://www.iphoneblog.de/fokus\">automatisch</a> schalten lässt.</p><ul><li>Schlafen</li><li>Arbeit</li></ul>",
+      "manifest": "https://www.iphoneblog.de/wp-content/video/iphoneblog_one_527_kalenderwochen/manifest.json",
+      "files": [
+        {
+          "url": "https://www.iphoneblog.de/wp-content/video/iphoneblog_one_527_kalenderwochen/remux.mp4",
+          "width": 1920,
+          "height": 1080,
+          "mime": "video/mp4",
+          "bytes": 512238592,
+          "list": true
+        },
+        {
+          "url": "https://www.iphoneblog.de/wp-content/video/iphoneblog_one_527_kalenderwochen/360.mp4",
+          "width": null,
+          "height": 360,
+          "mime": "video/mp4",
+          "bytes": null,
+          "list": false
+        }
+      ],
+      "captions": [
+        {
+          "lang": "de",
+          "label": "Deutsch",
+          "url": "https://www.iphoneblog.de/wp-content/video/iphoneblog_one_527_kalenderwochen/captions.de.vtt"
+        }
+      ],
+      "chapters": "https://www.iphoneblog.de/wp-content/video/iphoneblog_one_527_kalenderwochen/chapters.vtt"
+    },
+    {
+      "post_id": 91102,
+      "number": null,
+      "title": "mit Alex",
+      "published": "2026-11-10T06:00:00Z",
+      "duration_s": null,
+      "video_id": "gw-213-kurzbefehle",
+      "poster": null,
+      "link": "https://www.iphoneblog.de/2026/11/10/gewusst-wie-kurzbefehle/",
+      "notes_html": "<p>Drei Kurzbefehle, die jeden Tag Zeit sparen.</p>",
+      "manifest": "https://www.iphoneblog.de/wp-content/video/gw-213-kurzbefehle/manifest.json",
+      "files": [
+        {
+          "url": "https://www.iphoneblog.de/wp-content/video/gw-213-kurzbefehle/1080.mp4",
+          "width": 1920,
+          "height": 1080,
+          "mime": "video/mp4",
+          "bytes": 430964736,
+          "list": true
+        },
+        {
+          "url": "https://www.iphoneblog.de/wp-content/video/gw-213-kurzbefehle/720.mp4",
+          "width": 1280,
+          "height": 720,
+          "mime": "video/mp4",
+          "bytes": 203423744,
+          "list": true
+        }
+      ],
+      "captions": [],
+      "chapters": null
+    },
+    {
+      "post_id": 90876,
+      "number": 525,
+      "title": "Live vom Apple-Event",
+      "published": "2026-11-03T18:30:00Z",
+      "duration_s": 2410,
+      "video_id": "sonder-apple-event-nov",
+      "poster": "https://www.iphoneblog.de/wp-content/video/sonder-apple-event-nov/poster.jpg",
+      "link": "https://www.iphoneblog.de/2026/11/03/sonderfolge-apple-event/",
+      "notes_html": "",
+      "manifest": "https://www.iphoneblog.de/wp-content/video/sonder-apple-event-nov/manifest.json",
+      "files": [
+        {
+          "url": "https://www.iphoneblog.de/wp-content/video/sonder-apple-event-nov/1080.mp4",
+          "width": 1920,
+          "height": 1080,
+          "mime": "video/mp4",
+          "bytes": 801112064,
+          "list": true
+        }
+      ],
+      "captions": [
+        {
+          "lang": "de",
+          "label": "Deutsch",
+          "url": "https://www.iphoneblog.de/wp-content/video/sonder-apple-event-nov/captions.de.vtt"
+        }
+      ],
+      "chapters": null
+    }
+  ]
+}
