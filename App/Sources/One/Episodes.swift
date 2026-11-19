@@ -91,7 +91,9 @@ struct Episode: Decodable, Identifiable, Equatable, Hashable {
     private static let dateFormat: DateFormatter = {
         let format = DateFormatter()
         format.locale = Locale(identifier: "de_DE")
-        format.setLocalizedDateFormatFromTemplate("EEE d MMM")
+        // A fixed pattern: the template "EEE d MMM" comes out as "Di. 17. Nov." or "Di., 17. Nov."
+        // depending on the OS's ICU data, and CI and the phones differ.
+        format.dateFormat = "EEE, d. MMM"
         return format
     }()
 
