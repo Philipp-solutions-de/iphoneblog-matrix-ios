@@ -40,7 +40,11 @@ final class ReceiptsUITests: XCTestCase {
         // A teardown block, not defer: a failed assertion stops the test with an exception that
         // skips defer, and the rule would stay for every test after.
         let channel = room
-        addTeardownBlock { try? me.setRoomRule(channel, notify: nil); me.signOut(); other.signOut() }
+        // The app moves the old room rule to the "Alle" underride on start; both go.
+        addTeardownBlock {
+            try? me.setRoomRule(channel, notify: nil); me.deleteRule("underride", "de.iphoneblog.alle.\(channel)")
+            me.signOut(); other.signOut()
+        }
         try me.setRoomRule(room, notify: true)
         let stamp = Int(Date().timeIntervalSince1970)
         let before = try other.send("Quittung vorher C \(stamp)", in: room)

@@ -99,6 +99,9 @@ struct MeView: View {
         }
         .background(Theme.group)
         .task { await push.refreshAuthorization() }
+        // The room rows under Mitteilungen need the #one list, which only the #one tab loaded:
+        // someone who went to Ich first saw no rooms there.
+        .task(id: session.isOneMember) { await session.loadOneRooms() }
         .task(id: session.oneRooms.map(\.id)) { await prefs.load() }
         .confirmationDialog("Auf diesem Gerät abmelden?", isPresented: $confirmSignOut, titleVisibility: .visible) {
             Button("Abmelden", role: .destructive) { Task { await model.signOut() } }
