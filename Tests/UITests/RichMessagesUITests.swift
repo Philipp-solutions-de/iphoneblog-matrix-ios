@@ -251,7 +251,6 @@ final class RichMessagesUITests: XCTestCase {
         XCTAssertEqual(relation?["event_id"] as? String, root)
     }
 
-    /// + › Fotos, the first library picture, Senden in the upload preview; returns the server's event.
     /// A GIF pasted from a keyboard app or copied in Safari arrives animated (Thorsten, 2026-11-19).
     /// Gboard and Safari put a still JPEG beside the GIF on the pasteboard; the JPEG used to win.
     func testPastedGifIsSentAsAGif() throws {
@@ -295,6 +294,46 @@ final class RichMessagesUITests: XCTestCase {
         }.jpegData(compressionQuality: 0.8))
     }
 
+    /// "Markieren" in the upload preview opens Apple's Markup; the marked-up photo is what is sent
+    /// (Thorsten, 2026-11-19).
+    func testPhotoMarkupIsSent() throws {
+        let app = try openChannel()
+        let before = Date()
+        app.buttons["composer_toolbar-open_compose_options"].tap()
+        let photos = app.buttons["room-attachment_picker_photo_library"]
+        XCTAssertTrue(photos.waitForExistence(timeout: 5), "no Fotos in the + menu")
+        photos.tap()
+        let picture = app.images.matching(NSPredicate(format: "label BEGINSWITH 'Photo' OR label BEGINSWITH 'Foto'")).firstMatch
+        XCTAssertTrue(picture.waitForExistence(timeout: 45), "photo picker shows no pictures")
+        sleep(1)
+        picture.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        app.buttons["Add"].tap()
+        XCTAssertTrue(app.textViews["Bildunterschrift hinzufügen"].waitForExistence(timeout: 60), "no upload preview")
+
+        let markup = app.buttons["upload.markup"]
+        XCTAssertTrue(markup.waitForExistence(timeout: 10), "no Markieren in the upload preview")
+        markup.tap()
+        // Quick Look's own Markup: its pen button, a stroke, Fertig, then close Quick Look.
+        let pen = app.buttons.matching(NSPredicate(format: "label IN {'Markup', 'Markierung', 'Markieren'} OR identifier == 'QLOverlayMarkupButtonAccessibilityIdentifier'")).firstMatch
+        XCTAssertTrue(pen.waitForExistence(timeout: 20), "Quick Look shows no Markup button")
+        pen.tap()
+        sleep(2)
+        let canvas = app.windows.firstMatch
+        canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.45))
+            .press(forDuration: 0.1, thenDragTo: canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.55)))
+        attach(app, "markup-drawn")
+        for _ in 0..<2 {
+            let done = app.buttons.matching(NSPredicate(format: "label IN {'Fertig', 'Done'}")).firstMatch
+            if done.waitForExistence(timeout: 10) { done.tap(); sleep(1) }
+        }
+        XCTAssertTrue(app.textViews["Bildunterschrift hinzufügen"].waitForExistence(timeout: 20), "not back in the upload preview")
+        attach(app, "markup-preview")
+        app.buttons.matching(NSPredicate(format: "label == 'Senden' AND identifier != 'room-send_button'")).firstMatch.tap()
+        let event = try latestOwnMessage(msgtype: "m.image", after: before)
+        XCTAssertNotNil(event["url"], "the marked-up photo was not sent: \(event)")
+    }
+
+    /// + › Fotos, the first library picture, Senden in the upload preview; returns the server's event.
     private func sendPhoto(_ app: XCUIApplication, shotPrefix: String = "",
                            caption typed: String? = nil, mention pick: String? = nil) throws -> [String: Any] {
         let before = Date()

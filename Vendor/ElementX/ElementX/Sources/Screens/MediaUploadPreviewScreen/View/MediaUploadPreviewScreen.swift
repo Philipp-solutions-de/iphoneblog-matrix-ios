@@ -184,6 +184,20 @@ struct MediaUploadPreviewScreen: View {
         }
         
         if isCurrentMediaImage {
+            // iphoneblog: Apple's Markup for a photo, not for a GIF (Thorsten, 2026-11-19).
+            if !isCurrentMediaGIF {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        let index = currentIndex
+                        ChatMarkup.present(imageURL: context.viewState.mediaURLs[index]) { image in
+                            if let image { context.send(viewAction: .editedMedia(image: image, index: index)) }
+                        }
+                    } label: {
+                        Label("Markieren", systemImage: "pencil.tip.crop.circle")
+                    }
+                    .accessibilityIdentifier("upload.markup")
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button { context.isPresentingMediaEditor = true } label: {
                     CompoundIcon(\.crop)
@@ -204,6 +218,11 @@ struct MediaUploadPreviewScreen: View {
         }
         
         return type.conforms(to: .image)
+    }
+    
+    private var isCurrentMediaGIF: Bool {
+        guard context.viewState.mediaURLs.indices.contains(currentIndex) else { return false }
+        return UTType(filenameExtension: context.viewState.mediaURLs[currentIndex].pathExtension)?.conforms(to: .gif) ?? false
     }
     
     private func handleKeyPress(_ key: UIKeyboardHIDUsage) {
