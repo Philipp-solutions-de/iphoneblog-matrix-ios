@@ -1,7 +1,8 @@
 import XCTest
 
-/// The profile picture under Ich: set from the photo library, then removed; the server's profile
-/// follows each step (testers: "Profilbilder lassen sich nicht setzen").
+/// The profile picture under Ich: picked from the photo library, placed in the squircle (zoom and
+/// move), uploaded with its progress showing, then removed; the server's profile follows each
+/// step (testers: "Profilbilder lassen sich nicht setzen"; Thorsten, 2026-11-19: crop, progress).
 final class AvatarUITests: XCTestCase {
     private var env: [String: String] { ProcessInfo.processInfo.environment }
 
@@ -18,6 +19,7 @@ final class AvatarUITests: XCTestCase {
         app.launchEnvironment = [
             "IPHONEBLOG_NO_PUSH_PROMPT": "1",
             "IPHONEBLOG_START_TAB": "me",
+            "IPHONEBLOG_AVATAR_UPLOAD_DELAY": "2",
             "IPHONEBLOG_HOMESERVER": server,
             "IPHONEBLOG_DEV_USER": user,
             "IPHONEBLOG_DEV_PASSWORD": password,
@@ -28,14 +30,36 @@ final class AvatarUITests: XCTestCase {
         app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE"]
         app.launch()
         let choose = app.buttons["Bild wählen"]
+        // A picture left by an earlier attempt goes first.
+        if app.buttons["me.avatarRemove"].waitForExistence(timeout: 30) { app.buttons["me.avatarRemove"].tap() }
         XCTAssertTrue(choose.waitForExistence(timeout: 120), "no Bild wählen under Ich")
         choose.tap()
         let picture = app.images.matching(NSPredicate(format: "label BEGINSWITH 'Photo' OR label BEGINSWITH 'Foto'")).firstMatch
         XCTAssertTrue(picture.waitForExistence(timeout: 45), "photo picker shows no pictures")
         sleep(1)
         picture.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+
+        // Placed in the squircle first: zoom in, move, save.
+        let crop = app.otherElements["avatar.crop"]
+        XCTAssertTrue(crop.waitForExistence(timeout: 30), "no crop step after picking a picture")
+        crop.pinch(withScale: 2, velocity: 1)
+        crop.swipeLeft()
+        attach(app, "avatar-crop")
+        app.buttons["avatar.cropSave"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["me.avatarProgress"].waitForExistence(timeout: 10), "no progress while uploading")
+        attach(app, "avatar-progress")
+
         XCTAssertTrue(app.buttons["me.avatarRemove"].waitForExistence(timeout: 60), "the picture was not set")
-        XCTAssertFalse(try avatarURL(server: server, user: user).isEmpty, "the server has no picture")
+        let mxc = try avatarURL(server: server, user: user)
+        XCTAssertFalse(mxc.isEmpty, "the server has no picture")
+        let me = try TestServer.signIn(1)
+        defer { me.signOut() }
+        let uploaded = try XCTUnwrap(UIImage(data: try me.download(mxc)), "the upload is no picture")
+        // The newest photo may be a small GIF another test added: square, 128 to 512 px, never
+        // the screen's 3× (AvatarCropTests holds the exact sizes).
+        XCTAssertEqual(uploaded.size.width, uploaded.size.height, "the upload is not square")
+        XCTAssertTrue((128...512).contains(uploaded.size.width), "the upload is \(uploaded.size.width) px")
+        XCTAssertEqual(uploaded.scale, 1)
         attach(app, "avatar-set")
 
         app.buttons["me.avatarRemove"].tap()

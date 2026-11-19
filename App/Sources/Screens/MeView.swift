@@ -11,6 +11,10 @@ struct MeView: View {
     @State private var confirmSignOut = false
     @State private var pickedPhoto: PhotosPickerItem?
     @State private var avatarBusy = false
+    /// The picked picture while the person places it (AvatarCropView).
+    @State private var cropping: PickedImage?
+    /// The upload's share, 0 to 1, while it runs (Alex: the web gave no feedback at all).
+    @State private var uploadProgress: Double?
 
     var body: some View {
         ScrollView {
@@ -103,6 +107,22 @@ struct MeView: View {
         }
     }
 
+    /// The old picture stays until the new one is on the server; the progress shows meanwhile.
+    private func upload(_ square: UIImage, _ jpeg: Data) {
+        uploadProgress = 0
+        Task {
+            defer { uploadProgress = nil }
+            do {
+                try await session.setAvatar(jpeg: jpeg, image: square) { uploadProgress = $0 }
+                router.notice = "Profilbild gespeichert."
+            } catch let error as URLError where [.notConnectedToInternet, .networkConnectionLost, .timedOut].contains(error.code) {
+                router.notice = "Keine Verbindung. Dein altes Profilbild bleibt."
+            } catch {
+                router.notice = "Das Profilbild ließ sich nicht speichern. Dein altes bleibt."
+            }
+        }
+    }
+
     private var profile: some View {
         HStack(spacing: 14) {
             // The picture is the person's own (testers: "Profilbilder lassen sich nicht setzen");
@@ -116,7 +136,18 @@ struct MeView: View {
                     } else {
                         InitialsAvatar(name: session.displayName ?? MentionsModel.localpart(session.userID), size: Theme.Size.profileAvatar)
                     }
-                    if avatarBusy { ProgressView() }
+                    if let uploadProgress {
+                        AvatarShape.of(Theme.Size.profileAvatar).fill(.black.opacity(0.45))
+                            .frame(width: Theme.Size.profileAvatar, height: Theme.Size.profileAvatar)
+                        ProgressView(value: uploadProgress)
+                            .progressViewStyle(.circular)
+                            .tint(.white)
+                            .accessibilityLabel("Profilbild wird hochgeladen")
+                            .accessibilityValue("\(Int(uploadProgress * 100)) Prozent")
+                            .accessibilityIdentifier("me.avatarProgress")
+                    } else if avatarBusy {
+                        ProgressView()
+                    }
                 }
             }
             .accessibilityLabel("Profilbild wählen")
@@ -141,16 +172,13 @@ struct MeView: View {
                         router.notice = "Dieses Bild lässt sich nicht öffnen. Wähl ein anderes."
                         return
                     }
-                    // The old picture stays until the new one is on the server (Alex: the web gave
-                    // no feedback at all).
-                    do {
-                        try await session.setAvatar(image)
-                        router.notice = "Profilbild gespeichert."
-                    } catch let error as URLError where [.notConnectedToInternet, .networkConnectionLost, .timedOut].contains(error.code) {
-                        router.notice = "Keine Verbindung. Dein altes Profilbild bleibt."
-                    } catch {
-                        router.notice = "Das Profilbild ließ sich nicht speichern. Dein altes bleibt."
-                    }
+                    cropping = PickedImage(image: image)
+                }
+            }
+            .fullScreenCover(item: $cropping) { picked in
+                AvatarCropView(image: picked.image, onCancel: { cropping = nil }) { square, jpeg in
+                    cropping = nil
+                    upload(square, jpeg)
                 }
             }
             VStack(alignment: .leading, spacing: 2) {
@@ -192,4 +220,10 @@ struct MeView: View {
         .background(Theme.cell, in: RoundedRectangle(cornerRadius: Theme.Size.corner))
         .padding(.horizontal, Theme.Space.page)
     }
+}
+
+/// A picked picture as a sheet item.
+struct PickedImage: Identifiable {
+    let id = UUID()
+    let image: UIImage
 }
