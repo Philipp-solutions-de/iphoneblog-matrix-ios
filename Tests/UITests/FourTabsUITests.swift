@@ -8,6 +8,9 @@ final class FourTabsUITests: XCTestCase {
 
     override func setUp() {
         continueAfterFailure = false
+        // The previous test's app still runs until the next launch. With the channel open it
+        // reads what a test sends before launching, and the badge counts one short.
+        XCUIApplication().terminate()
     }
 
     // MARK: #one
