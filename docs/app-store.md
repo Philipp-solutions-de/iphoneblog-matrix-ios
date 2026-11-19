@@ -203,29 +203,25 @@ All within Apple's 30 characters (counted with spaces). Category: **primary News
 Social Networking would invite the reviewer to judge the app as a social network first, and
 the reader-app case rests on it being a publication.
 
-**Screenshots**: `scripts/store-screenshots.sh` takes six on an iPhone 17 Pro Max (1320 × 2868,
+**Screenshots**: `scripts/store-screenshots.sh` takes seven on an iPhone 17 Pro Max (1320 × 2868,
 Apple's 6.9" size, which App Store Connect scales down for smaller iPhones), German, light, with
 Apple's status bar (9:41), into `fastlane/screenshots/de-DE`. Articles come from live www's app
-view; the signed-in shots from the test server (`scripts/test-homeserver.sh`).
+view; the signed-in shots from the store server (`scripts/store-homeserver.sh start`, port 8018,
+server name iphoneblog.de), which `scripts/store-seed.py` fills with an invented cast: the demo
+member Lena Hoffmann and four others, all fictional, so nobody's consent is needed. They talk in
+German about the news: a real public article's discussion, episode #532 in Allgemein, a thread
+about the Passwords app, and a mention of Lena.
 
 1. `1_artikel`: the article list, signed out.
 2. `2_artikel-offen`: one public article, open.
 3. `3_diskussion`: the discussion under an article.
-4. `4_one`: #one, the members' area.
+4. `4_one`: #one, the members' room.
 5. `5_thread`: a thread in the members' room.
-6. `6_ich`: Ich, with notifications, the blocked list, the moderation contact and "Konto löschen".
+6. `6_fuer-dich`: Für dich, the mention of Lena.
+7. `7_ich`: Ich, with notifications, the blocked list, the moderation contact and "Konto löschen".
 
-No prices, no "Chat" in a caption. Before the shots that go to Apple:
-- **The tab label** shows in shots 4 and 5: the app calls the tab "#one-Chat". To keep "Chat" out
-  of the screenshots, the tab becomes "#one" (or "#one-connect") in the app itself; the app
-  session owns that label.
-- **The chat's content** in shots 3 to 6 is the test server's: colour-bar test images, "Meine
-  antwort4843", and "tester @tester:localhost" in Ich. For Apple it needs a staged conversation
-  about a real article, in German, with the posters' consent (or members' real posts with
-  theirs), and a demo member with a real-looking name and picture. A seed for that is not built
-  yet.
-- **The navigation** may still change (four tabs, "Für dich"); take the shots from the build
-  that is submitted.
+No prices, no "Chat" in a caption; the tab is "#one". Take the shots from the build that is
+submitted: run the script on that commit.
 
 A #one article open for a member is not among them: the screenshot run has no signed-in session
 on www.
