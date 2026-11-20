@@ -96,6 +96,9 @@ case "$action" in
         xcrun simctl keychain "$device" reset 2>/dev/null || true # as for integration
         # An animated GIF in the photo library, for the test that sends one (GifUITests).
         xcrun simctl addmedia "$device" scripts/fixtures/animation.gif 2>/dev/null || true
+        # A photo dated 2001-01-01, so the picker labels it with "2001" and the Markup test finds
+        # it among the GIFs other tests add (RichMessagesUITests.testPhotoMarkupIsSent).
+        xcrun simctl addmedia "$device" scripts/fixtures/markup-photo.jpg 2>/dev/null || true
         clear_app_settings
         if curl -s -o /dev/null http://127.0.0.1:8793/calls; then
             echo "build.sh: port 8793 is taken; stop the old fixture server first" >&2; exit 1

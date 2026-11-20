@@ -303,8 +303,10 @@ final class RichMessagesUITests: XCTestCase {
         let photos = app.buttons["room-attachment_picker_photo_library"]
         XCTAssertTrue(photos.waitForExistence(timeout: 5), "no Fotos in the + menu")
         photos.tap()
-        let picture = app.images.matching(NSPredicate(format: "label BEGINSWITH 'Photo' OR label BEGINSWITH 'Foto'")).firstMatch
-        XCTAssertTrue(picture.waitForExistence(timeout: 45), "photo picker shows no pictures")
+        // build.sh's photo dated 2001-01-01, not a GIF other tests saved: Markieren is for
+        // photos only, and only that date puts "2001" in the picker's label.
+        let picture = app.images.matching(NSPredicate(format: "label CONTAINS '2001'")).firstMatch
+        XCTAssertTrue(picture.waitForExistence(timeout: 45), "photo picker shows no sample photo")
         sleep(1)
         picture.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         app.buttons["Add"].tap()
