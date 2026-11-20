@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// One mention as "Für dich" lists it: who, where, when, and the message with my name marked.
+/// One mention as "Für dich" lists it: who, where, when, and the message with its mentions marked.
 struct MentionRow: View {
     let mention: MentionsModel.Mention
     let me: [String]
@@ -65,15 +65,36 @@ struct MentionRow: View {
         }
     }
 
-    /// The message, with my name in teal on soft teal, like the preview's "@Tim".
     private var highlighted: AttributedString {
-        var text = AttributedString(mention.body)
+        Self.highlight(mention.body, mentioned: mention.mentioned, me: me)
+    }
+
+    /// The message with its mentions marked as the room timeline marks them (Philip,
+    /// 2026-11-20): a mention of me white on solid teal, anyone else's teal on soft teal. Without
+    /// mention links (a client that typed "@Name" as plain text) my own name is still marked.
+    static func highlight(_ body: String, mentioned: [String], me: [String]) -> AttributedString {
+        var text = AttributedString(body)
+        let mine = Set(me.map { $0.lowercased() })
+        func mark(_ range: Range<AttributedString.Index>, isMe: Bool) {
+            text[range].foregroundColor = isMe ? .white : Theme.teal
+            text[range].backgroundColor = isMe ? Theme.badge : Theme.tealSoft
+            text[range].font = .system(size: 15.5, weight: .semibold)
+        }
+        if !mentioned.isEmpty {
+            for name in mentioned {
+                let isMe = mine.contains(String(name.dropFirst()).lowercased())
+                var from = text.startIndex
+                while from < text.endIndex, let range = text[from...].range(of: name) {
+                    mark(range, isMe: isMe)
+                    from = range.upperBound
+                }
+            }
+            return text
+        }
         for name in me {
             for candidate in ["@" + name, name] {
                 if let range = text.range(of: candidate, options: .caseInsensitive) {
-                    text[range].foregroundColor = Theme.teal
-                    text[range].backgroundColor = Theme.tealSoft
-                    text[range].font = .system(size: 15.5, weight: .semibold)
+                    mark(range, isMe: true)
                     return text
                 }
             }

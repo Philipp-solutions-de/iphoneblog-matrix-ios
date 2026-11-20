@@ -26,6 +26,8 @@ final class MentionsModel: ObservableObject {
         let senderID: String
         var senderName: String
         let body: String
+        /// The mentions in `body` ("@Name"), highlighted in the preview as in the room.
+        var mentioned: [String] = []
         let date: Date
         /// The thread it was said in, if any.
         let threadRoot: String?
@@ -234,7 +236,9 @@ final class MentionsModel: ObservableObject {
         }
         return Mention(id: event.eventId, roomID: entry.roomId, place: place, senderID: event.sender,
                        senderName: await name(of: event.sender, session: session),
-                       body: body, date: Date(milliseconds: event.originServerTs ?? entry.ts),
+                       body: body,
+                       mentioned: PushText.mentions(body: raw, formattedBody: event.content?.formattedBody),
+                       date: Date(milliseconds: event.originServerTs ?? entry.ts),
                        threadRoot: thread, unread: !entry.read)
     }
 
