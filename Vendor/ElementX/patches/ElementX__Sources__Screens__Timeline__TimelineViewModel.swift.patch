@@ -1,6 +1,17 @@
 --- a/ElementX/Sources/Screens/Timeline/TimelineViewModel.swift
 +++ b/ElementX/Sources/Screens/Timeline/TimelineViewModel.swift
-@@ -318,6 +318,12 @@
+@@ -118,7 +118,9 @@
+                    mediaProvider: userSession.mediaProvider,
+                    contentScannerService: userSession.contentScannerService)
+         
+-        if focussedEventID != nil {
++        // iPhoneBlog: no "Lädt" toast for a restored read position, which opens quietly and falls
++        // back to the newest message if its event is gone (ChatReadPositions).
++        if let focussedEventID, !ChatReadPositions.shared.isRestoring(focussedEventID) {
+             // The timeline controller will start loading a detached timeline.
+             showFocusLoadingIndicator()
+         }
+@@ -318,6 +320,12 @@
      // MARK: - Private
      
      private func handleTappedOnSenderDetails(sender: TimelineItemSender) {
@@ -13,7 +24,7 @@
          let memberDetails: ManageRoomMemberDetails = if let memberProxy = roomProxy.membersPublisher.value.first(where: { $0.userID == sender.id }) {
              .memberDetails(roomMember: .init(withProxy: memberProxy))
          } else {
-@@ -719,6 +725,11 @@
+@@ -719,6 +727,11 @@
      
      private func sendReadReceiptIfNeeded(for lastVisibleItemID: TimelineItemIdentifier) async {
          guard appMediator.appState == .active else { return }

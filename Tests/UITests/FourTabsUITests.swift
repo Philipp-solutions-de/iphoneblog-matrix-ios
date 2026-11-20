@@ -94,10 +94,11 @@ final class FourTabsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Keine Treffer"].waitForExistence(timeout: 20))
     }
 
-    /// Many new messages: the Neu divider above the first, and the pill that jumps to it. In a
+    /// Many new messages: the Neu divider above the first stays; the pill that jumped to it is
+    /// gone (Thorsten, 2026-11-19: Tweetbot's read position instead, ReadPositionUITests). In a
     /// room of its own: thirty messages in the channel would push the seeded GIF and files out of
     /// sight for the tests that come after (GifUITests, RichMessagesUITests).
-    func testNeuDividerAndJumpPill() throws {
+    func testNeuDividerWithoutJumpPill() throws {
         let me = try TestServer.signIn(1)
         let other = try TestServer.signIn(2)
         defer { me.signOut(); other.signOut() }
@@ -105,19 +106,21 @@ final class FourTabsUITests: XCTestCase {
         let space = try me.resolve(env["IPHONEBLOG_ONE_ALIAS"] ?? "#one:localhost")
         let busy = try me.createRoom("Neutest \(stamp)")
         try me.addChild(busy, toSpace: space, order: "y\(stamp)")
-        // The tester has written there, so what comes after counts as new.
-        try me.send("Hallo", in: busy)
+        // The tester has read up to here (m.fully_read, where the divider goes), so what comes
+        // after counts as new.
+        let hello = try me.send("Hallo", in: busy)
+        try me.setFullyRead(hello, in: busy)
         try other.join(busy)
         for n in 1...30 { try other.send("Neu \(n) \(stamp)", in: busy) }
         let app = launch(tab: "chat", room: busy)
         XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "the room did not open")
-        let pill = app.buttons["room.jumpToUnread"]
-        if !pill.waitForExistence(timeout: 30) { save(app, "debug-jump-pill") }
-        XCTAssertTrue(pill.exists, "no pill for the first unread message out of sight")
-        XCTAssertTrue(pill.label.contains("neue"), pill.label)
-        save(app, "jump-pill")
-        pill.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["timeline.readMarker"].waitForExistence(timeout: 20), "no Neu divider")
+        sleep(3)
+        XCTAssertFalse(app.buttons["room.jumpToUnread"].exists, "the old jump pill is back")
+        let marker = app.descendants(matching: .any)["timeline.readMarker"]
+        for _ in 0..<12 where !marker.exists {
+            app.swipeDown(velocity: .slow)
+        }
+        XCTAssertTrue(marker.waitForExistence(timeout: 10), "no Neu divider above the first new message")
         save(app, "neu-divider")
     }
 

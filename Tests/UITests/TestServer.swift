@@ -223,6 +223,19 @@ struct TestServer {
         return Set((page["notifications"] as? [[String: Any]] ?? []).compactMap { ($0["event"] as? [String: Any])?["event_id"] as? String })
     }
 
+    /// This account's m.fully_read in a room (the Neu divider's place), if any.
+    func fullyRead(in room: String) throws -> String? {
+        let data = try Self.call(base, "/_matrix/client/v3/user/\(Self.encode(userID))/rooms/\(Self.encode(room))/account_data/m.fully_read",
+                                 method: "GET", token: token, body: nil)
+        return data["event_id"] as? String
+    }
+
+    /// Sets m.fully_read as another client would.
+    func setFullyRead(_ eventID: String, in room: String) throws {
+        _ = try Self.call(base, "/_matrix/client/v3/rooms/\(Self.encode(room))/read_markers", method: "POST", token: token,
+                          body: ["m.fully_read": eventID])
+    }
+
     /// Reacts to an event and returns the reaction's ID.
     func react(_ key: String, to event: String, in room: String) throws -> String {
         let path = "/_matrix/client/v3/rooms/\(Self.encode(room))/send/m.reaction/r\(UInt64(Date().timeIntervalSince1970 * 1000))\(Int.random(in: 0..<1000))"

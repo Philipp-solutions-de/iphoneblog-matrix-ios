@@ -81,7 +81,9 @@ struct TimelineItemRowStylerView<Content: View>: View {
             .padding(.horizontal, style.metrics.page)
             .padding(.top, showsSender ? style.metrics.groupSpacing : style.metrics.messageSpacing)
             .padding(.bottom, 2)
-            .highlightedTimelineItem(isFocussed)
+            // A message shown on request (a search hit) fades in and out once; a restored read
+            // position not at all. Element X's lasting green band read as a status (Thorsten).
+            .modifier(ChatFocusFlash(isOn: isFocussed && !(focussedEventID.map(ChatReadPositions.shared.isQuiet) ?? false)))
 
             if isThreadRoot { threadRootFooter }
         }
@@ -429,5 +431,23 @@ enum ChatTimeLabel {
         let label = formatter.string(from: date)
         cache[key] = label
         return label
+    }
+}
+
+/// A brief tint on a message the reader was sent to, gone after a second and a half.
+struct ChatFocusFlash: ViewModifier {
+    let isOn: Bool
+    @State private var visible = false
+
+    func body(content: Content) -> some View {
+        content
+            .background(Color.compound.gradientSubtleStop1.opacity(visible ? 1 : 0))
+            .onAppear { if isOn { flash() } }
+            .onChange(of: isOn) { _, on in if on { flash() } }
+    }
+
+    private func flash() {
+        visible = true
+        withAnimation(.easeOut(duration: 1.5).delay(0.3)) { visible = false }
     }
 }
