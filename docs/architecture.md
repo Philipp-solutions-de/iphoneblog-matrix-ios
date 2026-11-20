@@ -113,8 +113,9 @@ replies, pictures, video, files and the composer against the test homeserver.
 chips holds every #one room from the server, each with its unread count, "@" for a mention and
 99+ as the cap; tap only, no swipe; a teal dot at the bar's edge marks a room with news out of
 sight. The open room sits under the bar and shows no title of its own; the tab opens the last
-room read (`Router.currentRoomID`, forgotten on sign-out). When the open room has nothing new
-and another has, "Weiter: # <room> · n neu" leads there. Above the first unread message a teal
+room read (`Router.currentRoomID`, forgotten on sign-out). The bar's counts and dots are the
+way to the next room with news; there is no "Weiter" bar over the room (Thorsten, 2026-11-20).
+Above the first unread message a teal
 "Neu" divider; when it is out of sight a pill "n neue · zur ersten springen" jumps to it, as on
 the web. Bots the server lists (`GET /_iphoneblog/v1/bots`) get their name in the strong teal
 and a "Bot" pill with a robot, never by name.
