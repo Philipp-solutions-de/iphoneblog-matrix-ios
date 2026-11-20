@@ -74,6 +74,7 @@ fails the TestFlight lane if one does.
 | `App/Resources/Assets.xcassets` | Icon, logo, colours; `scripts/make-assets.py` renders them from `brand/source/` |
 | `Tests/` | Unit tests, and the sign-in test against a real Synapse |
 | `.github/workflows/build.yml` | Build and tests on every push and weekly; TestFlight when switched on |
+| `scripts/mac-runner/` | The Mac Studio runner: setup, removal, which runner a job gets ([docs/mac-runner.md](docs/mac-runner.md)) |
 | `.github/workflows/sdk-bump.yml` | Weekly: move the SDK pin to the newest release on branch `sdk-bump` and build it |
 
 ## TestFlight

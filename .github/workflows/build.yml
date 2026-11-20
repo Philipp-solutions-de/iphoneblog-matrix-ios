@@ -20,11 +20,45 @@ concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # The Xcode both runners must have: GitHub's image takes its newest Xcode 27.x, the Mac
+  # Studio its /Applications/Xcode.app, which must be a 27.x (docs/mac-runner.md, "Xcode").
+  XCODE_MAJOR: "27"
+
 jobs:
+  pick:
+    name: Pick a runner
+    # The Mac Studio when it is online and idle and the code is ours; GitHub's hosted Xcode 27
+    # image otherwise (docs/mac-runner.md, "Which runner").
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      runs-on: ${{ steps.pick.outputs.runs-on }}
+      where: ${{ steps.pick.outputs.where }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/mac-runner
+      - name: Test the choice
+        run: scripts/mac-runner/test-pick-runner.sh
+      - name: Pick
+        id: pick
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+          MAC_RUNNER: ${{ vars.MAC_RUNNER }}
+          STATUS_TOKEN: ${{ secrets.MAC_RUNNER_STATUS_TOKEN }}
+        run: |
+          scripts/mac-runner/pick-runner.sh >> "$GITHUB_OUTPUT" 2> reason.txt || { cat reason.txt; exit 1; }
+          cat reason.txt
+          echo "Runner: $(tail -1 reason.txt)" >> "$GITHUB_STEP_SUMMARY"
+
   build:
     name: Build and test
-    # GitHub's hosted Xcode 27 image (public preview); macos-26 has no Xcode 27.
-    runs-on: xcode-27
+    needs: pick
+    runs-on: ${{ fromJSON(needs.pick.outputs.runs-on) }}
     # Build, unit, sign-in and 20 UI tests on a hosted runner: 70 minutes in the morning, past
     # two hours on a busy evening (2026-11-19: two builds cut off at 120 with no test failed).
     timeout-minutes: 180
@@ -34,16 +68,34 @@ jobs:
           persist-credentials: false
 
       - name: Select Xcode
+        if: runner.environment == 'github-hosted'
         run: |
-          xcode="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1)"
+          xcode="$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app 2>/dev/null | sort -V | tail -1)"
           [ -n "$xcode" ] || { ls -d /Applications/Xcode*; exit 1; }
           sudo xcode-select -s "$xcode"
           xcodebuild -version
 
-      - name: Install tools
+      # The runner's user has no sudo; its .env sets DEVELOPER_DIR to /Applications/Xcode.app.
+      - name: Check Xcode and the iOS runtime (Mac Studio)
+        if: runner.environment == 'self-hosted'
         run: |
-          scripts/install-xcodegen.sh build/tools >> "$GITHUB_PATH"
-          brew install uv
+          xcodebuild -version
+          version="$(xcodebuild -version | sed -n 's/^Xcode //p')"
+          [ "${version%%.*}" = "$XCODE_MAJOR" ] ||
+            { echo "::error::The Mac Studio has Xcode $version, the workflow wants $XCODE_MAJOR.x"; exit 1; }
+          sdk="$(xcodebuild -showsdks | sed -nE 's/.*-sdk iphonesimulator([0-9.]+).*/\1/p' | tail -1)"
+          xcrun simctl list runtimes | grep "^iOS $sdk " ||
+            { echo "::error::No iOS $sdk simulator runtime on the Mac Studio (docs/mac-runner.md, Xcode)"; exit 1; }
+          # A cancelled run can leave its test homeserver on port 8008; end it by PID.
+          pids="$(lsof -ti tcp:8008 -sTCP:LISTEN || true)"
+          [ -z "$pids" ] || { echo "ending leftover homeserver $pids"; kill $pids; }
+
+      - name: Install tools
+        run: scripts/install-xcodegen.sh build/tools >> "$GITHUB_PATH"
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: false
 
       - name: Vendor/ElementX matches its Element X release plus our patches
         run: scripts/sync-elementx.sh --check
@@ -77,6 +129,10 @@ jobs:
           set -a; . build/test-homeserver.env; set +a
           scripts/build.sh ui
 
+      - name: Stop the test homeserver
+        if: always()
+        run: scripts/test-homeserver.sh stop
+
       - name: Keep the logs
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -92,7 +148,7 @@ jobs:
     needs: build
     # The Apple key lives in the environment `apple`, which only main may use. This job runs
     # only for a push to main or a hand run on main: reviewed code, never a pull request,
-    # fork or other branch.
+    # fork or other branch. It stays on GitHub's runner: no Apple secret on the Mac Studio.
     if: >-
       vars.TESTFLIGHT_ENABLED == 'true' && github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
@@ -129,7 +185,7 @@ jobs:
 
   report:
     name: Report a red scheduled build
-    needs: [build, testflight]
+    needs: [pick, build, testflight]
     if: failure() && github.event_name == 'schedule'
     runs-on: ubuntu-latest
     permissions:

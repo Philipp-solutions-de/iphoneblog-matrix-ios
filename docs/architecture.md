@@ -331,7 +331,9 @@ API change small, which costs less than a monthly jump over eight releases.
   with xcodegen; neither is committed.
 - `scripts/build.sh build|test|integration` builds for the arm64 simulator (the SDK ships no
   x86_64 simulator slice), ad-hoc signed.
-- CI runs on GitHub's hosted `xcode-27` image (public preview; free for public repositories).
+- CI runs "Build and test" on Thorsten's Mac Studio when it is online and idle and the code is
+  ours, on GitHub's hosted `xcode-27` image otherwise: forks, the weekly run, and every fallback
+  (docs/mac-runner.md). TestFlight always runs on GitHub.
 - TestFlight: `fastlane/Fastfile`, switched on with the repository variable
   `TESTFLIGHT_ENABLED` once the App Store Connect key exists (README).
 
@@ -353,11 +355,9 @@ API change small, which costs less than a monthly jump over eight releases.
      from paths to suites, plus the full set whenever `Vendor/`, `project.yml` or
      `TestServer.swift` change. 15 to 40 minutes per PR, free, half a day's work. A break the
      map misses shows up on `main` after the merge, where the build also gates TestFlight.
-  3. **A self-hosted Mac.** A Mac mini runs the suite about twice as fast and nothing queues.
-     About EUR 700 to 1,000 to buy, or roughly EUR 100 to 200 a month rented (price not
-     checked), plus Xcode updates by hand. A public repository's pull requests would run
-     strangers' code on it, so it needs runs from forks switched off or kept on GitHub's
-     runners.
+  3. **A self-hosted Mac.** Decided 2026-11-20: Thorsten's Mac Studio, as its own user, with
+     forks kept on GitHub's runners (docs/mac-runner.md). Options 1 and 2 stay open for the
+     runs that fall back to GitHub.
 
 - Fonts: the blog uses Foro and Foro Sans, licensed for the web. Using them in the app needs
   an app licence from the foundry; until then the app uses the system font (SF Pro).
