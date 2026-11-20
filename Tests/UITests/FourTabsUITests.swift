@@ -28,8 +28,9 @@ final class FourTabsUITests: XCTestCase {
         XCTAssertTrue(again.textViews["Nachricht an # Raum 2"].waitForExistence(timeout: 120), "the tab did not open the last room read")
     }
 
-    /// The open room has nothing new, another one has: "Weiter" leads there.
-    func testWeiterLeadsToTheNextRoomWithNews() throws {
+    /// The open room has nothing new, another one has: no "Weiter" bar over the room (Thorsten,
+    /// 2026-11-20); the room bar counts the news, and a tap on it opens that room.
+    func testRoomBarLeadsToTheNextRoomWithNews() throws {
         let other = try TestServer.signIn(2)
         defer { other.signOut() }
         let room2 = try XCTUnwrap(env["IPHONEBLOG_TEST_ROOM2"].flatMap { $0.isEmpty ? nil : $0 })
@@ -38,12 +39,12 @@ final class FourTabsUITests: XCTestCase {
         XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "the room did not open")
         sleep(3) // read up to here
         try other.send("Weitertest \(Int(Date().timeIntervalSince1970))", in: room2)
-        let next = app.buttons["one.next"]
-        XCTAssertTrue(next.waitForExistence(timeout: 30), "no Weiter")
-        XCTAssertTrue(next.label.contains("Raum 2"), next.label)
-        save(app, "weiter")
-        next.tap()
-        XCTAssertTrue(app.textViews["Nachricht an # Raum 2"].waitForExistence(timeout: 60), "Weiter did not open Raum 2")
+        let news = app.buttons.matching(NSPredicate(format: "identifier == 'one-room' AND label BEGINSWITH 'Raum 2,' AND label CONTAINS 'ungelesen'")).firstMatch
+        XCTAssertTrue(news.waitForExistence(timeout: 30), "the room bar shows no news for Raum 2")
+        XCTAssertFalse(app.buttons["one.next"].exists, "the Weiter bar is back")
+        save(app, "room-bar-news")
+        news.tap()
+        XCTAssertTrue(app.textViews["Nachricht an # Raum 2"].waitForExistence(timeout: 60), "the room bar did not open Raum 2")
     }
 
     /// More rooms than fit: a room with news out of sight leaves a dot at the edge.

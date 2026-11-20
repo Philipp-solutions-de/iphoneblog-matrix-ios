@@ -148,7 +148,8 @@ private struct LegalLinks: View {
 /// #one for members: the hub at the root (variant A, Thorsten 2026-11-18), with Chat, Videos and
 /// an episode pushed on it. Chat is the room bar from room-nav variant A (Thorsten, 2026-11-17):
 /// the #one rooms with their unread counts, the open room below. A tap switches rooms; Chat opens
-/// the last room read; "Weiter" leads to the next room with news; the search looks in all rooms.
+/// the last room read; the bar's unread dots lead to the next room (no "Weiter" bar, Thorsten
+/// 2026-11-20); the search looks in all rooms.
 struct OneChatTab: View {
     @ObservedObject var router: Router
     @ObservedObject var session: ChatSession
@@ -221,44 +222,12 @@ private struct OneRoomView: View {
 
     private func summary(_ id: String) -> RoomSummary? { roomList.rooms.first { $0.id == id } }
 
-    /// The next room with news after the open one, in the bar's order.
-    private var nextWithNews: (room: ChatSession.OneRoom, unread: Int)? {
-        let rooms = session.oneRooms
-        guard let current, let index = rooms.firstIndex(where: { $0.id == current }), rooms.count > 1,
-              (summary(current)?.unreadMessages ?? 0) == 0 else { return nil }
-        for offset in 1..<rooms.count {
-            let room = rooms[(index + offset) % rooms.count]
-            if let unread = summary(room.id)?.unreadMessages, unread > 0 { return (room, unread) }
-        }
-        return nil
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             RoomBar(rooms: session.oneRooms, current: current, summary: summary) { router.openRoom($0) }
             if let current {
                 ChatScreens.provider.roomScreenUnderBar(roomID: current, host: session)
                     .id(current)
-                    .overlay(alignment: .bottom) {
-                        if let next = nextWithNews {
-                            Button { router.openRoom(next.room.id) } label: {
-                                HStack(spacing: 4) {
-                                    Text("Weiter: # \(next.room.name) ·").foregroundStyle(Theme.ink)
-                                    Text(next.unread > 99 ? "99+ neu" : "\(next.unread) neu").foregroundStyle(Theme.teal)
-                                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.ink3)
-                                }
-                                .font(.system(size: 14, weight: .semibold))
-                                .padding(.horizontal, 14)
-                                .frame(minHeight: 36)
-                                .background(.regularMaterial, in: Capsule())
-                                .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.bottom, 72) // above the composer
-                            .accessibilityLabel("Weiter zu \(next.room.name), \(next.unread) neu")
-                            .accessibilityIdentifier("one.next")
-                        }
-                    }
             } else {
                 ProgressView().frame(maxHeight: .infinity)
             }
