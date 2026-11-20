@@ -277,6 +277,15 @@ struct TestServer {
         return try XCTUnwrap(result["room_id"] as? String, "createRoom failed")
     }
 
+    /// A room where only its creator posts, as the server's read-only rooms (#releases): messages
+    /// need power level 50, reactions stay open to everyone (docs/matrix.md in infra, read_only).
+    func createReadOnlyRoom(_ name: String) throws -> String {
+        let result = try Self.call(base, "/_matrix/client/v3/createRoom", method: "POST", token: token,
+                                   body: ["name": name, "preset": "public_chat",
+                                          "power_level_content_override": ["events": ["m.room.message": 50, "m.reaction": 0]]])
+        return try XCTUnwrap(result["room_id"] as? String, "createRoom failed")
+    }
+
     /// Makes a room a child of a space (as the #one space lists its rooms).
     func addChild(_ room: String, toSpace space: String, order: String) throws {
         _ = try Self.call(base, "/_matrix/client/v3/rooms/\(Self.encode(space))/state/m.space.child/\(Self.encode(room))",
