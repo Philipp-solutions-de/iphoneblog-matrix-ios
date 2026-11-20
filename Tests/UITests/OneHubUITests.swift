@@ -54,6 +54,7 @@ final class OneHubUITests: XCTestCase {
             XCTAssertTrue(flow.waitForExistence(timeout: 120), "no cover flow")
             sleep(2)
             check(app, "one-\(name)")
+            XCTAssertTrue(tabColour(app, "one") == .red, "the selected one tab is not red (\(name))")
             flow.swipeLeft(velocity: .slow)
             sleep(1)
             check(app, "one-\(name)-swiped")
@@ -89,8 +90,34 @@ final class OneHubUITests: XCTestCase {
             app.buttons.matching(identifier: "videos.row").firstMatch.tap()
             XCTAssertTrue(app.staticTexts["episode.title"].waitForExistence(timeout: 10))
             check(app, "one-\(name)-episode")
+            // Outside #one the selected tab is teal again.
+            app.tabBars.buttons["Blog"].tap()
+            sleep(1)
+            XCTAssertTrue(tabColour(app, "Blog") == .teal, "the selected Blog tab is not teal (\(name))")
             app.terminate()
         }
+    }
+
+    private enum Hue { case red, teal, neither }
+
+    /// The colour of a tab item's coloured pixels: the selected item carries the tint.
+    private func tabColour(_ app: XCUIApplication, _ label: String) -> Hue {
+        guard let image = app.tabBars.buttons[label].firstMatch.screenshot().image.cgImage else { return .neither }
+        let width = image.width, height = image.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        guard let context = CGContext(data: &pixels, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return .neither }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        var red = 0, teal = 0
+        for i in stride(from: 0, to: pixels.count, by: 4) {
+            let r = Double(pixels[i]) / 255, g = Double(pixels[i + 1]) / 255, b = Double(pixels[i + 2]) / 255
+            let maxC = max(r, g, b), delta = maxC - min(r, g, b)
+            guard maxC > 0.25, delta / maxC > 0.35 else { continue }
+            if maxC == r { red += 1 } else if g > r && b > r { teal += 1 }
+        }
+        if red > 20 && red > teal * 3 { return .red }
+        if teal > 20 && teal > red * 3 { return .teal }
+        return .neither
     }
 
     /// Saves the screen and counts teal above the tab bar: hue 165–195°, clearly coloured.
