@@ -12,16 +12,15 @@ import Foundation
 public final class ChatReadPositions: @unchecked Sendable {
     public static let shared: ChatReadPositions = {
         let positions = ChatReadPositions(defaults: .standard)
-        #if DEBUG
-        // UI tests sign in as the same test accounts again and again. A position one test left in
-        // a shared room (Allgemein) opened the next test's room in the middle, away from the
-        // messages it looks for (CI, PR #48). Each test signs in afresh; only the read-position
-        // tests keep what they saved across their own relaunch.
+        // UI and perf tests sign in as the same test accounts again and again. A position one
+        // test left in a shared room (Allgemein) opened the next test's room in the middle, away
+        // from the messages it looks for (CI, PR #48). Each test starts without; only the
+        // read-position tests keep what they saved across their own relaunch. Not behind DEBUG:
+        // ChatKit's Perf configuration has none, and only test launches set IPHONEBLOG_DEV_USER.
         let env = ProcessInfo.processInfo.environment
         if env["IPHONEBLOG_DEV_USER"] != nil, env["IPHONEBLOG_KEEP_READPOS"] != "1" {
             positions.removeAll()
         }
-        #endif
         return positions
     }()
 
