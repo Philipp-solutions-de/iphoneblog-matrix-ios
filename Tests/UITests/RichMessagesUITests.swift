@@ -55,7 +55,15 @@ final class RichMessagesUITests: XCTestCase {
     /// then a picture, a video and a PDF.
     func testChannelShowsRichMessages() throws {
         let app = try openChannel()
-        XCTAssertTrue(fileRow(app).waitForExistence(timeout: 90), "file not shown")
+        // Tests that run earlier write into Allgemein too (the hub's, for one), so the seeded set
+        // may sit above the screen: wait for the timeline, then scroll up to the PDF.
+        if !fileRow(app).waitForExistence(timeout: 30) {
+            for _ in 0..<10 where !fileRow(app).isHittable {
+                app.swipeDown(velocity: .slow)
+                _ = fileRow(app).waitForExistence(timeout: 2)
+            }
+        }
+        XCTAssertTrue(fileRow(app).waitForExistence(timeout: 30), "file not shown")
         sleep(4) // pictures and the link preview load
         attach(app, "channel-media")
         scrollTimeline(app, toFind: "Lies das")
