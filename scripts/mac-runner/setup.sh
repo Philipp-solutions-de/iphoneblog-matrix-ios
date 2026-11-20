@@ -159,7 +159,8 @@ install_daemon de.iphoneblog.ci-runner.xcode "<?xml version=\"1.0\" encoding=\"U
 # 6. The runner.
 step "runner"
 dir="/Users/$user/actions-runner"
-as_ci() { sudo -u "$user" -H "$@"; }
+# From /, because the caller sits in a home ci may not read (getcwd warnings otherwise).
+as_ci() { (cd / && sudo -u "$user" -H "$@"); }
 if [[ ! -x "$dir/config.sh" ]]; then
     tarball="/Users/$user/actions-runner-$runner_version.tar.gz"
     as_ci curl -fsSL -o "$tarball" \
@@ -175,7 +176,7 @@ as_ci sh -c "printf '%s\n' 'LANG=en_US.UTF-8' 'DEVELOPER_DIR=/Applications/Xcode
 if [[ ! -f "$dir/.runner" ]]; then
     [[ -s "$token_file" ]] || { echo "No registration token." >&2; exit 1; }
     token="$(cat "$token_file")"
-    (cd "$dir" && as_ci ./config.sh --unattended --replace \
+    (cd "$dir" && sudo -u "$user" -H ./config.sh --unattended --replace \
         --url "https://github.com/$repo" --token "$token" \
         --name "$runner_name" --labels "$labels" --work _work)
     unset token
