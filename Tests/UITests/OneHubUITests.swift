@@ -146,7 +146,7 @@ final class OneHubUITests: XCTestCase {
             blogTab.tap()
             sleep(5)
             save(app, "root-blog")
-            app.buttons["#one"].firstMatch.tap()
+            app.tabBars.buttons["one"].firstMatch.tap()
             XCTAssertTrue(tile.waitForExistence(timeout: 10), "back on #one, no Chat tile")
         }
         tile.tap()

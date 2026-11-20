@@ -72,7 +72,8 @@ with the extension. Apple's notification-filtering entitlement is requested for 
 account so the extension may drop pushes it cannot show.
 
 **Four tabs for members, two for everyone else; the blog as the front page.** #one members see
-Blog, #one, Für dich and Ich (Thorsten, 2026-11-17). Everyone else sees Blog and #one: signed out, a neutral
+Blog, #one, Für dich and Ich (Thorsten, 2026-11-17); the #one tab shows one "#", its big symbol,
+over the label "one" (Thorsten, 2026-11-20). Everyone else sees Blog and #one: signed out, a neutral
 sign-in ("Der Chat für #one-Mitglieder", Anmelden); signed in without #one, "Nur für
 #one-Mitglieder" with Abmelden and Konto löschen (App Store 5.1.1(v), since they have no Ich).
 No price, no way to buy, no hint where to get #one; they read discussions without writing
