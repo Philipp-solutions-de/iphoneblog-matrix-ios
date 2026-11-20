@@ -42,7 +42,7 @@ extension ChatKitStyle {
                           highlight: .white, highlightSoft: Theme.badge,
                           ink: Theme.ink, ink2: Theme.ink2, ink3: Theme.ink3,
                           background: Theme.background, surface: Theme.surface, line: Theme.line,
-                          avatars: Theme.avatarColors),
+                          avatars: Theme.avatarColors, bot: Theme.bot),
             fonts: .init(senderName: Theme.Chat.senderName, time: Theme.Chat.time,
                          threadSummary: Theme.Chat.threadSummary, threadPreview: Theme.Chat.threadPreview,
                          roomTitle: Theme.Chat.roomTitle, roomSubtitle: Theme.Chat.roomSubtitle,

@@ -41,9 +41,11 @@ final class OneHubUITests: XCTestCase {
         XCTAssertTrue(first.label.contains("Gesehen"), "a watched episode does not say Gesehen: \(first.label)")
     }
 
-    /// Light and dark, at rest and with the cover flow swiped to the second episode: the
-    /// screenshots for the PR.
-    func testOneScreenInLightAndDark() throws {
+    /// Every #one screen in light and dark, for the PR: the start screen at rest and swiped, a
+    /// room, a thread, the Threads list, Videos and the episode page. #one is in the #one red,
+    /// never teal (Thorsten, 2026-11-20): above the tab bar, which is not #one's, no screen may
+    /// show a teal pixel.
+    func testOneScreensInLightAndDarkWithoutTeal() throws {
         // The app's own switch: XCUIDevice.appearance left the simulator light (2026-11-20).
         for name in ["light", "dark"] {
             let app = try launch(["IPHONEBLOG_PLAYBACK_RESET": "1", "IPHONEBLOG_PLAYBACK_SEED": "\(newest)=372/1532",
@@ -51,12 +53,74 @@ final class OneHubUITests: XCTestCase {
             let flow = app.descendants(matching: .any)["one.coverflow"]
             XCTAssertTrue(flow.waitForExistence(timeout: 120), "no cover flow")
             sleep(2)
-            save(app, "one-\(name)")
+            check(app, "one-\(name)")
             flow.swipeLeft(velocity: .slow)
             sleep(1)
-            save(app, "one-\(name)-swiped")
+            check(app, "one-\(name)-swiped")
+
+            let room = app.buttons["one.room.Allgemein"]
+            XCTAssertTrue(room.waitForExistence(timeout: 10))
+            room.tap()
+            XCTAssertTrue(app.textViews["Nachricht an # Allgemein"].waitForExistence(timeout: 60), "no room")
+            sleep(2)
+            check(app, "one-\(name)-room")
+            let summary = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Antwort'")).firstMatch
+            if summary.waitForExistence(timeout: 5) {
+                summary.tap()
+                if app.textViews["Antworten…"].waitForExistence(timeout: 20) {
+                    sleep(2)
+                    check(app, "one-\(name)-thread")
+                    app.navigationBars.buttons.firstMatch.tap()
+                }
+            }
+            app.navigationBars.buttons.firstMatch.tap()
+
+            let threads = app.buttons["one.threads"]
+            if threads.waitForExistence(timeout: 10) {
+                threads.tap()
+                sleep(2)
+                check(app, "one-\(name)-threads")
+                app.navigationBars.buttons.firstMatch.tap()
+            }
+
+            app.buttons["one.videos.all"].tap()
+            XCTAssertTrue(app.buttons.matching(identifier: "videos.row").firstMatch.waitForExistence(timeout: 10))
+            check(app, "one-\(name)-videos")
+            app.buttons.matching(identifier: "videos.row").firstMatch.tap()
+            XCTAssertTrue(app.staticTexts["episode.title"].waitForExistence(timeout: 10))
+            check(app, "one-\(name)-episode")
             app.terminate()
         }
+    }
+
+    /// Saves the screen and counts teal above the tab bar: hue 165–195°, clearly coloured.
+    private func check(_ app: XCUIApplication, _ name: String) {
+        let shot = app.screenshot()
+        save(app, name)
+        guard let image = shot.image.cgImage else { return }
+        let width = image.width, height = image.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        guard let context = CGContext(data: &pixels, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        // The tab bar floats over the bottom eighth; its "one" is the app's, not #one's.
+        let bottom = height * 7 / 8
+        var teal = 0
+        for y in stride(from: 0, to: bottom, by: 2) {
+            for x in stride(from: 0, to: width, by: 2) {
+                let i = (y * width + x) * 4
+                let r = Double(pixels[i]) / 255, g = Double(pixels[i + 1]) / 255, b = Double(pixels[i + 2]) / 255
+                let maxC = max(r, g, b), minC = min(r, g, b), delta = maxC - minC
+                guard maxC > 0.25, delta / maxC > 0.35 else { continue }
+                var hue: Double
+                if maxC == r { hue = 60 * ((g - b) / delta).truncatingRemainder(dividingBy: 6) }
+                else if maxC == g { hue = 60 * ((b - r) / delta + 2) }
+                else { hue = 60 * ((r - g) / delta + 4) }
+                if hue < 0 { hue += 360 }
+                if hue >= 165 && hue <= 195 { teal += 1 }
+            }
+        }
+        XCTAssertLessThan(teal, 40, "\(name): \(teal) teal pixels inside #one")
     }
 
     /// A room row opens Chat on that room, with its newest message as the preview; the Threads
