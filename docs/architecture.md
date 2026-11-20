@@ -337,6 +337,28 @@ API change small, which costs less than a monthly jump over eight releases.
 
 ## Open points
 
+- **CI time.** "Build and test" runs build, unit tests, the sign-in test and 74 UI tests in one
+  job on GitHub's hosted `xcode-27` runner. Measured 2026-11-19: 87 minutes in the morning
+  (UI step 69 minutes: 63 in the tests, slowest RichMessages 12, Threads 7, ThreadHeader 5,
+  Contacts 5). In the evening the UI step took 66 minutes on one run and over 87 on two
+  others, which hit the 120-minute job limit with no test failed. The limit is 180 minutes for now. Every new screen adds
+  tests (hub, GIF picker, Markup), and five branches building at once share GitHub's macOS
+  slots. Options, not yet decided:
+  1. **Split the UI tests into three or four parallel jobs.** Build once (`build-for-testing`),
+     hand the products to a matrix of `test-without-building -only-testing:` shards, each with
+     its own test homeserver. About 30 to 35 minutes per run. Minutes stay free (public
+     repository), but each run takes four macOS slots instead of one, so busy evenings queue.
+     About a day's work.
+  2. **On a pull request, run only the suites its files touch; the full set on `main`.** A map
+     from paths to suites, plus the full set whenever `Vendor/`, `project.yml` or
+     `TestServer.swift` change. 15 to 40 minutes per PR, free, half a day's work. A break the
+     map misses shows up on `main` after the merge, where the build also gates TestFlight.
+  3. **A self-hosted Mac.** A Mac mini runs the suite about twice as fast and nothing queues.
+     About EUR 700 to 1,000 to buy, or roughly EUR 100 to 200 a month rented (price not
+     checked), plus Xcode updates by hand. A public repository's pull requests would run
+     strangers' code on it, so it needs runs from forks switched off or kept on GitHub's
+     runners.
+
 - Fonts: the blog uses Foro and Foro Sans, licensed for the web. Using them in the app needs
   an app licence from the foundry; until then the app uses the system font (SF Pro).
 - Licence: AGPL-3.0, because of the transplanted Element X views (above). App Store question before launch.
