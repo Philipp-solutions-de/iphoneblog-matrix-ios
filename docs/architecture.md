@@ -117,7 +117,9 @@ room read (`Router.currentRoomID`, forgotten on sign-out). When the open room ha
 and another has, "Weiter: # <room> · n neu" leads there. Above the first unread message a teal
 "Neu" divider; when it is out of sight a pill "n neue · zur ersten springen" jumps to it, as on
 the web. Bots the server lists (`GET /_iphoneblog/v1/bots`) get their name in the strong teal
-and a "Bot" pill with a robot, never by name.
+and a "Bot" pill with a robot, never by name. A room where members may not post (power levels, as on the
+server's read-only #releases) shows "Nur das Team schreibt hier" in place of the composer;
+reactions stay open.
 
 **Für dich: what concerns me, in one list.** Mentions of me (@me, @room, replies to my
 messages), threads I take part in with new replies (#one and the Blog's discussions), and the

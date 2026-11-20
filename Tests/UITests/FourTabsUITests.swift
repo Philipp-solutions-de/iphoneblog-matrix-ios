@@ -46,6 +46,28 @@ final class FourTabsUITests: XCTestCase {
         XCTAssertTrue(app.textViews["Nachricht an # Raum 2"].waitForExistence(timeout: 60), "Weiter did not open Raum 2")
     }
 
+    /// A read-only room (#releases): only the team posts. No composer, one quiet line in its
+    /// place (Thorsten, 2026-11-20); the room still opens and shows its messages.
+    func testReadOnlyRoomShowsNoComposer() throws {
+        let me = try TestServer.signIn(1)
+        let team = try TestServer.signIn(2)
+        defer { me.signOut(); team.signOut() }
+        let stamp = Int(Date().timeIntervalSince1970)
+        let releases = try team.createReadOnlyRoom("Releases \(stamp)")
+        try team.send("Build \(stamp) ist live", in: releases)
+        try me.join(releases)
+        let space = try me.resolve(env["IPHONEBLOG_ONE_ALIAS"] ?? "#one:localhost")
+        try me.addChild(releases, toSpace: space, order: "x\(stamp)")
+        let app = launch(tab: "chat", room: releases)
+        let line = app.staticTexts["Nur das Team schreibt hier"]
+        XCTAssertTrue(line.waitForExistence(timeout: 120), "no line in place of the composer")
+        let message = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Build \(stamp) ist live")).firstMatch
+        XCTAssertTrue(message.waitForExistence(timeout: 30), "the room's message is not shown")
+        XCTAssertFalse(app.buttons["room-send_button"].exists, "a composer in a read-only room")
+        XCTAssertFalse(app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Nachricht an'")).firstMatch.exists, "a text field in a read-only room")
+        save(app, "read-only-room")
+    }
+
     /// More rooms than fit: a room with news out of sight leaves a dot at the edge.
     func testDotForANewsRoomOutOfSight() throws {
         let me = try TestServer.signIn(1)
