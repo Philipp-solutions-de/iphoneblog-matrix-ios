@@ -34,12 +34,13 @@ slower than it was, on every pull request; the budget is checked on a device.
 
 ## The tests
 
-`Tests/PerfTests/PerformanceTests.swift`, six tests, five measured iterations each after one
+`Tests/PerfTests/PerformanceTests.swift`, seven tests, five measured iterations each after one
 warm-up:
 
 | test | what | metrics |
 |---|---|---|
 | `testLaunch` | cold launch to the first frame that answers a touch, signed out | launch duration |
+| `testOneChatAfterLaunch` | a launch with a stored session to the first #one messages, through a phone's 100 ms round trip | first messages (the app's own time) |
 | `testScrollOneChat` | #one-Chat, 160 messages, 30 photos up to 4032x3024, flung up and down | hitch ratio, late frames |
 | `testOpenThread` | channel to the long thread and back | clock time |
 | `testScrollThread` | the long thread, 90 replies, 12 photos | hitch ratio, late frames |
@@ -48,7 +49,9 @@ warm-up:
 
 **The data.** `scripts/perf.sh` starts its own Synapse (a copy of `scripts/test-homeserver.sh`
 on port 8048, `build/perf-synapse`), seeds it with `scripts/seed-perf-data.py`, and starts the
-blog fixture on 8796. Its own ports and its own simulator, always the same model (`PERF_MODEL`,
+blog fixture on 8796, and `scripts/latency-proxy.py` on 8049 in front of the Synapse: 50 ms each
+way, a phone on LTE. Against the local server every request answers at once, so start-up steps
+that wait one after another show only through the proxy. Its own ports and its own simulator, always the same model (`PERF_MODEL`,
 "iPhone 17 Pro", as `perf-iphone-17-pro`, whose keychain it resets each run): a missing model
 fails the run rather than measure on another one. So it runs beside other test servers on a
 shared Mac.
@@ -150,6 +153,30 @@ request carries no cookie and no token. Never from a simulator or a test run. Li
 Pro proves the key; `hitch` under 5 is Apple's "good".
 
 ## What made it fast
+
+**From launch to the first #one messages** (`testOneChatAfterLaunch`, the simulator through the
+100 ms proxy, 2026-11-20, five launches each). The app times itself: from the moment the kernel
+started the process to the first timeline with five items (`StartTrace`, `ChatOpenTrace`,
+`FirstMessagesMetric`); a clock around `app.launch()` read 3.4 s on both sides, XCTest's own
+launch and polling hiding the difference. Synapse was not the cause: its `/messages` p95 was
+93 ms over the same day.
+
+| | first messages |
+|---|---|
+| main (b3bcd84) | 3.08 s (2.91–3.52) |
+| start-up waits in parallel | 2.68 s (2.59–2.94) |
+| and 50 events per back-pagination | 2.57 s (2.44–2.70) |
+
+| change | where |
+|---|---|
+| Bots, display name and picture load beside the screens; the app showed a spinner until all three round trips were done | `ChatSession.start()` |
+| The three room aliases resolve at once, not one after another | `ChatSession.resolveRooms()` |
+| The #one room list loads during start-up, once, not when the tab first appears | `ChatSession.loadOneRooms()` |
+| 50 events per back-pagination, not 20: reactions, edits and state filled a page, and a room needed four round trips for its first screen | `TimelineViewModel` (patch) |
+
+The log keeps every step with its time (subsystem `de.iphoneblog.chat`, categories `start` and
+`open`), so a slow phone can be read with Console.
+
 
 Measured on the iPad Pro on 2026-11-16, medians of five passes, hitch ratio while dragging /
 while coasting:

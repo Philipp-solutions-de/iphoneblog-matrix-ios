@@ -22,6 +22,8 @@ mkdir -p build
 action="${1:-all}"
 port="${PERF_HOMESERVER_PORT:-8048}"
 fixture_port="${PERF_FIXTURE_PORT:-8796}"
+# The homeserver behind a phone's round trip (latency-proxy.py), for testOneChatAfterLaunch.
+slow_port="${PERF_SLOW_PORT:-8049}"
 result=build/perf.xcresult
 
 # **Its own simulator, always the same model** (PERF_MODEL, "iPhone 17 Pro"): a run on another
@@ -113,6 +115,8 @@ PY
     set -a; . build/perf-homeserver.env; . build/perf-data.env; set +a
     python3 scripts/blog-fixture-server.py "$fixture_port" "$IPHONEBLOG_TEST_ARTICLE_ROOT" >build/perf-fixture.log 2>&1 &
     echo $! > build/perf-fixture.pid
+    python3 scripts/latency-proxy.py "$slow_port" "$port" 50 >build/perf-latency.log 2>&1 &
+    echo $! > build/perf-latency.pid
     sleep 1
     if [[ -n "$lan" ]]; then
         /usr/bin/python3 scripts/lan-forward.py "$lan" "$port" "$fixture_port" >build/perf-forward.log 2>&1 &
@@ -124,6 +128,7 @@ PY
 stop_servers() {
     [[ -f build/perf-forward.pid ]] && kill "$(cat build/perf-forward.pid)" 2>/dev/null || true
     [[ -f build/perf-fixture.pid ]] && kill "$(cat build/perf-fixture.pid)" 2>/dev/null || true
+    [[ -f build/perf-latency.pid ]] && kill "$(cat build/perf-latency.pid)" 2>/dev/null || true
     [[ -x build/perf-homeserver.sh ]] && build/perf-homeserver.sh stop || true
 }
 
@@ -138,6 +143,8 @@ run() {
         [[ -n "${!var:-}" ]] && export "TEST_RUNNER_$var=${!var}"
     done
     [[ -n "$lan" ]] && export TEST_RUNNER_IPHONEBLOG_TEST_HOMESERVER="http://$lan:$port"
+    # A device has its own network delay; the proxy is for the simulator.
+    [[ -z "$lan" ]] && export TEST_RUNNER_IPHONEBLOG_SLOW_HOMESERVER="http://127.0.0.1:$slow_port"
     if [[ -n "$lan" ]]; then
         # A device keeps its keychain across a reinstall too; testLaunch runs first and signs
         # out, which deletes the stored session before the signed-in tests start.

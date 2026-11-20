@@ -18,6 +18,7 @@ final class ElementXChatScreens: ChatScreenProviding {
 
     init() {
         ChatKitTheme.apply(.app)
+        ChatOpenTrace.onFirstMessages = { Task { @MainActor in StartTrace.firstMessages() } }
         ChatKitText.preview = { body, html in PushText.plain(body: body, formattedBody: html) }
         // "Link kopieren": the app's readable link (ChatLink), not matrix.to.
         ChatKitLinks.message = { roomID, alias, eventID in ChatLink.url(roomID: roomID, alias: alias, eventID: eventID) }

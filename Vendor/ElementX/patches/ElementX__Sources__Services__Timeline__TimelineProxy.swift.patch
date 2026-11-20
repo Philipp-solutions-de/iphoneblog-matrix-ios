@@ -1,6 +1,19 @@
 --- a/ElementX/Sources/Services/Timeline/TimelineProxy.swift
 +++ b/ElementX/Sources/Services/Timeline/TimelineProxy.swift
-@@ -276,13 +276,15 @@
+@@ -132,10 +132,12 @@
+     /// Paginate backwards using the subscription from Rust to drive the pagination state.
+     private func paginateBackwardsOnLive(requestSize: UInt16) async -> Result<Void, TimelineProxyError> {
+         MXLog.info("Paginating backwards")
++        ChatOpenTrace.mark("paginate \(requestSize) start") // iphoneblog: room-open timing
+         
+         do {
+             let _ = try await timeline.paginateBackwards(numEvents: requestSize)
+             MXLog.info("Finished paginating backwards")
++            ChatOpenTrace.mark("paginate end") // iphoneblog
+             
+             return .success(())
+         } catch {
+@@ -276,13 +278,15 @@
                     audioInfo: AudioInfo,
                     caption: String?,
                     requestHandle: @MainActor (SendAttachmentJoinHandleProtocol) -> Void) async -> Result<Void, TimelineProxyError> {
@@ -19,7 +32,7 @@
                                                                inReplyTo: nil),
                                                  audioInfo: audioInfo)
              
-@@ -302,13 +304,15 @@
+@@ -302,13 +306,15 @@
                    fileInfo: FileInfo,
                    caption: String?,
                    requestHandle: @MainActor (SendAttachmentJoinHandleProtocol) -> Void) async -> Result<Void, TimelineProxyError> {
@@ -38,7 +51,7 @@
                                                               inReplyTo: nil),
                                                 fileInfo: fileInfo)
              
-@@ -329,13 +333,15 @@
+@@ -329,13 +335,15 @@
                     imageInfo: ImageInfo,
                     caption: String?,
                     requestHandle: @MainActor (SendAttachmentJoinHandleProtocol) -> Void) async -> Result<Void, TimelineProxyError> {
@@ -57,7 +70,7 @@
                                                                inReplyTo: nil),
                                                  thumbnailSource: .file(filename: thumbnailURL.path(percentEncoded: false)),
                                                  imageInfo: imageInfo)
-@@ -381,13 +387,15 @@
+@@ -381,13 +389,15 @@
                     videoInfo: VideoInfo,
                     caption: String?,
                     requestHandle: @MainActor (SendAttachmentJoinHandleProtocol) -> Void) async -> Result<Void, TimelineProxyError> {
@@ -76,7 +89,7 @@
                                                                inReplyTo: nil),
                                                  thumbnailSource: .file(filename: thumbnailURL.path(percentEncoded: false)),
                                                  videoInfo: videoInfo)
-@@ -407,12 +415,14 @@
+@@ -407,12 +417,14 @@
      func sendGallery(itemInfos: [GalleryItemInfo],
                       caption: String?,
                       inReplyToEventID: String?) async -> Result<Void, TimelineProxyError> {
@@ -94,7 +107,7 @@
                                                                  inReplyTo: inReplyToEventID),
                                                    itemInfos: itemInfos)
              try await handle.join()
-@@ -430,6 +440,8 @@
+@@ -430,6 +442,8 @@
                            waveform: [Float],
                            inReplyToEventID: String?,
                            requestHandle: @MainActor (SendAttachmentJoinHandleProtocol) -> Void) async -> Result<Void, TimelineProxyError> {
@@ -103,7 +116,7 @@
          MXLog.info("Sending voice message")
          
          do {
-@@ -460,6 +472,8 @@
+@@ -460,6 +474,8 @@
                       html: String?,
                       inReplyToEventID: String? = nil,
                       intentionalMentions: IntentionalMentions) async -> Result<Void, TimelineProxyError> {
@@ -112,7 +125,7 @@
          if let inReplyToEventID {
              MXLog.info("Sending reply to eventID: \(inReplyToEventID)")
          } else {
-@@ -636,8 +650,12 @@
+@@ -636,8 +652,12 @@
              }
              content = buildEmoteMessageContentFor(emoteMessage, html: emoteHtml)
          } else {
