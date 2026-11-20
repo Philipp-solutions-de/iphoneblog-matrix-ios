@@ -36,12 +36,17 @@ final class AvatarUITests: XCTestCase {
         choose.tap()
         let picture = app.images.matching(NSPredicate(format: "label BEGINSWITH 'Photo' OR label BEGINSWITH 'Foto'")).firstMatch
         XCTAssertTrue(picture.waitForExistence(timeout: 45), "photo picker shows no pictures")
-        sleep(1)
-        picture.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-
         // Placed in the squircle first: zoom in, move, save.
         let crop = app.otherElements["avatar.crop"]
-        XCTAssertTrue(crop.waitForExistence(timeout: 30), "no crop step after picking a picture")
+        // On a slow CI runner the picker can swallow the first tap while its grid is still
+        // settling (main 3c2ddaf, 2026-11-20: one query took 30 s, the tap brought no crop
+        // step). Tap again while the picker is still there.
+        for _ in 0..<3 where !crop.exists {
+            sleep(1)
+            if picture.exists { picture.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap() }
+            _ = crop.waitForExistence(timeout: 20)
+        }
+        XCTAssertTrue(crop.waitForExistence(timeout: 10), "no crop step after picking a picture")
         crop.pinch(withScale: 2, velocity: 1)
         crop.swipeLeft()
         attach(app, "avatar-crop")
