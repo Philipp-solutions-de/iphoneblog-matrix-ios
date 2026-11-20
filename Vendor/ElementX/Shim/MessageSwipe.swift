@@ -129,6 +129,14 @@ private struct HorizontalPan: UIGestureRecognizerRepresentable {
             self.isEnabled = isEnabled
         }
 
+        /// A touch that lands at the screen's left edge belongs to the navigation's swipe-back.
+        /// Checked where the finger lands: by the time the pan would begin, it has already moved
+        /// past the margin. Since the row takes the full width (2026-11-20), such a touch reaches
+        /// the row, and the pan took the back swipe in a thread (DiscussionUITests).
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+            touch.location(in: nil).x > edgeMargin
+        }
+
         func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
             guard let pan = gestureRecognizer as? UIPanGestureRecognizer, isEnabled() else { return false }
             let start = pan.location(in: nil)
