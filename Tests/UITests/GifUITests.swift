@@ -49,11 +49,13 @@ final class GifUITests: XCTestCase {
         while Date() < until, loaded.count == 0 { sleep(1) }
         let gif = loaded.allElementsBoundByIndex.last { $0.isHittable } ?? loaded.firstMatch
         XCTAssertTrue(gif.exists, "the GIF did not load")
-        // Only the picture is compared, so nothing else that moves on the screen counts. A few
-        // tries: a busy runner may skip frames.
+        // Only the picture is compared (the marker sits at its centre), so nothing else that
+        // moves on the screen counts. The GIF loops every 0.8 s (8 frames of 0.1 s); evenly
+        // spaced shots once landed on the same frame every time, 400 ms apart plus the time a
+        // screenshot takes. Uneven gaps cannot all match the loop.
         var first = gif.screenshot(), second = first
-        for _ in 0..<5 {
-            usleep(400_000)
+        for gap: UInt32 in [130_000, 270_000, 350_000, 610_000, 190_000, 470_000] {
+            usleep(gap)
             second = gif.screenshot()
             if second.pngRepresentation != first.pngRepresentation { break }
         }
