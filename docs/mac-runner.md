@@ -141,3 +141,4 @@ unregisters the runner, stops and deletes the three LaunchDaemons and the networ
 whatever still runs as `ci`. CI carries on at once on GitHub's runner. `--delete-user` deletes
 the user `ci` and its home as well. The home folders stay closed; the script prints the modes
 they had. Developer mode (`DevToolsSecurity`) stays on.
+
