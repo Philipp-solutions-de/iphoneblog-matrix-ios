@@ -1,6 +1,6 @@
 --- a/ElementX/Sources/Services/Timeline/TimelineController/TimelineController.swift
 +++ b/ElementX/Sources/Services/Timeline/TimelineController/TimelineController.swift
-@@ -136,7 +136,13 @@
+@@ -136,7 +136,14 @@
              return
          }
          
@@ -11,6 +11,7 @@
 +            var threadRootEventID: String?
 +            if case let .thread(rootEventID) = timelineKind { threadRootEventID = rootEventID }
 +            ChatKitReads.seen?(roomProxy.id, threadRootEventID, eventID, receiptType == .readPrivate)
++            ChatReadPositions.shared.noteSeen(room: roomProxy.id, thread: threadRootEventID, event: eventID)
 +        }
      }
      

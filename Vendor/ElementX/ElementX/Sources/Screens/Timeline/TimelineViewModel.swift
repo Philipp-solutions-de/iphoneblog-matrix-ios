@@ -118,7 +118,9 @@ class TimelineViewModel: TimelineViewModelType, TimelineViewModelProtocol {
                    mediaProvider: userSession.mediaProvider,
                    contentScannerService: userSession.contentScannerService)
         
-        if focussedEventID != nil {
+        // iPhoneBlog: no "Lädt" toast for a restored read position, which opens quietly and falls
+        // back to the newest message if its event is gone (ChatReadPositions).
+        if let focussedEventID, !ChatReadPositions.shared.isRestoring(focussedEventID) {
             // The timeline controller will start loading a detached timeline.
             showFocusLoadingIndicator()
         }

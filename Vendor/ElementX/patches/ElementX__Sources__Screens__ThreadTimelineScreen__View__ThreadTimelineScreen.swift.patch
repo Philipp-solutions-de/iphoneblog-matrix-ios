@@ -18,7 +18,19 @@
              .navigationBarTitleDisplayMode(.inline)
              .toolbar { toolbar }
              .toolbarBackground(.visible, for: .navigationBar) // Fix the toolbar's background.
-@@ -80,6 +82,7 @@
+@@ -39,8 +41,9 @@
+                 }
+                 .padding(.top, 13)
+             }
+-            .overlay(alignment: .bottomTrailing) {
+-                TimelineScrollButton(isHidden: !timelineContext.viewState.shouldShowScrollToBottomButton) {
++            .overlay(alignment: .bottom) {
++                // iPhoneBlog: "Zum Ende springen", as in a room (ChatReadPositions).
++                ChatJumpToEndButton(isHidden: !timelineContext.viewState.shouldShowScrollToBottomButton) {
+                     timelineContext.send(viewAction: .scrollToBottom)
+                 }
+             }
+@@ -80,6 +83,7 @@
      private var toolbar: some ToolbarContent {
          // .principal + .primaryAction works better than .navigation leading + trailing
          // as the latter disables interaction in the action button for rooms with long names
@@ -26,7 +38,7 @@
          ToolbarItem(placement: .principal) {
              RoomHeaderView(roomName: L10n.commonThread,
                             roomSubtitle: context.viewState.roomTitle,
-@@ -90,6 +93,7 @@
+@@ -90,6 +94,7 @@
                  // There is no action but the iOS 26 designs have it looking like a button.
              }
          }

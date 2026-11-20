@@ -41,8 +41,9 @@ struct ThreadTimelineScreen: View {
                 }
                 .padding(.top, 13)
             }
-            .overlay(alignment: .bottomTrailing) {
-                TimelineScrollButton(isHidden: !timelineContext.viewState.shouldShowScrollToBottomButton) {
+            .overlay(alignment: .bottom) {
+                // iPhoneBlog: "Zum Ende springen", as in a room (ChatReadPositions).
+                ChatJumpToEndButton(isHidden: !timelineContext.viewState.shouldShowScrollToBottomButton) {
                     timelineContext.send(viewAction: .scrollToBottom)
                 }
             }

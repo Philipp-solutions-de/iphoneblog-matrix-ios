@@ -142,6 +142,7 @@ class TimelineController: TimelineControllerProtocol {
             var threadRootEventID: String?
             if case let .thread(rootEventID) = timelineKind { threadRootEventID = rootEventID }
             ChatKitReads.seen?(roomProxy.id, threadRootEventID, eventID, receiptType == .readPrivate)
+            ChatReadPositions.shared.noteSeen(room: roomProxy.id, thread: threadRootEventID, event: eventID)
         }
     }
     

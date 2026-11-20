@@ -59,9 +59,16 @@ final class RichMessagesUITests: XCTestCase {
         let app = try openChannel()
         // Tests that run earlier write into Allgemein too (the hub's, for one), so the seeded set
         // may sit above the screen: wait for the timeline, then scroll up to the PDF.
+        // Each suite added there pushes it further up (25 swipes; 10 stopped short on CI once
+        // the hub's and the long-press tests had written), and a swipe can carry past the row
+        // while the list still moves, so the search also comes back down.
         if !fileRow(app).waitForExistence(timeout: 30) {
-            for _ in 0..<10 where !fileRow(app).isHittable {
+            for _ in 0..<25 where !fileRow(app).isHittable {
                 app.swipeDown(velocity: .slow)
+                _ = fileRow(app).waitForExistence(timeout: 2)
+            }
+            for _ in 0..<25 where !fileRow(app).isHittable {
+                app.swipeUp(velocity: .slow)
                 _ = fileRow(app).waitForExistence(timeout: 2)
             }
         }
