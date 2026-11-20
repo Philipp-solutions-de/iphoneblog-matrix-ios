@@ -61,7 +61,6 @@ enum Theme {
         static let overline = SwiftUI.Font.system(size: 13, weight: .semibold)
         static let sectionHeader = SwiftUI.Font.system(size: 13, weight: .semibold)
         static let rowTitle = SwiftUI.Font.system(size: 16)
-        static let rowHash = SwiftUI.Font.system(size: 19)
         static let name = SwiftUI.Font.system(size: 15, weight: .semibold)
         static let time = SwiftUI.Font.system(size: 13)
         static let body = SwiftUI.Font.system(size: 16)

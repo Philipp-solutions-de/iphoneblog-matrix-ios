@@ -132,7 +132,14 @@ nonisolated struct AttributedStringBuilder: AttributedStringBuilderProtocol {
                 
                 // If this node is plain text append the whitespace normalised version
                 if node.parent() == documentBody {
-                    result.append(NSAttributedString(string: textNode.text()))
+                    var text = textNode.text()
+                    // iphoneblog: "<br />\nBuild 220." normalises to " Build 220.": the newline after a
+                    // break became a space that indented the line (Philip, 2026-11-20). Trimmed as
+                    // below for text inside other elements.
+                    if (node.previousSibling() as? Element)?.tagName() == "br" {
+                        text.trimPrefix(" ")
+                    }
+                    result.append(NSAttributedString(string: text))
                     continue
                 }
                 

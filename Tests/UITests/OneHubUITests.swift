@@ -130,6 +130,41 @@ final class OneHubUITests: XCTestCase {
 
     // MARK: - Helpers
 
+    /// A back swipe let go halfway keeps the back button where the system puts it: the hub has a
+    /// navigation bar too, so the bar does not appear and vanish with the swipe (Philip,
+    /// 2026-11-20: the arrow jumped to the screen's edge). The shots during the snap back show
+    /// it; the test checks that the swipe returns to Chat and a full swipe reaches the hub.
+    func testBackSwipeLetGoStaysInChat() throws {
+        let app = try launch([:])
+        let tile = app.buttons["hub.tile.chat"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 120), "no Chat tile")
+        sleep(1)
+        save(app, "root-hub")
+        // The Blog tab's root: its logo bar must look as it did (Brain, 2026-11-20).
+        let blogTab = app.buttons["Blog"].firstMatch
+        if blogTab.exists {
+            blogTab.tap()
+            sleep(5)
+            save(app, "root-blog")
+            app.buttons["#one"].firstMatch.tap()
+            XCTAssertTrue(tile.waitForExistence(timeout: 10), "back on #one, no Chat tile")
+        }
+        tile.tap()
+        XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 60), "no room in Chat")
+        sleep(1)
+        save(app, "backswipe-rest")
+        let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.01, dy: 0.5))
+        edge.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.5)),
+                   withVelocity: .slow, thenHoldForDuration: 0.3)
+        for index in 0..<4 { save(app, "backswipe-letgo-\(index)") }
+        XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 5), "a half swipe left Chat")
+        sleep(1)
+        edge.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)),
+                   withVelocity: .default, thenHoldForDuration: 0.1)
+        XCTAssertTrue(tile.waitForExistence(timeout: 10), "a full back swipe does not return to the hub")
+        save(app, "backswipe-hub")
+    }
+
     private func launch(_ extra: [String: String]) throws -> XCUIApplication {
         guard let server = env["IPHONEBLOG_TEST_HOMESERVER"], !server.isEmpty else { throw XCTSkip("no test homeserver configured") }
         let app = XCUIApplication()

@@ -17,10 +17,11 @@ struct BlogTab: View {
     var body: some View {
         NavigationStack(path: $router.blogPath) {
             BlogHome(web: web)
-                // The bar stays hidden over the blog; its title is what the system back button
-                // on the discussion says ("‹ Blog"), and the system button keeps the edge swipe.
+                // The logo sits in the navigation bar: a bar on both the blog and the discussion
+                // keeps the system back button where it belongs during a back swipe (Philip,
+                // 2026-11-20). The title is what that button says; the button keeps the edge swipe.
                 .navigationTitle("Blog")
-                .toolbar(.hidden, for: .navigationBar)
+                .navigationBarTitleDisplayMode(.inline)
                 .navigationDestination(for: Router.DiscussionRoute.self) { route in
                     DiscussionView(route: route, session: session, router: router)
                 }
@@ -78,19 +79,20 @@ private struct BlogHome: View {
                     EmptyView()
                 }
             }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                Button { web.goHome() } label: {
-                    Image("Logo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: Theme.BlogBar.logo, height: Theme.BlogBar.logo)
-                        .frame(maxWidth: .infinity, minHeight: Theme.BlogBar.height)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Button { web.goHome() } label: {
+                        Image("Logo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: Theme.BlogBar.logo, height: Theme.BlogBar.logo)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("iPhoneBlog.de, zum Anfang")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("iPhoneBlog.de, zum Anfang")
-                .background(Theme.background)
-                .overlay(alignment: .bottom) { Theme.line.frame(height: 1) }
             }
+            .toolbarBackground(Theme.background, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
     }
 }
 
@@ -98,8 +100,7 @@ private struct BlogHome: View {
 /// when it next changes.
 extension Theme {
     enum BlogBar {
-        static let logo: CGFloat = 38
-        static let height: CGFloat = 52
+        static let logo: CGFloat = 34
     }
 }
 

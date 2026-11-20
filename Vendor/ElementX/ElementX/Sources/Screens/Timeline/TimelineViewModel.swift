@@ -592,9 +592,9 @@ class TimelineViewModel: TimelineViewModelType, TimelineViewModelProtocol {
     }
     
     private func setupUserSettingsSubscriptions() {
-        userSettings.account.sharePresencePublisher
-            .weakAssign(to: \.state.showReadReceipts, on: self)
-            .store(in: &cancellables)
+        // iphoneblog: no read-receipt avatars and no "Gelesen von" in the timeline (Philip,
+        // 2026-11-20; the website shows none). showReadReceipts stays false. Our own receipts go
+        // out as before: sharePresence, which picks public receipts, is untouched.
         
         userSettings.app.viewSourceEnabledPublisher
             .weakAssign(to: \.state.isViewSourceEnabled, on: self)

@@ -157,6 +157,61 @@ final class RichMessagesUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["timeline-image.loaded"].exists, "no loaded picture in sight")
     }
 
+    /// A picture's caption keeps its first letter: the rounded corners belong to the picture,
+    /// not to the caption below it (Philip, 2026-11-20, "Ein Kreis" lost the left of its E).
+    func testCaptionIsNotClippedByThePicturesCorner() throws {
+        let anna = try TestServer.signIn(2)
+        defer { anna.signOut() }
+        let room = try XCTUnwrap(env["IPHONEBLOG_TEST_CHANNEL_ROOM"])
+        let text = "Ein Kreis \(Int(Date().timeIntervalSince1970) % 100_000)"
+        try anna.sendContent(["msgtype": "m.image", "body": text, "filename": "picture.png",
+                              "url": try anna.uploadPNG(colored: .systemGray4, width: 240, height: 160),
+                              "info": ["mimetype": "image/png", "w": 240, "h": 160]], in: room)
+        let app = try openChannel()
+        // The caption's own text view: on screen (a frame), narrower than the row.
+        let candidates = app.descendants(matching: .any).matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@", text, text))
+        let until = Date().addingTimeInterval(60)
+        var found: XCUIElement?
+        while found == nil, Date() < until {
+            found = candidates.allElementsBoundByIndex.first { element in
+                let frame = element.frame
+                return frame.width > 20 && frame.height > 8 && frame.width < app.frame.width * 0.9 && app.frame.contains(frame)
+            }
+            if found == nil { sleep(1) }
+        }
+        let element = try XCTUnwrap(found, "the caption is not in the channel")
+        attach(app, "caption-timeline")
+        // The E's stem is the caption's leftmost ink. Cut by the picture's rounded corner, it
+        // lost its lower part; whole, it is as tall as the rest of the text.
+        let shot = try XCTUnwrap(element.screenshot().image.cgImage)
+        let width = shot.width, height = shot.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let context = try XCTUnwrap(CGContext(data: &pixels, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                              space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(shot, in: CGRect(x: 0, y: 0, width: width, height: height))
+        func isInk(_ x: Int, _ y: Int) -> Bool {
+            let i = (y * width + x) * 4
+            return (Int(pixels[i]) + Int(pixels[i + 1]) + Int(pixels[i + 2])) / 3 < 110
+        }
+        func rows(columns: Range<Int>) -> (top: Int, bottom: Int) {
+            var top = height, bottom = -1
+            for x in columns { for y in 0..<height where isInk(x, y) { top = min(top, y); bottom = max(bottom, y) } }
+            return (top, bottom)
+        }
+        let first = try XCTUnwrap((0..<width).first { x in (0..<height).contains { isInk(x, $0) } }, "no text in the caption")
+        // The first letters only, so no other text in the element counts.
+        let whole = rows(columns: first..<min(first + 60, width))
+        let stem = rows(columns: first..<min(first + 3, width))
+        let measured = XCTAttachment(string: "first ink column \(first), stem rows \(stem), text rows \(whole), width \(width)")
+        measured.name = "caption-measure"
+        measured.lifetime = .keepAlways
+        add(measured)
+        // Where the rounded corner cut, the stem stopped short of the line's foot (measured
+        // 2026-11-20: 6 px short before the fix, 1 px after).
+        XCTAssertGreaterThanOrEqual(stem.bottom, whole.bottom - 2,
+                                    "the caption's first letter is cut at the lower left (stem rows \(stem), text rows \(whole))")
+    }
+
     /// "@Anna" in a picture's caption (Philip, 2026-11-18: a caption's mention reached nobody):
     /// picked from the @ suggestions, sent as a mention (m.mentions, a link in formatted_body,
     /// the name as plain text in body), and Anna gets a mention.
