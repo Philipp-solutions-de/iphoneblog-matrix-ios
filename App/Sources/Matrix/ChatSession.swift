@@ -246,7 +246,9 @@ final class ChatSession: ObservableObject, ChatHost {
         struct Response: Decodable {
             struct Room: Decodable {
                 let room_id: String // swiftlint:disable:this identifier_name
-                let name: String
+                // Rooms come from the space #one since 2026-11-20; one made in Element may have
+                // no name (the server sends "") and no alias (the app never reads alias).
+                let name: String?
                 let topic: String?
                 let locked: Bool?
             }
@@ -254,7 +256,12 @@ final class ChatSession: ObservableObject, ChatHost {
         }
         if let data = try? await api("GET", "/_iphoneblog/v1/rooms"),
            let response = try? JSONDecoder().decode(Response.self, from: data) {
-            let list = response.rooms.map { OneRoom(id: $0.room_id, name: $0.name, topic: $0.topic, locked: $0.locked ?? !isOneMember) }
+            let list = response.rooms.map { room in
+                let given = room.name.flatMap { $0.isEmpty ? nil : $0 }
+                let shown = given ?? (try? client.getRoom(roomId: room.room_id))?.displayName().flatMap { $0.isEmpty ? nil : $0 } ?? room.room_id
+                return OneRoom(id: room.room_id, name: shown, topic: room.topic.flatMap { $0.isEmpty ? nil : $0 },
+                               locked: room.locked ?? !isOneMember)
+            }
             if list != oneRooms { oneRooms = list }
             return
         }
