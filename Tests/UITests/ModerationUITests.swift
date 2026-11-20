@@ -50,7 +50,9 @@ final class ModerationUITests: XCTestCase {
     func testPushPrimerOnOneChat() throws {
         // "-pushPrimerShown NO" resets the card's flag for this launch (the argument domain wins
         // over the stored value), so an earlier run's "Später" does not hide it.
-        let app = try launch(["IPHONEBLOG_START_TAB": "chat"], arguments: ["-pushPrimerShown", "NO"])
+        // The card sits on the hub, #one's root; a run that starts in #one lands in Chat unless
+        // IPHONEBLOG_START_HUB keeps it on the hub.
+        let app = try launch(["IPHONEBLOG_START_TAB": "chat", "IPHONEBLOG_START_HUB": "1"], arguments: ["-pushPrimerShown", "NO"])
         let later = app.buttons["Später"]
         XCTAssertTrue(later.waitForExistence(timeout: 120), "no primer on #one")
         attach(app, "push-primer")

@@ -8,23 +8,23 @@ final class RouterTests: XCTestCase {
         XCTAssertEqual(Router().tab, .blog)
     }
 
-    /// A thread opens over its room in #one, from any tab, so back leads into the room (the room
-    /// is the one under the room bar, not a pushed screen).
+    /// A thread opens over Chat in #one, from any tab, so back leads into the room under the
+    /// room bar, and back again to the hub.
     func testOpenThreadPutsItOverItsRoom() {
         let router = Router()
         router.tab = .forYou
         router.openThread(roomID: "!a", rootEventID: "$root")
         XCTAssertEqual(router.tab, .chat)
-        XCTAssertEqual(router.chatPath, [.thread(Router.ThreadRoute(roomID: "!a", rootEventID: "$root"))])
+        XCTAssertEqual(router.chatPath, [.chat, .thread(Router.ThreadRoute(roomID: "!a", rootEventID: "$root"))])
         XCTAssertEqual(router.selectedRoomID, "!a")
     }
 
-    /// A room opens under the room bar and is remembered as the last room read.
+    /// A room opens in Chat, under the room bar, and is remembered as the last room read.
     func testOpenRoomBecomesTheCurrentRoom() {
         let router = Router()
         router.openThreadsList()
         router.openRoom("!b")
-        XCTAssertEqual(router.chatPath, [])
+        XCTAssertEqual(router.chatPath, [.chat])
         XCTAssertEqual(router.currentRoomID, "!b")
         XCTAssertEqual(Router().currentRoomID, "!b", "the last room read is not remembered")
     }
@@ -43,9 +43,23 @@ final class RouterTests: XCTestCase {
         let router = Router()
         router.openThread(roomID: "!a", rootEventID: "$reply")
         router.correctThread(roomID: "!a", from: "$reply", to: "$root")
-        XCTAssertEqual(router.chatPath, [.thread(.init(roomID: "!a", rootEventID: "$root"))])
+        XCTAssertEqual(router.chatPath, [.chat, .thread(.init(roomID: "!a", rootEventID: "$root"))])
         XCTAssertTrue(router.isOnScreen(roomID: "!a", threadRootEventID: "$root"))
         XCTAssertFalse(router.isOnScreen(roomID: "!a", threadRootEventID: "$reply"))
+    }
+
+    /// The hub is no timeline: nothing on it sends a receipt; Chat on top is the room on screen.
+    func testHubSendsNoReceiptChatDoes() {
+        let router = Router()
+        router.tab = .chat
+        router.currentRoomID = "!a"
+        router.chatPath = []
+        XCTAssertFalse(router.isOnScreen(roomID: "!a", threadRootEventID: nil), "the hub counts as the room")
+        router.openChat()
+        XCTAssertTrue(router.isOnScreen(roomID: "!a", threadRootEventID: nil))
+        router.openChat(roomID: "!b")
+        XCTAssertEqual(router.currentRoomID, "!b")
+        XCTAssertEqual(router.chatPath, [.chat])
     }
 
     /// A push or link into an article thread opens it in the Blog tab, not in #one-Chat.

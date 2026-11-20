@@ -122,7 +122,8 @@ targets:
         NSPhotoLibraryAddUsageDescription: Damit du Bilder aus dem Chat in deinen Fotos sichern kannst.
         # The + menu in a conversation offers the camera.
         NSCameraUsageDescription: Damit du Fotos direkt im Chat aufnehmen kannst.
-        UIBackgroundModes: [remote-notification]
+        # audio: a #one video keeps playing in picture-in-picture (spec-ios.md "Player").
+        UIBackgroundModes: [remote-notification, audio]
         # **120 Hz on ProMotion iPhones.** Without this key iOS caps every iPhone app at 60 Hz,
         # whatever the views ask for; iPads do not need it. docs/performance.md.
         CADisableMinimumFrameDurationOnPhone: true
@@ -181,6 +182,9 @@ targets:
       configs:
         Perf:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+        # The #one episode fixture and the sample video are for debug runs and UI tests only.
+        Release:
+          EXCLUDED_SOURCE_FILE_NAMES: "episodes-fixture.json sample-video.mp4 sample-captions.de.vtt"
 
   NotificationExtension:
     type: app-extension

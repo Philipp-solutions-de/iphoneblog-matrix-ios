@@ -199,8 +199,11 @@ final class PerformanceTests: XCTestCase {
         let deadline = Date().addingTimeInterval(120)
         // #one's room bar; Allgemein, the first room, holds the seeded history.
         let room = app.buttons.matching(identifier: "one-room").firstMatch
+        // The tab opens on the hub; its chat tile leads to the rooms.
+        let chatTile = app.buttons["hub.tile.chat"].firstMatch
         repeat {
             tab.tap()
+            if chatTile.waitForExistence(timeout: 5) { chatTile.tap() }
             if room.waitForExistence(timeout: 5) { room.tap() }
             if app.staticTexts["Felix H."].firstMatch.waitForExistence(timeout: 5) { break }
         } while Date() < deadline

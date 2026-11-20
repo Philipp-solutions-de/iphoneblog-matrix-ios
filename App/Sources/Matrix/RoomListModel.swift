@@ -15,6 +15,10 @@ struct RoomSummary: Identifiable, Equatable {
     var sdkMentions = 0
     var serverMentions = 0
     var isMarkedUnread = false
+    /// The newest message: when (ms), who, what. "Gerade aktiv" on the #one hub sorts and shows them.
+    var lastActivity: UInt64?
+    var lastSender: String?
+    var lastLine: String?
 
     var hasUnread: Bool { unreadMessages > 0 || isMarkedUnread }
 }
@@ -98,6 +102,14 @@ final class RoomListModel: ObservableObject {
                 summary.isMarkedUnread = info.isMarkedUnread
             }
             summary.serverMentions = serverMentions[summary.id] ?? 0
+            if case let .remote(timestamp, sender, _, profile, content) = await room.latestEvent() {
+                summary.lastActivity = timestamp
+                if case let .ready(displayName, _, _, _, _) = profile { summary.lastSender = displayName }
+                summary.lastSender = summary.lastSender ?? MentionsModel.localpart(sender)
+                if case let .msgLike(like) = content, case let .message(message) = like.kind {
+                    summary.lastLine = message.body.split(separator: "\n").first.map(String.init)
+                }
+            }
             summaries.append(summary)
         }
         // Publish only a real change: every publish re-renders the tab bar and wakes @Mentions
