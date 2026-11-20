@@ -123,6 +123,11 @@ job when the Mac has another major version, or no simulator runtime for its SDK.
 - **Send everything to GitHub for a while:** `gh variable set MAC_RUNNER -b off -R Philipp-solutions-de/iphoneblog-matrix-ios`;
   `gh variable delete MAC_RUNNER …` brings the Mac back.
 - **Restart the runner:** `sudo launchctl kickstart -k system/de.iphoneblog.ci-runner`
+- **Ports:** the Mac is shared with Thorsten's own test runs, which hold 8008 (test
+  homeserver) and 8793 (blog fixture). Jobs here use 18008 and 18793
+  (`TEST_HOMESERVER_PORT`, `FIXTURE_PORT`).
+- **Swift package cache:** one per kind of runner (`spm-self-hosted-…`, `spm-github-hosted-…`),
+  because the packages record absolute paths and the workspaces differ.
 - **Disk:** a job needs about 40 GB free (iOS runtime, derived data, Swift packages,
   simulators). The checkout wipes `build/` at the start of every job.
 

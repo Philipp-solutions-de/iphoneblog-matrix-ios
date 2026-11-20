@@ -97,14 +97,15 @@ case "$action" in
         # An animated GIF in the photo library, for the test that sends one (GifUITests).
         xcrun simctl addmedia "$device" scripts/fixtures/animation.gif 2>/dev/null || true
         clear_app_settings
-        if curl -s -o /dev/null http://127.0.0.1:8793/calls; then
-            echo "build.sh: port 8793 is taken; stop the old fixture server first" >&2; exit 1
+        fixture_port="${FIXTURE_PORT:-8793}" # another port beside a running one (docs/mac-runner.md)
+        if curl -s -o /dev/null "http://127.0.0.1:$fixture_port/calls"; then
+            echo "build.sh: port $fixture_port is taken; stop the old fixture server first" >&2; exit 1
         fi
-        python3 scripts/blog-fixture-server.py 8793 "${IPHONEBLOG_TEST_ARTICLE_ROOT:-\$madebypost}" &
+        python3 scripts/blog-fixture-server.py "$fixture_port" "${IPHONEBLOG_TEST_ARTICLE_ROOT:-\$madebypost}" &
         fixture=$!
         trap 'kill "$fixture" 2>/dev/null' EXIT
         sleep 1
-        export TEST_RUNNER_IPHONEBLOG_FIXTURE="http://127.0.0.1:8793"
+        export TEST_RUNNER_IPHONEBLOG_FIXTURE="http://127.0.0.1:$fixture_port"
         for name in TEST_HOMESERVER TEST_USER TEST_PASSWORD TEST_USER2 TEST_PASSWORD2 TEST_USER3 TEST_PASSWORD3 TEST_ADMIN TEST_ADMIN_PASSWORD ONE_ALIAS BLOG_ALIAS CHANNEL_ALIAS TEST_CHANNEL_ROOM TEST_ROOM2 TEST_BLOG_ROOM TEST_CHANNEL_THREAD TEST_ARTICLE_ROOT TEST_SYNAPSE_LOG; do
             var="IPHONEBLOG_$name"
             [[ -n "${!var:-}" ]] && export "TEST_RUNNER_$var=${!var}"

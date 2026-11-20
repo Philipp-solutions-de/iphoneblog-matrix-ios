@@ -86,9 +86,14 @@ jobs:
           sdk="$(xcodebuild -showsdks | sed -nE 's/.*-sdk iphonesimulator([0-9.]+).*/\1/p' | tail -1)"
           xcrun simctl list runtimes | grep "^iOS $sdk " ||
             { echo "::error::No iOS $sdk simulator runtime on the Mac Studio (docs/mac-runner.md, Xcode)"; exit 1; }
-          # A cancelled run can leave its test homeserver on port 8008; end it by PID.
-          pids="$(lsof -ti tcp:8008 -sTCP:LISTEN || true)"
-          [ -z "$pids" ] || { echo "ending leftover homeserver $pids"; kill $pids; }
+          # Ports of its own: Thorsten's local test runs on this Mac hold 8008 and 8793.
+          echo "TEST_HOMESERVER_PORT=18008" >> "$GITHUB_ENV"
+          echo "FIXTURE_PORT=18793" >> "$GITHUB_ENV"
+          # A cancelled run can leave its servers behind; end ci's own by PID.
+          for port in 18008 18793; do
+            pids="$(lsof -a -ti "tcp:$port" -sTCP:LISTEN -u ci || true)"
+            [ -z "$pids" ] || { echo "ending leftover server on $port: $pids"; kill $pids; }
+          done
 
       - name: Install tools
         run: scripts/install-xcodegen.sh build/tools >> "$GITHUB_PATH"
