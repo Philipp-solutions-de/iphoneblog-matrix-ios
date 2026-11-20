@@ -15,23 +15,33 @@ cd "$here"
 mkdir -p build
 action="${1:-build}"
 
-# The newest available iPhone simulator, by runtime version; DEVICE=<udid> picks one (the
-# 393 pt screenshots for design pages).
+# An iPhone 17 Pro on the newest iOS runtime, created when the machine has none; DEVICE=<udid>
+# picks another (the 393 pt screenshots for design pages). Never "the first iPhone": the
+# iOS 27.2 runtime's default set holds only the iPhone Duo, a foldable whose inner screen gets
+# the iPad layout without a tab bar, and every tab test failed on it (docs/mac-runner.md).
+device_type="${DEVICE_TYPE:-iPhone 17 Pro}"
 device="${DEVICE:-}"
-[[ -n "$device" ]] || device="$(xcrun simctl list devices available -j | python3 -c '
-import json, sys, re
-data = json.load(sys.stdin)["devices"]
-best = None
-for runtime, devices in data.items():
-    m = re.search(r"iOS-(\d+)-(\d+)", runtime)
-    if not m:
-        continue
-    version = (int(m.group(1)), int(m.group(2)))
-    for d in devices:
-        if d["name"].startswith("iPhone") and (best is None or version > best[0]):
-            best = (version, d["udid"], d["name"])
-print(best[1] if best else "")
-')"
+if [[ -z "$device" ]]; then
+    read -r runtime device < <(xcrun simctl list -j devices available runtimes | DEVICE_TYPE="$device_type" python3 -c '
+import json, os, re, sys
+data = json.load(sys.stdin)
+want = os.environ["DEVICE_TYPE"]
+runtimes = [r for r in data["runtimes"] if r.get("platform") == "iOS" and r.get("isAvailable")]
+# The general runtime before a device-specific one of the same version (iOS-27-2-iPhone19-4
+# runs only the Duo).
+runtimes.sort(key=lambda r: (tuple(int(x) for x in r["version"].split(".")),
+                             re.search(r"iOS-\d+(-\d+)*$", r["identifier"]) is not None))
+if not runtimes:
+    sys.exit(1)
+newest = runtimes[-1]["identifier"]
+match = [d["udid"] for d in data["devices"].get(newest, []) if d["name"] == want]
+print(newest, match[0] if match else "")
+') || true
+    if [[ -z "$device" && -n "${runtime:-}" ]]; then
+        device="$(xcrun simctl create "$device_type" "$device_type" "$runtime")"
+        echo "build.sh: created $device_type on $runtime ($device)" >&2
+    fi
+fi
 
 common=(
     -project iphoneblog.xcodeproj
