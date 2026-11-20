@@ -294,8 +294,8 @@ final class RichMessagesUITests: XCTestCase {
         }.jpegData(compressionQuality: 0.8))
     }
 
-    /// "Markieren" in the upload preview opens Apple's Markup; the marked-up photo is what is sent
-    /// (Thorsten, 2026-11-19).
+    /// "Markieren" in the upload preview opens a PencilKit canvas over the photo; the marked-up
+    /// photo is what is sent (Thorsten, 2026-11-19; PencilKit approved 2026-11-20).
     func testPhotoMarkupIsSent() throws {
         let app = try openChannel()
         let before = Date()
@@ -306,11 +306,12 @@ final class RichMessagesUITests: XCTestCase {
         // build.sh's photo dated 2001-01-01, not a GIF other tests saved: Markieren is for
         // photos only, and only that date puts "2001" in the picker's label.
         let picture = app.images.matching(NSPredicate(format: "label CONTAINS '2001'")).firstMatch
-        // The picker opens at the newest pictures; the oldest, this one, is at the top.
-        let grid = app.scrollViews.firstMatch.exists ? app.scrollViews.firstMatch : app.collectionViews.firstMatch
-        XCTAssertTrue(app.images.firstMatch.waitForExistence(timeout: 45), "photo picker shows no pictures")
+        // The picker shows the newest pictures first; this one, the oldest, is further down.
+        // Swipe up only: a swipe down closes the picker sheet.
+        let anyPicture = app.images.matching(NSPredicate(format: "label BEGINSWITH 'Foto' OR label BEGINSWITH 'Photo'")).firstMatch
+        XCTAssertTrue(anyPicture.waitForExistence(timeout: 45), "the photo picker did not open")
         for _ in 0..<15 where !picture.isHittable {
-            grid.swipeDown(velocity: .fast)
+            app.swipeUp(velocity: .fast)
             _ = picture.waitForExistence(timeout: 1)
         }
         XCTAssertTrue(picture.isHittable, "photo picker shows no photo from 2001 (build.sh adds it)")
@@ -322,24 +323,37 @@ final class RichMessagesUITests: XCTestCase {
         let markup = app.buttons["upload.markup"]
         XCTAssertTrue(markup.waitForExistence(timeout: 10), "no Markieren in the upload preview")
         markup.tap()
-        // Quick Look's own Markup: its pen button, a stroke, Fertig, then close Quick Look.
-        let pen = app.buttons.matching(NSPredicate(format: "label IN {'Markup', 'Markierung', 'Markieren'} OR identifier == 'QLOverlayMarkupButtonAccessibilityIdentifier'")).firstMatch
-        XCTAssertTrue(pen.waitForExistence(timeout: 20), "Quick Look shows no Markup button")
-        pen.tap()
-        sleep(2)
-        let canvas = app.windows.firstMatch
-        canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.45))
-            .press(forDuration: 0.1, thenDragTo: canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.55)))
+        // Our PencilKit editor: a red stroke across the photo, then Fertig. The canvas is a
+        // scroll view to XCTest, so it is looked up by identifier alone.
+        let canvas = app.descendants(matching: .any)["markup.canvas"]
+        XCTAssertTrue(canvas.waitForExistence(timeout: 10), "Markieren opened no drawing canvas")
+        let finish = app.buttons["markup.done"]
+        XCTAssertFalse(finish.isEnabled, "Fertig is on before anything is drawn")
+        canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.4))
+            .press(forDuration: 0.1, thenDragTo: canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.6)))
         attach(app, "markup-drawn")
-        for _ in 0..<2 {
-            let done = app.buttons.matching(NSPredicate(format: "label IN {'Fertig', 'Done'}")).firstMatch
-            if done.waitForExistence(timeout: 10) { done.tap(); sleep(1) }
-        }
+        XCTAssertTrue(finish.isEnabled, "the stroke did not reach the canvas")
+        finish.tap()
         XCTAssertTrue(app.textViews["Bildunterschrift hinzufügen"].waitForExistence(timeout: 20), "not back in the upload preview")
         attach(app, "markup-preview")
         app.buttons.matching(NSPredicate(format: "label == 'Senden' AND identifier != 'room-send_button'")).firstMatch.tap()
         let event = try latestOwnMessage(msgtype: "m.image", after: before)
-        XCTAssertNotNil(event["url"], "the marked-up photo was not sent: \(event)")
+        let mxc = try XCTUnwrap(event["url"] as? String, "the marked-up photo was not sent: \(event)")
+        // The photo has no red; the pen draws red. Red pixels in what the server holds prove
+        // the drawing went out, not the untouched photo.
+        let sent = try XCTUnwrap(UIImage(data: try TestServer.signIn(1).download(mxc)), "the sent photo does not decode")
+        XCTAssertGreaterThan(Self.redPixels(in: sent), 200, "the sent photo carries no drawing")
+    }
+
+    /// Pixels that are clearly red, the pen's colour.
+    private static func redPixels(in image: UIImage) -> Int {
+        guard let cg = image.cgImage else { return 0 }
+        let width = cg.width, height = cg.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        guard let context = CGContext(data: &pixels, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return 0 }
+        context.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return stride(from: 0, to: pixels.count, by: 4).filter { pixels[$0] > 190 && pixels[$0 + 1] < 90 && pixels[$0 + 2] < 90 }.count
     }
 
     /// + › Fotos, the first library picture, Senden in the upload preview; returns the server's event.

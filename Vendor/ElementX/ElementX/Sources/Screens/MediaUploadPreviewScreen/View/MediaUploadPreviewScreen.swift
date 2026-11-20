@@ -184,7 +184,7 @@ struct MediaUploadPreviewScreen: View {
         }
         
         if isCurrentMediaImage {
-            // iphoneblog: Apple's Markup for a photo, not for a GIF (Thorsten, 2026-11-19).
+            // iphoneblog: draw on a photo with PencilKit, not on a GIF (Thorsten, 2026-11-19).
             if !isCurrentMediaGIF {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
