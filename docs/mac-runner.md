@@ -23,7 +23,7 @@ on `ubuntu-latest` and hands `runs-on` to "Build and test". Its tests,
 | the weekly scheduled run | GitHub, always: it checks the hosted image the TestFlight job needs |
 | repository variable `MAC_RUNNER` = `off` | GitHub, always |
 | Mac offline, not registered, or the status token missing or expired | GitHub |
-| Mac busy | wait up to 20 minutes for it, then GitHub |
+| Mac busy | wait up to 20 minutes for it (repository variable `MAC_RUNNER_WAIT`), then GitHub |
 
 **The fallback asks GitHub before it queues.** A job sent to a self-hosted label waits up to 24
 hours for that runner and cannot be moved once queued, so the pick job reads the runner's state

@@ -50,6 +50,7 @@ jobs:
           REPO: ${{ github.repository }}
           MAC_RUNNER: ${{ vars.MAC_RUNNER }}
           STATUS_TOKEN: ${{ secrets.MAC_RUNNER_STATUS_TOKEN }}
+          WAIT_MINUTES: ${{ vars.MAC_RUNNER_WAIT || '20' }}
         run: |
           scripts/mac-runner/pick-runner.sh >> "$GITHUB_OUTPUT" 2> reason.txt || { cat reason.txt; exit 1; }
           cat reason.txt
