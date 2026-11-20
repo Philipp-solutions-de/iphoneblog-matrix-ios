@@ -8,6 +8,7 @@ struct DiscussionView: View {
     /// Nil while signed out.
     let session: ChatSession?
     @ObservedObject var router: Router
+    @EnvironmentObject private var model: AppModel
 
     @State private var rootEventID: String?
     @State private var page: GuestAPI.ThreadPage?
@@ -37,17 +38,29 @@ struct DiscussionView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
+            // The article's video plays right in the card (Thorsten, 2026-11-20); a tap anywhere
+            // else in the card, the title, opens the article.
+            if let video = page?.root.video {
+                CardVideoView(video: video, fallbackPoster: page?.root.imageUrl.flatMap(URL.init(string:)))
+                    .padding(.bottom, 8)
+            }
             Text("DISKUSSION")
                 .font(Theme.Font.overline)
                 .tracking(0.5)
                 .foregroundStyle(Theme.ink3)
             // No thread file yet (a new thread, or none): no empty title line.
             if page != nil || state == .loading {
-                Text(page?.root.title ?? " ")
-                    .font(.system(size: 22))
-                    .foregroundStyle(Theme.tealBright)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .redacted(reason: page == nil ? .placeholder : [])
+                Button(action: openArticle) {
+                    Text(page?.root.title ?? " ")
+                        .font(.system(size: 22))
+                        .foregroundStyle(Theme.tealBright)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .redacted(reason: page == nil ? .placeholder : [])
+                }
+                .buttonStyle(.plain)
+                .disabled(page?.root.link == nil)
+                .accessibilityIdentifier("discussion.title")
             }
             // Members see the live count under the thread's first message; the file's count
             // lags behind the chat by up to a minute.
@@ -61,6 +74,14 @@ struct DiscussionView: View {
         .padding(.horizontal, Theme.Space.page)
         .padding(.top, 4)
         .padding(.bottom, 14)
+    }
+
+    /// The card's article in the Blog tab's web view, which is under this page.
+    private func openArticle() {
+        guard let link = page?.root.link, let url = URL(string: link) else { return }
+        model.blogWeb.open(url)
+        router.tab = .blog
+        router.blogPath = []
     }
 
     // MARK: Content
