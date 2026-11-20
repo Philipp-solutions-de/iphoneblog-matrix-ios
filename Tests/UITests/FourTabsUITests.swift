@@ -172,7 +172,7 @@ final class FourTabsUITests: XCTestCase {
         XCTAssertTrue(mentionRow.label.contains("ungelesen"), "Alle gelesen under Threads cleared a mention")
     }
 
-    /// A long press on the Für dich tab marks everything read.
+    /// A long press on the Für dich tab asks, then marks everything read; cancelling keeps it.
     func testLongPressOnFuerDichReadsEverything() throws {
         closeRunningApp()
         let me = try TestServer.signIn(1)
@@ -182,8 +182,20 @@ final class FourTabsUITests: XCTestCase {
         let app = launch(tab: "blog")
         XCTAssertTrue(app.tabBars.buttons["Für dich"].waitForExistence(timeout: 120), "not signed in")
         XCTAssertTrue(waitForBadge(app, above: 0), "nothing unread to start with")
+        let before = badge(app) ?? 0
         app.tabBars.buttons["Für dich"].press(forDuration: 1.0)
-        XCTAssertTrue(waitForBadge(app, atMost: 0), "the long press did not read everything")
+        let confirm = app.buttons["Alle als gelesen markieren"].firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "the long press does not ask first")
+        save(app, "fuer-dich-confirm")
+        // iOS 26 shows the cancel action only as a tap outside the dialog.
+        if app.buttons["Abbrechen"].exists { app.buttons["Abbrechen"].tap() } else { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap() }
+        XCTAssertTrue(confirm.waitForNonExistence(timeout: 5), "the dialog did not close")
+        sleep(2)
+        XCTAssertEqual(badge(app) ?? 0, before, "cancelling still read something")
+        app.tabBars.buttons["Für dich"].press(forDuration: 1.0)
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "the second long press does not ask")
+        confirm.tap()
+        XCTAssertTrue(waitForBadge(app, atMost: 0), "the confirmed long press did not read everything")
     }
 
     // MARK: - Helpers
