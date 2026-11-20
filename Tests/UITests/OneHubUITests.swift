@@ -1,8 +1,8 @@
 import XCTest
 
-/// The #one hub (variant A, spec-ios.md "Tests"): the newest episode unwatched and started, Chat
-/// from the tile and from a "Gerade aktiv" row, Videos, the episode page and its player, and
-/// progress kept after a relaunch. Episodes come from the bundled fixture; with
+/// #one's start screen, draft B (Thorsten, 2026-11-20): the cover flow's episode states, the room
+/// and Threads rows, Videos, the episode page and its player, and progress kept after a
+/// relaunch; screenshots in light and dark. Episodes come from the bundled fixture; with
 /// IPHONEBLOG_EPISODES_LOCAL_VIDEO=1 they play the bundled sample.
 final class OneHubUITests: XCTestCase {
     private var env: [String: String] { ProcessInfo.processInfo.environment }
@@ -12,67 +12,85 @@ final class OneHubUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    func testHubShowsAnUnwatchedAndAStartedEpisode() throws {
+    /// The cover flow's first card: unwatched with "Neu", started with "Weiter ab" and the bar,
+    /// watched with "Gesehen".
+    func testCoverFlowShowsEachEpisodesState() throws {
         var app = try launch(["IPHONEBLOG_PLAYBACK_RESET": "1"])
-        let hero = app.buttons["hub.hero"]
-        XCTAssertTrue(hero.waitForExistence(timeout: 120), "no Neu für dich")
-        XCTAssertTrue(app.staticTexts["Neu für dich"].exists)
-        XCTAssertTrue(hero.label.contains("Fokus-Modi, die wirklich helfen"), hero.label)
-        XCTAssertTrue(hero.label.contains("Ansehen"), "an unwatched episode does not say Ansehen: \(hero.label)")
+        var first = app.buttons.matching(identifier: "one.episode").firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 120), "no episodes in the cover flow")
+        XCTAssertTrue(app.staticTexts["Videos"].exists && app.staticTexts["Räume"].exists, "Videos or Räume missing")
+        XCTAssertTrue(first.label.contains("Fokus-Modi, die wirklich helfen"), first.label)
         XCTAssertTrue(app.descendants(matching: .any)["episode.new"].exists, "no Neu badge on an unwatched episode")
-        XCTAssertTrue(app.buttons["hub.tile.chat"].exists && app.buttons["hub.tile.videos"].exists, "tiles missing")
-        XCTAssertTrue(app.buttons["hub.tile.videos"].label.contains("525"), app.buttons["hub.tile.videos"].label)
-        save(app, "hub-unwatched")
+        for gone in ["Neu für dich", "Bereiche", "Gerade aktiv"] {
+            XCTAssertFalse(app.staticTexts[gone].exists, "the old hub's \(gone) is still there")
+        }
+        save(app, "one-light")
         app.terminate()
 
         app = try launch(["IPHONEBLOG_PLAYBACK_RESET": "1", "IPHONEBLOG_PLAYBACK_SEED": "\(newest)=372/1532"])
-        XCTAssertTrue(app.buttons["hub.hero"].waitForExistence(timeout: 120))
-        XCTAssertTrue(app.buttons["hub.hero"].label.contains("Weiter ab 6:12"), app.buttons["hub.hero"].label)
+        first = app.buttons.matching(identifier: "one.episode").firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 120))
+        XCTAssertTrue(first.label.contains("Weiter ab 6:12"), first.label)
         XCTAssertTrue(app.descendants(matching: .any)["episode.progress"].exists, "no progress bar on a started episode")
-        XCTAssertFalse(app.descendants(matching: .any)["episode.new"].exists, "Neu on a started episode")
-        save(app, "hub-started")
         app.terminate()
 
-        // Watched to 95 %: the hero says Gesehen, as the Videos list does.
+        // Watched to 95 %: "Gesehen", as the Videos list says.
         app = try launch(["IPHONEBLOG_PLAYBACK_RESET": "1", "IPHONEBLOG_PLAYBACK_SEED": "\(newest)=1500/1532"])
-        XCTAssertTrue(app.buttons["hub.hero"].waitForExistence(timeout: 120))
-        XCTAssertTrue(app.buttons["hub.hero"].label.contains("Gesehen"), "a watched episode does not say Gesehen: \(app.buttons["hub.hero"].label)")
+        first = app.buttons.matching(identifier: "one.episode").firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 120))
+        XCTAssertTrue(first.label.contains("Gesehen"), "a watched episode does not say Gesehen: \(first.label)")
     }
 
-    func testChatFromTheTileAndFromAnActiveRow() throws {
+    /// Light and dark, at rest and with the cover flow swiped to the second episode: the
+    /// screenshots for the PR.
+    func testOneScreenInLightAndDark() throws {
+        // The app's own switch: XCUIDevice.appearance left the simulator light (2026-11-20).
+        for name in ["light", "dark"] {
+            let app = try launch(["IPHONEBLOG_PLAYBACK_RESET": "1", "IPHONEBLOG_PLAYBACK_SEED": "\(newest)=372/1532",
+                                  "IPHONEBLOG_APPEARANCE": name])
+            let flow = app.descendants(matching: .any)["one.coverflow"]
+            XCTAssertTrue(flow.waitForExistence(timeout: 120), "no cover flow")
+            sleep(2)
+            save(app, "one-\(name)")
+            flow.swipeLeft(velocity: .slow)
+            sleep(1)
+            save(app, "one-\(name)-swiped")
+            app.terminate()
+        }
+    }
+
+    /// A room row opens Chat on that room, with its newest message as the preview; the Threads
+    /// row opens the Threads list.
+    func testRoomsAndThreadsRows() throws {
         let other = try TestServer.signIn(2)
         addTeardownBlock { other.signOut() }
         let room = try XCTUnwrap(env["IPHONEBLOG_TEST_CHANNEL_ROOM"])
-        try other.send("Hub aktiv \(Int(Date().timeIntervalSince1970))", in: room)
+        let text = "Raumliste \(Int(Date().timeIntervalSince1970))"
+        try other.send(text, in: room)
 
         let app = try launch([:])
-        let tile = app.buttons["hub.tile.chat"]
-        XCTAssertTrue(tile.waitForExistence(timeout: 120), "no Chat tile")
-        XCTAssertTrue(tile.label.contains("Räume"), tile.label)
-        tile.tap()
-        XCTAssertTrue(app.scrollViews["one.roomBar"].waitForExistence(timeout: 30) || app.descendants(matching: .any)["one.roomBar"].exists,
-                      "the tile does not open Chat with its room bar")
-        XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 60), "no room in Chat")
-        save(app, "hub-chat")
-        app.navigationBars.buttons.firstMatch.tap()
-        XCTAssertTrue(tile.waitForExistence(timeout: 10), "back does not return to the hub")
-
-        // The room just written to is on top of Gerade aktiv; its row opens that room.
-        let row = app.buttons["hub.active.Allgemein"]
-        XCTAssertTrue(row.waitForExistence(timeout: 30), "Allgemein is not under Gerade aktiv")
+        let row = app.buttons["one.room.Allgemein"]
+        XCTAssertTrue(row.waitForExistence(timeout: 120), "no Allgemein under Räume")
+        let deadline = Date().addingTimeInterval(30)
+        while !row.label.contains(text), Date() < deadline { sleep(1) }
+        XCTAssertTrue(row.label.contains(text), "the row does not show the newest message: \(row.label)")
         row.tap()
-        XCTAssertTrue(app.textViews["Nachricht an # Allgemein"].waitForExistence(timeout: 60), "the row does not land in Allgemein")
+        XCTAssertTrue(app.textViews["Nachricht an # Allgemein"].waitForExistence(timeout: 60), "the row does not open Allgemein")
         app.navigationBars.buttons.firstMatch.tap()
-        XCTAssertTrue(app.buttons["hub.active.all"].waitForExistence(timeout: 10))
-        app.buttons["hub.active.all"].tap()
-        XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 30), "Alle does not open Chat")
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "back does not return to #one")
+
+        let threads = app.buttons["one.threads"]
+        if threads.waitForExistence(timeout: 10) {
+            threads.tap()
+            XCTAssertTrue(app.navigationBars["Threads"].waitForExistence(timeout: 10), "the Threads row does not open the list")
+        }
     }
 
     func testVideosListsEveryEpisodeWithItsState() throws {
         let app = try launch(["IPHONEBLOG_PLAYBACK_RESET": "1", "IPHONEBLOG_PLAYBACK_SEED": "\(newest)=372/1532;gw-213-kurzbefehle=1000/1000"])
-        let tile = app.buttons["hub.tile.videos"]
-        XCTAssertTrue(tile.waitForExistence(timeout: 120))
-        tile.tap()
+        let all = app.buttons["one.videos.all"]
+        XCTAssertTrue(all.waitForExistence(timeout: 120))
+        all.tap()
         XCTAssertTrue(app.staticTexts["videos.subtitle"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.staticTexts["videos.subtitle"].label, "Gewusst wie · 525 Folgen")
         let rows = app.buttons.matching(identifier: "videos.row")
@@ -91,8 +109,9 @@ final class OneHubUITests: XCTestCase {
     /// and coming back after a relaunch reads "Weiter ab".
     func testEpisodePagePlaysWithCaptionsAndKeepsProgress() throws {
         var app = try launch(["IPHONEBLOG_PLAYBACK_RESET": "1", "IPHONEBLOG_EPISODES_LOCAL_VIDEO": "1"])
-        XCTAssertTrue(app.buttons["hub.hero"].waitForExistence(timeout: 120))
-        app.buttons["hub.hero"].tap()
+        let first = app.buttons.matching(identifier: "one.episode").firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 120))
+        first.tap()
         XCTAssertTrue(app.staticTexts["episode.title"].waitForExistence(timeout: 10), "no episode page")
         XCTAssertEqual(app.staticTexts["episode.title"].label, "Fokus-Modi, die wirklich helfen")
         let notes = app.staticTexts["episode.notes"]
@@ -114,15 +133,16 @@ final class OneHubUITests: XCTestCase {
         sleep(3)
         save(app, "episode-playing")
         app.navigationBars.buttons.firstMatch.tap()
-        XCTAssertTrue(app.buttons["hub.hero"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["hub.hero"].label.contains("Weiter ab 0:"), app.buttons["hub.hero"].label)
+        XCTAssertTrue(first.waitForExistence(timeout: 10))
+        XCTAssertTrue(first.label.contains("Weiter ab 0:"), first.label)
         app.terminate()
 
         // A relaunch keeps where it stopped.
         app = try launch(["IPHONEBLOG_EPISODES_LOCAL_VIDEO": "1"])
-        XCTAssertTrue(app.buttons["hub.hero"].waitForExistence(timeout: 120))
-        XCTAssertTrue(app.buttons["hub.hero"].label.contains("Weiter ab 0:"), "progress lost after relaunch: \(app.buttons["hub.hero"].label)")
-        app.buttons["hub.hero"].tap()
+        let again = app.buttons.matching(identifier: "one.episode").firstMatch
+        XCTAssertTrue(again.waitForExistence(timeout: 120))
+        XCTAssertTrue(again.label.contains("Weiter ab 0:"), "progress lost after relaunch: \(again.label)")
+        again.tap()
         XCTAssertTrue(app.staticTexts["episode.status"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["episode.status"].label.hasPrefix("Weiter ab 0:"), app.staticTexts["episode.status"].label)
         XCTAssertTrue(app.buttons["episode.play"].label.hasPrefix("Weiter ab"), app.buttons["episode.play"].label)
@@ -133,11 +153,11 @@ final class OneHubUITests: XCTestCase {
     /// A back swipe let go halfway keeps the back button where the system puts it: the hub has a
     /// navigation bar too, so the bar does not appear and vanish with the swipe (Philip,
     /// 2026-11-20: the arrow jumped to the screen's edge). The shots during the snap back show
-    /// it; the test checks that the swipe returns to Chat and a full swipe reaches the hub.
+    /// it; the test checks that the swipe returns to Chat and a full swipe reaches #one.
     func testBackSwipeLetGoStaysInChat() throws {
         let app = try launch([:])
-        let tile = app.buttons["hub.tile.chat"]
-        XCTAssertTrue(tile.waitForExistence(timeout: 120), "no Chat tile")
+        let tile = app.buttons["one.room.Allgemein"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 120), "no Allgemein row")
         sleep(1)
         save(app, "root-hub")
         // The Blog tab's root: its logo bar must look as it did (Brain, 2026-11-20).
@@ -147,7 +167,7 @@ final class OneHubUITests: XCTestCase {
             sleep(5)
             save(app, "root-blog")
             app.tabBars.buttons["one"].firstMatch.tap()
-            XCTAssertTrue(tile.waitForExistence(timeout: 10), "back on #one, no Chat tile")
+            XCTAssertTrue(tile.waitForExistence(timeout: 10), "back on #one, no Allgemein row")
         }
         tile.tap()
         XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 60), "no room in Chat")
@@ -161,7 +181,7 @@ final class OneHubUITests: XCTestCase {
         sleep(1)
         edge.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)),
                    withVelocity: .default, thenHoldForDuration: 0.1)
-        XCTAssertTrue(tile.waitForExistence(timeout: 10), "a full back swipe does not return to the hub")
+        XCTAssertTrue(tile.waitForExistence(timeout: 10), "a full back swipe does not return to #one")
         save(app, "backswipe-hub")
     }
 

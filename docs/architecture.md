@@ -94,8 +94,8 @@ The hub's episode request (`LiveEpisodesSource`) carries that web view's cookies
 host, so the gate session on beta, and never follows a redirect: without a session the gate's
 302 means no episodes, not a sign-in started outside the web view. The discussion uses the system back
 button, so a swipe from the left edge returns to the blog where the reader was; a custom back
-button would switch that swipe off (Thorsten's test of build 70). The Blog home and the #one
-hub keep a navigation bar too, with their own header in it (the logo; "#one" and the search):
+button would switch that swipe off (Thorsten's test of build 70). The Blog home and #one's
+start screen keep a navigation bar too, with their own header in it (the logo; "#one" and the search):
 with the bar hidden on one side of a push, the back button rode with the page and jumped when a
 back swipe was let go (Philip, 2026-11-20).
 
@@ -125,6 +125,13 @@ the server sanitizes with the website's allowlist (`ReplyHTML`, no WebKit), or e
 their body text ("in der App zu sehen"); reply quotes and link previews are not in the files. `scripts/build.sh ui` drives this path in the simulator
 against `scripts/blog-fixture-server.py`, and `RichMessagesUITests` checks formatting, links,
 replies, pictures, video, files and the composer against the test homeserver.
+
+**#one opens on draft B** (Thorsten, 2026-11-20, replacing the hub of 2026-11-18): "Videos"
+with "Alle" and the newest episodes as a cover flow (the centred one full size, its neighbours
+smaller and turned; flat with Reduce Motion), then "Räume": a Threads row with the latest
+thread and the unread ones counted, and every #one room with its last sender, line, time and
+unread count (`OneHubView.swift`). An episode opens its page, Threads the list, a room the Chat
+screen below on that room. Without episodes from the route the rooms show alone.
 
 **#one: a room bar, variant A.** Under the title "#one" (with the open room's topic) a bar of
 chips holds every #one room from the server, each with its unread count, "@" for a mention and
