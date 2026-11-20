@@ -1,21 +1,39 @@
 #!/bin/sh
 # Keep Xcode usable for the CI runner. Runs as root from the LaunchDaemon
-# de.iphoneblog.ci-runner.xcode at load and daily at 05:10 (docs/mac-runner.md, "Xcode").
-# After the App Store updates /Applications/Xcode.app it accepts the licence, installs the
-# first-launch packages and downloads the iOS simulator runtime that matches the new SDK.
+# de.iphoneblog.ci-runner.xcode at load, daily at 05:10, and whenever Xcode's version.plist
+# changes, i.e. right after the App Store updates Xcode (docs/mac-runner.md, "Xcode").
+# It accepts the licence, installs the first-launch packages and downloads the iOS simulator
+# runtime that matches the SDK. While Xcode is not ready it stops the runner: GitHub then sees
+# it offline and build.yml sends every job to GitHub's runner instead of failing it here.
 set -eu
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+runner=de.iphoneblog.ci-runner
 log() { echo "$(date '+%F %T') $*"; }
+running() { launchctl print "system/$runner" >/dev/null 2>&1; }
+stop_runner() { if running; then launchctl bootout "system/$runner"; log "runner stopped until Xcode is ready"; fi; }
+start_runner() {
+    if ! running && [ -f "/Library/LaunchDaemons/$runner.plist" ]; then
+        launchctl bootstrap system "/Library/LaunchDaemons/$runner.plist"; log "runner started"
+    fi
+}
 
-xcodebuild -license check >/dev/null 2>&1 || { xcodebuild -license accept; log "licence accepted"; }
-xcodebuild -checkFirstLaunchStatus >/dev/null 2>&1 || { xcodebuild -runFirstLaunch; log "first launch done"; }
+# The App Store writes the new Xcode in place; wait until the bundle stops changing.
+sleep 60
+
+if ! xcodebuild -license check >/dev/null 2>&1; then
+    stop_runner; xcodebuild -license accept; log "licence accepted"
+fi
+if ! xcodebuild -checkFirstLaunchStatus >/dev/null 2>&1; then
+    stop_runner; xcodebuild -runFirstLaunch; log "first launch done"
+fi
 
 sdk="$(xcodebuild -showsdks 2>/dev/null | sed -nE 's/.*-sdk iphonesimulator([0-9.]+).*/\1/p' | tail -1)"
-[ -n "$sdk" ] || { log "no iOS simulator SDK"; exit 1; }
-if xcrun simctl list runtimes 2>/dev/null | grep -q "^iOS $sdk "; then
-    log "Xcode $(xcodebuild -version | head -1 | cut -d' ' -f2), iOS $sdk runtime present"
-    exit 0
+if [ -z "$sdk" ]; then stop_runner; log "no iOS simulator SDK"; exit 1; fi
+if ! xcrun simctl list runtimes 2>/dev/null | grep -q "^iOS $sdk "; then
+    stop_runner
+    log "downloading the iOS $sdk simulator runtime"
+    xcodebuild -downloadPlatform iOS 2>&1 | tr '\r' '\n' | grep -v '% (' || true
+    xcrun simctl list runtimes | grep -q "^iOS $sdk " || { log "iOS $sdk runtime still missing"; exit 1; }
 fi
-log "downloading the iOS $sdk simulator runtime"
-xcodebuild -downloadPlatform iOS
-xcrun simctl list runtimes | grep "^iOS $sdk " || { log "iOS $sdk runtime still missing"; exit 1; }
+log "Xcode $(xcodebuild -version | head -1 | cut -d' ' -f2), iOS $sdk runtime present"
+start_runner

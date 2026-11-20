@@ -60,6 +60,11 @@ for all external contributors" on 2026-11-20. Check it:
 gh api repos/Philipp-solutions-de/iphoneblog-matrix-ios/actions/permissions/fork-pr-contributor-approval
 ```
 
+`.github/workflows/mac-runner-check.yml` proves the wall from inside a job, weekly and on every
+pull request that changes `scripts/mac-runner/`: it runs as `ci`, has no admin, sudo or keychain,
+cannot list another home, cannot reach `iron`, the router or the NAS (all open to Thorsten's
+user), and does reach the internet and loopback. By hand: `sudo -u ci -H scripts/mac-runner/check-isolation.sh`.
+
 Branches of this repository are trusted: whoever can push here can already change the app.
 
 External disks mounted with "Ignore ownership on this volume" are open to every user; `setup.sh`
@@ -80,7 +85,7 @@ creates the user, the wall and the three LaunchDaemons:
 |---|---|---|
 | `de.iphoneblog.ci-runner` | always, as `ci` | the Actions runner, `/Users/ci/actions-runner`, label `mac-studio`, log `/Users/ci/Library/Logs/actions-runner.log` |
 | `de.iphoneblog.ci-runner.pf` | at boot, every 5 minutes, as root | loads the network wall if it is missing |
-| `de.iphoneblog.ci-runner.xcode` | at boot, daily 05:10, as root | Xcode licence, first launch, iOS runtime (below) |
+| `de.iphoneblog.ci-runner.xcode` | at boot, daily 05:10, after an Xcode update, as root | Xcode licence, first launch, iOS runtime; holds the runner back until they are ready (below) |
 
 Then the status token, in the browser: GitHub → Settings → Developer settings → Fine-grained
 tokens → Generate new token. Resource owner `Philipp-solutions-de`, only the repository
@@ -102,10 +107,14 @@ job when the Mac has another major version, or no simulator runtime for its SDK.
 - **Xcode itself** updates through the App Store with automatic updates on, signed in with
   Thorsten's Apple ID. That sign-in is the one thing only he can do. A new major Xcode (28) means
   changing `XCODE_MAJOR` in the same pull request that moves the hosted image.
-- **Everything after an update** is `de.iphoneblog.ci-runner.xcode`: it accepts the licence, runs
-  the first-launch install, and downloads the iOS simulator runtime that matches the new SDK
-  (`xcodebuild -downloadPlatform iOS`, about 8 GB, no Apple ID needed). Log:
-  `/var/log/ci-runner-xcode.log`. To run it now: `sudo launchctl kickstart system/de.iphoneblog.ci-runner.xcode`.
+- **Everything after an update** is `de.iphoneblog.ci-runner.xcode`. It starts when Xcode's
+  `version.plist` changes, at boot and daily at 05:10. It accepts the licence, runs the
+  first-launch install, and downloads the iOS simulator runtime that matches the new SDK
+  (`xcodebuild -downloadPlatform iOS`, 8.3 GB, no Apple ID needed, about an hour). **While
+  Xcode is not ready it stops the runner**, so GitHub sees the Mac offline and every job goes
+  to GitHub's runner instead of failing; it starts the runner again when the runtime is in.
+  Log: `/var/log/ci-runner-xcode.log`. To run it now:
+  `sudo launchctl kickstart -k system/de.iphoneblog.ci-runner.xcode`.
 - **The runner** updates itself to each new release.
 
 ## Running it

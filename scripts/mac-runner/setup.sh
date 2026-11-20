@@ -152,6 +152,7 @@ install_daemon de.iphoneblog.ci-runner.xcode "<?xml version=\"1.0\" encoding=\"U
   <key>ProgramArguments</key><array><string>$support/xcode-upkeep.sh</string></array>
   <key>RunAtLoad</key><true/>
   <key>StartCalendarInterval</key><dict><key>Hour</key><integer>5</integer><key>Minute</key><integer>10</integer></dict>
+  <key>WatchPaths</key><array><string>/Applications/Xcode.app/Contents/version.plist</string></array>
   <key>StandardOutPath</key><string>/var/log/ci-runner-xcode.log</string>
   <key>StandardErrorPath</key><string>/var/log/ci-runner-xcode.log</string>
 </dict></plist>"
@@ -207,6 +208,13 @@ install_daemon de.iphoneblog.ci-runner "<?xml version=\"1.0\" encoding=\"UTF-8\"
   <key>StandardOutPath</key><string>/Users/$user/Library/Logs/actions-runner.log</string>
   <key>StandardErrorPath</key><string>/Users/$user/Library/Logs/actions-runner.log</string>
 </dict></plist>"
+# xcode-upkeep.sh starts the runner once Xcode is ready; until then GitHub sees it offline.
+sdk="$(DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -showsdks 2>/dev/null |
+    sed -nE 's/.*-sdk iphonesimulator([0-9.]+).*/\1/p' | tail -1)"
+if ! xcrun simctl list runtimes 2>/dev/null | grep -q "^iOS $sdk "; then
+    launchctl bootout system/de.iphoneblog.ci-runner 2>/dev/null || true
+    echo "runner waits for the iOS $sdk runtime; de.iphoneblog.ci-runner.xcode starts it (/var/log/ci-runner-xcode.log)"
+fi
 
 step "done"
 echo "Runner '$runner_name' runs as $user. Check: gh api repos/$repo/actions/runners --jq '.runners[] | {name,status,busy}'"
