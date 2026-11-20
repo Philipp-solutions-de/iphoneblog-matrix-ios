@@ -6,6 +6,8 @@
 // ours: a swipe never starts within 30 pt of the screen's left edge, where the navigation's
 // swipe-back lives, and only a mostly horizontal pan begins one, so scrolling stays scrolling.
 // A haptic tick at the threshold; with Reduce Motion the row does not move or spring.
+// The swipe takes the whole row width, also the empty space beside a short message (approved
+// 2026-11-20); taps and the long press stay on the message itself.
 
 import SwiftUI
 import UIKit
@@ -31,6 +33,10 @@ struct MessageSwipe<Leading: View, Trailing: View>: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            // Full width for the pan alone: the message's own tap and long press sit inside, on
+            // its own area, so a tap beside a short message still does nothing.
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
             .offset(x: reduceMotion ? 0 : xOffset)
             .animation(reduceMotion ? nil : .interactiveSpring().speed(0.5), value: xOffset)
             .overlay(alignment: .leading) {
