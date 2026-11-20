@@ -10,7 +10,20 @@
 import Foundation
 
 public final class ChatReadPositions: @unchecked Sendable {
-    public static let shared = ChatReadPositions(defaults: .standard)
+    public static let shared: ChatReadPositions = {
+        let positions = ChatReadPositions(defaults: .standard)
+        #if DEBUG
+        // UI tests sign in as the same test accounts again and again. A position one test left in
+        // a shared room (Allgemein) opened the next test's room in the middle, away from the
+        // messages it looks for (CI, PR #48). Each test signs in afresh; only the read-position
+        // tests keep what they saved across their own relaunch.
+        let env = ProcessInfo.processInfo.environment
+        if env["IPHONEBLOG_DEV_USER"] != nil, env["IPHONEBLOG_KEEP_READPOS"] != "1" {
+            positions.removeAll()
+        }
+        #endif
+        return positions
+    }()
 
     /// About this many rooms and threads are kept; the oldest go first.
     public static let capacity = 500
@@ -61,6 +74,15 @@ public final class ChatReadPositions: @unchecked Sendable {
             }
         }
         defaults.set(index, forKey: Self.indexKey)
+    }
+
+    /// Forgets every saved position.
+    func removeAll() {
+        lock.lock()
+        defer { lock.unlock() }
+        let index = defaults.dictionary(forKey: Self.indexKey) as? [String: Double] ?? [:]
+        for key in index.keys { defaults.removeObject(forKey: key) }
+        defaults.removeObject(forKey: Self.indexKey)
     }
 
     /// The saved position for a screen about to open, marked for restoring.
