@@ -42,10 +42,21 @@ final class GifUITests: XCTestCase {
         try me.sendContent(["msgtype": "m.image", "body": "animation.gif", "url": try me.uploadGIF(),
                             "info": ["mimetype": "image/gif", "w": 240, "h": 160]], in: room)
         let app = try openChannel()
-        sleep(6) // the GIF near the bottom loads
-        let first = app.screenshot()
-        usleep(400_000)
-        let second = app.screenshot()
+        // Wait for the picture itself, not a fixed time: a slow CI runner took more than six
+        // seconds to load it (2026-11-19), and two shots of the placeholder are equal.
+        let loaded = app.descendants(matching: .any).matching(identifier: "timeline-image.loaded")
+        let until = Date().addingTimeInterval(60)
+        while Date() < until, loaded.count == 0 { sleep(1) }
+        let gif = loaded.allElementsBoundByIndex.last { $0.isHittable } ?? loaded.firstMatch
+        XCTAssertTrue(gif.exists, "the GIF did not load")
+        // Only the picture is compared, so nothing else that moves on the screen counts. A few
+        // tries: a busy runner may skip frames.
+        var first = gif.screenshot(), second = first
+        for _ in 0..<5 {
+            usleep(400_000)
+            second = gif.screenshot()
+            if second.pngRepresentation != first.pngRepresentation { break }
+        }
         attach(first, "gif-frame-a")
         attach(second, "gif-frame-b")
         XCTAssertNotEqual(first.pngRepresentation, second.pngRepresentation, "the GIF does not move")

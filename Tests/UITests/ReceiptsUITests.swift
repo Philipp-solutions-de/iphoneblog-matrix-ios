@@ -70,7 +70,7 @@ final class ReceiptsUITests: XCTestCase {
 
         let app = launch(["IPHONEBLOG_START_TAB": "chat", "IPHONEBLOG_START_THREAD": "\(room)|\(root)"])
         XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "thread did not open")
-        XCTAssertTrue(waitFor(30) { (try? me.receiptsCover(reply, in: room, thread: root)) == true },
+        XCTAssertTrue(waitFor(60) { (try? me.receiptsCover(reply, in: room, thread: root)) == true }, // 60: a slow CI runner
                       "the thread's receipt does not cover its newest reply")
         sleep(3)
         let refused = try refusedReceipts(log, from: offset)
