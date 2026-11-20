@@ -20,6 +20,23 @@ enum PushText {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// The mentions in a message as `plain` writes them ("@Name"), in order, each once. Lets a
+    /// preview mark them as the room timeline does (Philip, 2026-11-20: Für dich showed them grey).
+    static func mentions(body: String, formattedBody: String? = nil) -> [String] {
+        let pattern = formattedBody == nil
+            ? #"\[@?([^\]]+)\]\(https://matrix\.to/#/@[^)]*\)"#
+            : #"<a[^>]*href="https://matrix\.to/#/@[^"]*"[^>]*>@?([^<]*)</a>"#
+        let source = formattedBody ?? body
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        var names: [String] = []
+        for match in regex.matches(in: source, range: NSRange(source.startIndex..., in: source)) {
+            guard let range = Range(match.range(at: 1), in: source) else { continue }
+            let name = "@" + decodeEntities(String(source[range])).trimmingCharacters(in: .whitespaces)
+            if name.count > 1, !names.contains(name) { names.append(name) }
+        }
+        return names
+    }
+
     // MARK: HTML
 
     static func fromHTML(_ html: String) -> String {
