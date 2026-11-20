@@ -50,8 +50,8 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: build/DerivedData/SourcePackages
-          key: spm-${{ hashFiles('project.yml') }}
-          restore-keys: spm-
+          key: spm-${{ runner.environment }}-${{ hashFiles('project.yml') }}
+          restore-keys: spm-${{ runner.environment }}-
 
       - name: Build
         run: scripts/perf.sh build
