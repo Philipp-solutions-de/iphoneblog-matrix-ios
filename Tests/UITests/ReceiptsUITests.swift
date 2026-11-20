@@ -13,6 +13,26 @@ final class ReceiptsUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    /// Other people's read receipts show no avatars and no "Gelesen von" under a message
+    /// (Philip, 2026-11-20; the website shows none either). Our own receipts still go out, as
+    /// the tests below check.
+    func testOthersReceiptsShowNoAvatars() throws {
+        let me = try TestServer.signIn(1), other = try TestServer.signIn(2)
+        defer { me.signOut(); other.signOut() }
+        let mine = try me.send("Gelesen? \(Int(Date().timeIntervalSince1970))", in: room)
+        try other.readReceipt(mine, in: room, thread: nil)
+
+        let app = launch(["IPHONEBLOG_START_TAB": "chat", "IPHONEBLOG_START_ROOM": room])
+        XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "room did not open")
+        sleep(3)
+        let receipts = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] 'gelesen von' OR label CONTAINS[c] 'read by'"))
+        XCTAssertEqual(receipts.count, 0, "read receipts are shown: \(receipts.allElementsBoundByIndex.map(\.label))")
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "no-receipt-avatars"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
     func testRoomReadToTheEndMovesTheUnthreadedReceipt() throws {
         let me = try TestServer.signIn(1), other = try TestServer.signIn(2)
         defer { me.signOut(); other.signOut() }

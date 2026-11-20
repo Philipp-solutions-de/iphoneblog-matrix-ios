@@ -35,7 +35,8 @@ struct MainView: View {
             // #one for everyone: the rooms for members, otherwise sign-in or "Nur für
             // #one-Mitglieder". Für dich and Ich for members only (Thorsten, 2026-11-16/17).
             OneChatGate(router: router, session: session)
-                .tabItem { Label("#one", systemImage: "number") }
+                // One "#": the big symbol; the label says "one" (Thorsten, 2026-11-20).
+                .tabItem { Label("one", systemImage: "number") }
                 .tag(Router.Tab.chat)
                 .badge(router.chatBadge)
 

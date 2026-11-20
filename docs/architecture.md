@@ -72,7 +72,8 @@ with the extension. Apple's notification-filtering entitlement is requested for 
 account so the extension may drop pushes it cannot show.
 
 **Four tabs for members, two for everyone else; the blog as the front page.** #one members see
-Blog, #one, Für dich and Ich (Thorsten, 2026-11-17). Everyone else sees Blog and #one: signed out, a neutral
+Blog, #one, Für dich and Ich (Thorsten, 2026-11-17); the #one tab shows one "#", its big symbol,
+over the label "one" (Thorsten, 2026-11-20). Everyone else sees Blog and #one: signed out, a neutral
 sign-in ("Der Chat für #one-Mitglieder", Anmelden); signed in without #one, "Nur für
 #one-Mitglieder" with Abmelden and Konto löschen (App Store 5.1.1(v), since they have no Ich).
 No price, no way to buy, no hint where to get #one; they read discussions without writing
@@ -88,7 +89,10 @@ server sends them, so beta's staff gate (Authelia at `auth.phso.de`) signs in in
 One web view lives as long as the app (`BlogWebModel`): a tab switch, a sign-in or a
 discussion never reloads the page the reader is on. The discussion uses the system back
 button, so a swipe from the left edge returns to the blog where the reader was; a custom back
-button would switch that swipe off (Thorsten's test of build 70).
+button would switch that swipe off (Thorsten's test of build 70). The Blog home and the #one
+hub keep a navigation bar too, with their own header in it (the logo; "#one" and the search):
+with the bar hidden on one side of a push, the back button rode with the page and jumped when a
+back swipe was let go (Philip, 2026-11-20).
 
 **Every article has a thread when someone signed in opens it.** A signed-in tap on
 "Diskussion" calls `POST /_iphoneblog/v1/article-thread` with the article's www address and
@@ -176,6 +180,11 @@ one waits while a thread mention in the room is unread, because it would mark th
 does not take the server's counts instead: they follow push rules, and the app turns
 `.m.rule.message` off for members who want no message pushes.
 
+**The timeline shows no one else's read receipts:** no avatars under the newest message and no
+"Gelesen von" (Philip, 2026-11-20; the website shows none). The app's own receipts go out as
+before, public: Element X ties both to `sharePresence`, so only the display is cut
+(`TimelineViewModel`, patch).
+
 **A thread opens only on its root.** A thread timeline built on a reply's ID sends receipts
 naming that reply as the thread, and Synapse refuses each with 400 (Alex's #bugs, 2026-11-17).
 `ResolvedThreadScreen` asks the server first and moves the route to the real root.
@@ -259,7 +268,7 @@ That code is AGPL-3.0, so this app is AGPL-3.0 too; the repository is public, as
 | Timeline | `Timeline`: pagination, local echo, send queue, edits, reactions, receipts | `Screens/Timeline` (cells, list, reactions, replies, thread summaries), `Services/Timeline` (SDK wrapper, view items) | adapters, our colours and type, cells we do not want removed |
 | Threads | thread focus, `ThreadListService`, thread subscriptions | `Screens/ThreadTimelineScreen`, `Screens/RoomThreadListScreen` | the article discussions and the threads in #one |
 | Composer | send queue, replies, edits, `Mentions`, markdown to HTML, media upload | the composer, its formatting toolbar (+ › Textformatierung) and mention suggestions from `Screens/RoomScreen`, `Other/Pills` | no polls, no voice messages |
-| Media | thumbnails, files, upload with progress | `Screens/FilePreviewScreen`, `Screens/MediaPickerScreen`, `Screens/MediaUploadPreviewScreen`; link previews through Apple's `LPMetadataProvider` (the phone fetches the page, not Synapse's preview_url) | the upload progress bar under a sending photo, video or file (`Shim/ChatUploadProgress.swift`); animated GIFs play from the original and go out unchanged (Element X), with Reduce Motion as their first frame (patch) |
+| Media | thumbnails, files, upload with progress | `Screens/FilePreviewScreen`, `Screens/MediaPickerScreen`, `Screens/MediaUploadPreviewScreen`; link previews through Apple's `LPMetadataProvider` (the phone fetches the page, not Synapse's preview_url) | the upload progress bar under a sending photo, video or file (`Shim/ChatUploadProgress.swift`); animated GIFs play from the original and go out unchanged (Element X), with Reduce Motion as their first frame (patch); with a caption, the picture alone gets the rounded corners, so the caption keeps its first letter (patch) |
 | Design system | | `compound-ios` (needed by the views), recoloured through its override API | our tokens: teal, coral, greys; teal for all content, coral only for #one and sign-in (the colour rule in `App/Sources/Theme.swift`; it overrides the coral badges and mentions in `design/screens.html`) |
 | Push | `NotificationClient` | | extension text, pusher registration, tap routing |
 | Sign-in | OAuth 2.0, PKCE, dynamic registration | | one button, `ASWebAuthenticationSession` |

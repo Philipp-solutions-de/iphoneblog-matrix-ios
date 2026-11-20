@@ -67,6 +67,12 @@ struct TimelineItemRowStylerView<Content: View>: View {
         timelineItem is ImageRoomTimelineItem || timelineItem is VideoRoomTimelineItem || timelineItem is StickerRoomTimelineItem
     }
 
+    /// A picture or video with a caption: the media view rounds the picture alone, so the
+    /// caption below keeps its first letter (Philip, 2026-11-20).
+    private var hasMediaCaption: Bool {
+        (timelineItem as? ImageRoomTimelineItem)?.content.caption != nil || (timelineItem as? VideoRoomTimelineItem)?.content.caption != nil
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: style.metrics.avatarGap) {
@@ -163,7 +169,7 @@ struct TimelineItemRowStylerView<Content: View>: View {
             if isMedia {
                 content()
                     .frame(maxWidth: style.metrics.mediaWidth, alignment: .leading)
-                    .clipShape(RoundedRectangle(cornerRadius: style.metrics.corner, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: hasMediaCaption ? 0 : style.metrics.corner, style: .continuous))
             } else {
                 content()
             }

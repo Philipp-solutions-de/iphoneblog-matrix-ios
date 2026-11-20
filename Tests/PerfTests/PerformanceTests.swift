@@ -129,7 +129,7 @@ final class PerformanceTests: XCTestCase {
         launchSignedIn(app)
         _ = try openOneChat(app)
         measure(metrics: [XCTClockMetric(), XCTOSSignpostMetric.navigationTransitionMetric], options: options) {
-            for name in ["Blog", "#one", "Für dich", "Ich", "Blog"] {
+            for name in ["Blog", "one", "Für dich", "Ich", "Blog"] {
                 let tab = tabButton(app, name)
                 tab.tap()
                 XCTAssertTrue(tab.isSelected, "\(name) not selected")
@@ -191,7 +191,7 @@ final class PerformanceTests: XCTestCase {
     /// Opens the #one tab and returns its timeline once the newest seeded messages show.
     private func openOneChat(_ app: XCUIApplication) throws -> XCUIElement {
         allowLocalNetwork()
-        let tab = tabButton(app, "#one")
+        let tab = tabButton(app, "one")
         XCTAssertTrue(tab.waitForExistence(timeout: 30), "no #one tab")
         // The sign-in runs in the background after launch; the tab shows the channel once the
         // session and the space are there.
