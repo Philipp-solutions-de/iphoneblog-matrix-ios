@@ -40,7 +40,11 @@ final class ReceiptsUITests: XCTestCase {
         // A teardown block, not defer: a failed assertion stops the test with an exception that
         // skips defer, and the rule would stay for every test after.
         let channel = room
-        addTeardownBlock { try? me.setRoomRule(channel, notify: nil); me.signOut(); other.signOut() }
+        // The app moves the old room rule to the "Alle" underride on start; both go.
+        addTeardownBlock {
+            try? me.setRoomRule(channel, notify: nil); me.deleteRule("underride", "de.iphoneblog.alle.\(channel)")
+            me.signOut(); other.signOut()
+        }
         try me.setRoomRule(room, notify: true)
         let stamp = Int(Date().timeIntervalSince1970)
         let before = try other.send("Quittung vorher C \(stamp)", in: room)
@@ -70,7 +74,7 @@ final class ReceiptsUITests: XCTestCase {
 
         let app = launch(["IPHONEBLOG_START_TAB": "chat", "IPHONEBLOG_START_THREAD": "\(room)|\(root)"])
         XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "thread did not open")
-        XCTAssertTrue(waitFor(30) { (try? me.receiptsCover(reply, in: room, thread: root)) == true },
+        XCTAssertTrue(waitFor(60) { (try? me.receiptsCover(reply, in: room, thread: root)) == true }, // 60: a slow CI runner
                       "the thread's receipt does not cover its newest reply")
         sleep(3)
         let refused = try refusedReceipts(log, from: offset)

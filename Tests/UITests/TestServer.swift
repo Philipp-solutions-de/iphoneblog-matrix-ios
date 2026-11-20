@@ -197,6 +197,32 @@ struct TestServer {
         return try XCTUnwrap(result, "no download")
     }
 
+    /// This account's push rules of one kind ("override", "underride", "room"), by rule ID.
+    func pushRules(_ kind: String) throws -> [String: [String: Any]] {
+        let all = try Self.call(base, "/_matrix/client/v3/pushrules/", method: "GET", token: token, body: nil)
+        let rules = ((all["global"] as? [String: Any])?[kind] as? [[String: Any]]) ?? []
+        return Dictionary(rules.compactMap { rule in (rule["rule_id"] as? String).map { ($0, rule) } }) { first, _ in first }
+    }
+
+    /// Removes a push rule if it is there.
+    func deleteRule(_ kind: String, _ ruleID: String) {
+        let id = ruleID.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "._-"))) ?? ruleID
+        _ = try? Self.call(base, "/_matrix/client/v3/pushrules/global/\(kind)/\(id)", method: "DELETE", token: token, body: nil)
+    }
+
+    /// Edits a message (m.replace) and returns the edit's ID.
+    func edit(_ event: String, in room: String, to body: String) throws -> String {
+        try sendContent(["msgtype": "m.text", "body": "* \(body)",
+                         "m.new_content": ["msgtype": "m.text", "body": body],
+                         "m.relates_to": ["rel_type": "m.replace", "event_id": event]], in: room)
+    }
+
+    /// The event IDs in this account's notification list, highlights or not.
+    func notifiedEvents() throws -> Set<String> {
+        let page = try Self.call(base, "/_matrix/client/v3/notifications?limit=100", method: "GET", token: token, body: nil)
+        return Set((page["notifications"] as? [[String: Any]] ?? []).compactMap { ($0["event"] as? [String: Any])?["event_id"] as? String })
+    }
+
     /// Reacts to an event and returns the reaction's ID.
     func react(_ key: String, to event: String, in room: String) throws -> String {
         let path = "/_matrix/client/v3/rooms/\(Self.encode(room))/send/m.reaction/r\(UInt64(Date().timeIntervalSince1970 * 1000))\(Int.random(in: 0..<1000))"

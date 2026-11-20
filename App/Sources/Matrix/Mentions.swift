@@ -368,17 +368,53 @@ final class NotificationPrefs: ObservableObject {
         }
         newArticles = (try? await session.api("GET", "/_matrix/client/v3/pushrules/global/override/\(Self.articleRuleID)")) != nil
         mentions = (try? await settings.isUserMentionEnabled()) ?? true
-        var modes: [String: ChannelMode] = [:]
-        for roomID in session.rooms.channelIDs {
-            guard let current = try? await settings.getRoomNotificationSettings(roomId: roomID, isEncrypted: false, isOneToOne: false) else { continue }
-            modes[roomID] = switch current.mode {
-            case .allMessages: .all
-            case .mentionsAndKeywordsOnly: .mentions
-            case .mute: .mute
+        if let data = try? await session.api("GET", "/_matrix/client/v3/pushrules/"),
+           let rules = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["global"] as? [String: Any] {
+            let read = Self.modes(rules: rules, rooms: Array(session.rooms.channelIDs))
+            // The old form of "Alle", a room rule that counts every event: the underride first,
+            // then the room rule goes (alle-notify-rule.md, "Migration").
+            for roomID in read.legacy {
+                do {
+                    try await putAlleRule(roomID, session: session)
+                    await delete("room", roomID, session: session)
+                } catch {
+                    log.error("Alle migration failed: \(error.localizedDescription, privacy: .public)")
+                }
             }
+            roomModes = read.modes
         }
-        roomModes = modes
         hasLoaded = true
+    }
+
+    /// "Alle" for a #one room: an underride for its messages. It runs after the server's own
+    /// overrides, so reactions, edits and notices stay silent and a mention keeps its highlight;
+    /// redactions are not messages. The old room rule counted every event (Philip's #bugs badge).
+    nonisolated static func alleRuleID(_ roomID: String) -> String { "de.iphoneblog.alle.\(roomID)" }
+
+    /// Each room's mode from the account's push rules, and the rooms still on the old room rule.
+    /// Aus: an override with the room's ID and no notify. Alle: the underride, or the old room rule
+    /// with notify. Anything else: Nur Erwähnungen.
+    nonisolated static func modes(rules: [String: Any], rooms: [String]) -> (modes: [String: ChannelMode], legacy: [String]) {
+        func list(_ kind: String) -> [[String: Any]] {
+            ((rules[kind] as? [[String: Any]]) ?? []).filter { ($0["enabled"] as? Bool) ?? true }
+        }
+        func notifies(_ rule: [String: Any]) -> Bool {
+            ((rule["actions"] as? [Any]) ?? []).contains { ($0 as? String) == "notify" }
+        }
+        let overrides = list("override"), underrides = list("underride"), roomRules = list("room")
+        var modes: [String: ChannelMode] = [:], legacy: [String] = []
+        for room in rooms {
+            let old = roomRules.first { $0["rule_id"] as? String == room }.map(notifies) ?? false
+            if let mute = overrides.first(where: { $0["rule_id"] as? String == room }), !notifies(mute) {
+                modes[room] = .mute
+            } else if underrides.contains(where: { $0["rule_id"] as? String == alleRuleID(room) }) || old {
+                modes[room] = .all
+            } else {
+                modes[room] = .mentions
+            }
+            if old, modes[room] == .all { legacy.append(room) }
+        }
+        return (modes, legacy)
     }
 
     func setNewArticles(_ on: Bool) {
@@ -413,24 +449,57 @@ final class NotificationPrefs: ObservableObject {
         }
     }
 
-    /// One room's push mode: Alle (its own rule), Nur Erwähnungen, Aus.
+    /// One room's push mode, written as the web app writes it (alle-notify-rule.md, "The three
+    /// modes"): the new rule first, then the others go.
     func setMode(_ mode: ChannelMode, roomID: String) {
         guard let session else { return }
         roomModes[roomID] = mode
         Task {
-            let settings = await session.client.getNotificationSettings()
-            let sdkMode: RoomNotificationMode = switch mode {
-            case .all: .allMessages
-            case .mentions: .mentionsAndKeywordsOnly
-            case .mute: .mute
-            }
             do {
-                try await settings.setRoomNotificationMode(roomId: roomID, mode: sdkMode)
+                switch mode {
+                case .all:
+                    try await putAlleRule(roomID, session: session)
+                    await delete("room", roomID, session: session)
+                    await delete("override", roomID, session: session)
+                case .mentions:
+                    await delete("underride", Self.alleRuleID(roomID), session: session)
+                    await delete("room", roomID, session: session)
+                    await delete("override", roomID, session: session)
+                case .mute:
+                    let rule: [String: Any] = ["conditions": [["kind": "event_match", "key": "room_id", "pattern": roomID]], "actions": []]
+                    _ = try await session.api("PUT", Self.rulePath("override", roomID), body: JSONSerialization.data(withJSONObject: rule))
+                    await delete("underride", Self.alleRuleID(roomID), session: session)
+                    await delete("room", roomID, session: session)
+                }
+                await load()
             } catch {
                 log.error("room mode failed: \(error.localizedDescription, privacy: .public)")
                 await load()
             }
         }
+    }
+
+    private func putAlleRule(_ roomID: String, session: ChatSession) async throws {
+        let rule: [String: Any] = [
+            "conditions": [
+                ["kind": "event_match", "key": "room_id", "pattern": roomID],
+                ["kind": "event_match", "key": "type", "pattern": "m.room.message"],
+            ],
+            "actions": ["notify", ["set_tweak": "sound", "value": "default"]],
+        ]
+        _ = try await session.api("PUT", Self.rulePath("underride", Self.alleRuleID(roomID)),
+                                  body: JSONSerialization.data(withJSONObject: rule))
+    }
+
+    /// Deletes a rule. Most are not there (a 404); a delete that failed for real shows when the
+    /// rules are read back after a change.
+    private func delete(_ kind: String, _ ruleID: String, session: ChatSession) async {
+        _ = try? await session.api("DELETE", Self.rulePath(kind, ruleID))
+    }
+
+    nonisolated static func rulePath(_ kind: String, _ ruleID: String) -> String {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._-"))
+        return "/_matrix/client/v3/pushrules/global/\(kind)/\(ruleID.addingPercentEncoding(withAllowedCharacters: allowed) ?? ruleID)"
     }
 
 
