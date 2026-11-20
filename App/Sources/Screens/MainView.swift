@@ -28,7 +28,7 @@ struct MainView: View {
 
     var body: some View {
         TabView(selection: $router.tab) {
-            BlogTab(router: router, session: session)
+            BlogTab(router: router, session: session, web: model.blogWeb)
                 .tabItem { Label("Blog", systemImage: "doc.richtext") }
                 .tag(Router.Tab.blog)
 

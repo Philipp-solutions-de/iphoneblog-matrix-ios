@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import WebKit
 
 /// One #one video episode, as the WordPress route answers it (spec-ios.md "Data",
 /// episodes-route-notes.md). Video only in v1 (Thorsten, 2026-11-17).
@@ -128,13 +129,50 @@ protocol EpisodesSource: Sendable {
 
 /// `GET /wp-json/iphoneblog/v1/one/episodes` with the app's Matrix token as Bearer, checked by
 /// WordPress the way web-login checks it (DECISIONS.md). The host is the blog the app shows.
+///
+/// Beta sits behind the staff gate. The request carries the gate session the Blog web view
+/// holds (its cookies for that host) and never follows a redirect: without a session the gate
+/// answers 302, which counts as unavailable, not as a sign-in to start. URLSession used to
+/// follow it to /oauth2/start, racing the web view's own sign-in (Philip's 500, 2026-11-20).
+/// Live has no gate.
 struct LiveEpisodesSource: EpisodesSource {
     let token: @Sendable () async -> String?
     var limit = 30
 
     static var endpoint: URL? {
-        guard let blog = URL(string: Brand.blogWebURL), let host = blog.host() else { return nil }
-        return URL(string: "\(blog.scheme ?? "https")://\(host)/wp-json/iphoneblog/v1/one/episodes")
+        // The blog the Blog tab shows: as BlogTab.startURL, which a debug run may point at the
+        // test fixture.
+        var blog = Brand.blogWebURL
+        #if DEBUG
+        if let override = ProcessInfo.processInfo.environment["IPHONEBLOG_BLOG_WEB"] { blog = override }
+        #endif
+        guard let base = URL(string: blog), let components = URLComponents(url: base, resolvingAgainstBaseURL: false),
+              let host = components.host else { return nil }
+        var endpoint = URLComponents()
+        endpoint.scheme = components.scheme ?? "https"
+        endpoint.host = host
+        endpoint.port = components.port
+        endpoint.path = "/wp-json/iphoneblog/v1/one/episodes"
+        return endpoint.url
+    }
+
+    /// No redirects, no cookie jar of its own: the gate's cookies are set by hand.
+    private static let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.httpShouldSetCookies = false
+        config.httpCookieStorage = nil
+        return URLSession(configuration: config, delegate: RefuseRedirects(), delegateQueue: nil)
+    }()
+
+    /// The Blog web view's cookies for this address (the gate session on beta).
+    @MainActor static func webCookies(for url: URL) async -> [HTTPCookie] {
+        guard let host = url.host()?.lowercased() else { return [] }
+        let all = await WKWebsiteDataStore.default().httpCookieStore.allCookies()
+        return all.filter { cookie in
+            let domain = cookie.domain.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
+            let hostMatches = host == domain || host.hasSuffix("." + domain)
+            return hostMatches && url.path().hasPrefix(cookie.path) && (!cookie.isSecure || url.scheme == "https")
+        }
     }
 
     func page(before: String?) async throws -> EpisodesPage {
@@ -147,14 +185,27 @@ struct LiveEpisodesSource: EpisodesSource {
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        for (field, value) in HTTPCookie.requestHeaderFields(with: await Self.webCookies(for: url)) {
+            request.setValue(value, forHTTPHeaderField: field)
+        }
+        let (data, response) = try await Self.session.data(for: request)
         switch (response as? HTTPURLResponse)?.statusCode ?? 0 {
         case 200: return try JSONDecoder().decode(EpisodesPage.self, from: data)
+        // The gate, without a session: no episodes, and no sign-in started from here.
+        case 300..<400: throw EpisodesError.unavailable
         case 401: throw EpisodesError.signedOut
         case 403: throw EpisodesError.notMember
         case 404: throw EpisodesError.unavailable
         default: throw EpisodesError.failed
         }
+    }
+}
+
+/// Hands every redirect back as the response (LiveEpisodesSource).
+private final class RefuseRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest) async -> URLRequest? {
+        nil
     }
 }
 

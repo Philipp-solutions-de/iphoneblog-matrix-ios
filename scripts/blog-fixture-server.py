@@ -10,9 +10,15 @@
                 with one, the first call for article 1 makes its thread, later calls return
                 the same root with created=false. <root-event-id> is that thread's root, the
                 test server's article root when the member test runs.
-/calls          how many article-thread calls made a thread and how many found one
+/calls          how many article-thread calls made a thread and how many found one, how often the
+                blog page loaded, and the staff-gate counts below
+/gate/start?rd= a stand-in for beta's staff gate: sets its session cookie and redirects to rd
+/gate/reset     POST: a new session token, so every earlier cookie is void
+/wp-json/iphoneblog/v1/one/episodes
+                the bundled episodes with the gate's cookie; without it 302 to /gate/start,
+                as the real gate answers (BlogLoadUITests)
 """
-import html, json, sys, urllib.parse
+import html, json, os, secrets, sys, urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 port = int(sys.argv[1])
@@ -21,7 +27,9 @@ ARTICLES = [(i, f"https://www.iphoneblog.de/2026/11/{16 - i:02d}/artikel-{i}/", 
 ARTICLES[0] = (1, "https://www.iphoneblog.de/2023/02/28/tipp-in-der-reader-darstellung-verschickt-apple-mail-einen-kompletten-web-artikel/", "Artikel 1")
 EXISTING = {ARTICLES[1][1]: "$existing", ARTICLES[5][1]: "$existing6"}
 made = {}
-calls = {"created": 0, "found": 0}
+calls = {"created": 0, "found": 0, "blog_loads": 0, "gate_starts": 0, "episodes_ok": 0, "episodes_gated": 0}
+gate = {"token": secrets.token_hex(16)}
+EPISODES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "App", "Resources", "Fixtures", "episodes-fixture.json")
 
 def page():
     body = []
@@ -42,18 +50,33 @@ def thread(root):
                      "last_repliers": []}, "replies": replies, "next": None}
 
 class Handler(BaseHTTPRequestHandler):
-    def send(self, status, body, kind="application/json"):
+    def send(self, status, body, kind="application/json", headers=()):
         data = body.encode() if isinstance(body, str) else json.dumps(body).encode()
         self.send_response(status)
+        for name, value in headers:
+            self.send_header(name, value)
         self.send_header("Content-Type", kind)
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
 
     def do_GET(self):
-        path = urllib.parse.unquote(urllib.parse.urlparse(self.path).path)
+        parsed = urllib.parse.urlparse(self.path)
+        path = urllib.parse.unquote(parsed.path)
         if path.startswith("/blog"):
+            calls["blog_loads"] += 1
             return self.send(200, page(), "text/html; charset=utf-8")
+        if path == "/gate/start":
+            calls["gate_starts"] += 1
+            target = urllib.parse.parse_qs(parsed.query).get("rd", ["/blog/?app=1"])[0]
+            return self.send(302, "", "text/plain", [("Location", target), ("Set-Cookie", f"fixture_gate={gate['token']}; Path=/")])
+        if path == "/wp-json/iphoneblog/v1/one/episodes":
+            if f"fixture_gate={gate['token']}" in self.headers.get("Cookie", ""):
+                calls["episodes_ok"] += 1
+                with open(EPISODES, encoding="utf-8") as fixture:
+                    return self.send(200, fixture.read())
+            calls["episodes_gated"] += 1
+            return self.send(302, "", "text/plain", [("Location", "/gate/start?rd=" + urllib.parse.quote(self.path, safe=""))])
         if path == "/api/links.json":
             return self.send(200, {"generated_ts": 0, "links": {**EXISTING, **made}})
         if path.startswith("/api/threads/") and path.endswith(".json"):
@@ -65,6 +88,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send(404, {})
 
     def do_POST(self):
+        if urllib.parse.urlparse(self.path).path == "/gate/reset":
+            gate["token"] = secrets.token_hex(16)
+            return self.send(200, {})
         if urllib.parse.urlparse(self.path).path != "/article-thread":
             return self.send(404, {})
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
