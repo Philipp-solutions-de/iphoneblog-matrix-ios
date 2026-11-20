@@ -1,4 +1,4 @@
-# TestFlight for the iphoneblog chat app. Everything runs with an App Store Connect API key
+# TestFlight for the iPhoneBlog chat app. Everything runs with an App Store Connect API key
 # from repository secrets; nobody's Apple ID password is used. Setup: docs/apple-setup.md.
 #
 #   bundle exec fastlane ios register   identifiers and capabilities (Apple setup workflow)
