@@ -306,7 +306,14 @@ final class RichMessagesUITests: XCTestCase {
         // build.sh's photo dated 2001-01-01, not a GIF other tests saved: Markieren is for
         // photos only, and only that date puts "2001" in the picker's label.
         let picture = app.images.matching(NSPredicate(format: "label CONTAINS '2001'")).firstMatch
-        XCTAssertTrue(picture.waitForExistence(timeout: 45), "photo picker shows no sample photo")
+        // The picker opens at the newest pictures; the oldest, this one, is at the top.
+        let grid = app.scrollViews.firstMatch.exists ? app.scrollViews.firstMatch : app.collectionViews.firstMatch
+        XCTAssertTrue(app.images.firstMatch.waitForExistence(timeout: 45), "photo picker shows no pictures")
+        for _ in 0..<15 where !picture.isHittable {
+            grid.swipeDown(velocity: .fast)
+            _ = picture.waitForExistence(timeout: 1)
+        }
+        XCTAssertTrue(picture.isHittable, "photo picker shows no photo from 2001 (build.sh adds it)")
         sleep(1)
         picture.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         app.buttons["Add"].tap()
