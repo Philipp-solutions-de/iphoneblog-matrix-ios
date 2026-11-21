@@ -41,6 +41,30 @@ final class DiscussionUITests: XCTestCase {
         return app
     }
 
+    /// An article's video plays right in its card (Thorsten, 2026-11-20, blog-card-video.md):
+    /// the poster with play, then the player with the drawn captions, on by default; a tap on
+    /// the title, outside the player, still opens the article in the Blog tab.
+    func testCardVideoPlaysInTheCard() throws {
+        let app = try launch(member: false)
+        let web = app.webViews.firstMatch
+        XCTAssertTrue(web.staticTexts["Artikel 1"].waitForExistence(timeout: 30), "blog page not loaded")
+        let link = web.links["Diskussion 2"]
+        for _ in 0..<6 where !link.isHittable { web.swipeUp(velocity: .slow) }
+        link.tap()
+        let play = app.buttons["card.video.play"]
+        XCTAssertTrue(play.waitForExistence(timeout: 20), "the card shows no video")
+        attach(app, "card-video-poster")
+        play.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["card.video.player"].waitForExistence(timeout: 10), "no player in the card")
+        let caption = app.staticTexts["player.caption"]
+        XCTAssertTrue(caption.waitForExistence(timeout: 20), "no captions over the card's video")
+        attach(app, "card-video-playing")
+
+        app.buttons["discussion.title"].tap()
+        XCTAssertTrue(app.staticTexts["DISKUSSION"].waitForNonExistence(timeout: 10), "the title does not open the article")
+        XCTAssertTrue(web.waitForExistence(timeout: 10), "not back in the Blog tab")
+    }
+
     /// Signed out: the discussion of an article that has a thread opens read-only, without
     /// "Artikel lesen", and a swipe from the left edge returns to the blog where it was.
     func testReaderOpensDiscussionAndSwipesBack() throws {

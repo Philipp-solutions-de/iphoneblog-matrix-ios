@@ -12,6 +12,8 @@
                 test server's article root when the member test runs.
 /calls          how many article-thread calls made a thread and how many found one, how often the
                 blog page loaded, and the staff-gate counts below
+/video/fx1/      an article video for article 2's card: manifest.json, h264.mp4 (the app's
+                sample, with byte ranges as AVPlayer asks) and captions.de.vtt (blog-card-video.md)
 /gate/start?rd= a stand-in for beta's staff gate: sets its session cookie and redirects to rd
 /gate/reset     POST: a new session token, so every earlier cookie is void
 /wp-json/iphoneblog/v1/one/episodes
@@ -29,6 +31,7 @@ EXISTING = {ARTICLES[1][1]: "$existing", ARTICLES[5][1]: "$existing6"}
 made = {}
 calls = {"created": 0, "found": 0, "blog_loads": 0, "gate_starts": 0, "episodes_ok": 0, "episodes_gated": 0}
 gate = {"token": secrets.token_hex(16)}
+FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "App", "Resources", "Fixtures")
 EPISODES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "App", "Resources", "Fixtures", "episodes-fixture.json")
 
 def page():
@@ -45,9 +48,16 @@ def page():
 def thread(root):
     title = next((t for _, l, t in ARTICLES if EXISTING.get(l) == root or made.get(l) == root), "Artikel")
     replies = [] if root == new_root else [{"event_id": "$r1", "ts": 1763290000000, "sender_name": "Jana Sommer", "body": "Guter Punkt."}]
-    return {"root": {"root_event_id": root, "title": title, "link": None, "image_url": None, "teaser": None,
+    # Article 2's card has a video (blog-card-video.md); the others have none.
+    video, link = None, None
+    if root == "$existing":
+        base = f"http://127.0.0.1:{port}/video/fx1/"
+        video = {"id": "fx1", "manifest_url": base + "manifest.json", "poster_url": None,
+                 "captions_url": base + "captions.de.vtt", "duration_ms": 10000, "width": 1280, "height": 720}
+        link = ARTICLES[1][1]
+    return {"root": {"root_event_id": root, "title": title, "link": link, "image_url": None, "teaser": None,
                      "published_ts": 1763290000000, "reply_count": len(replies), "latest_reply_ts": None,
-                     "last_repliers": []}, "replies": replies, "next": None}
+                     "last_repliers": [], "video": video}, "replies": replies, "next": None}
 
 class Handler(BaseHTTPRequestHandler):
     def send(self, status, body, kind="application/json", headers=()):
@@ -83,9 +93,38 @@ class Handler(BaseHTTPRequestHandler):
             root = path[len("/api/threads/"):-5]
             known = set(EXISTING.values()) | set(made.values())
             return self.send(200, thread(root)) if root in known else self.send(404, {})
+        if path == "/video/fx1/manifest.json":
+            return self.send(200, {"files": [{"name": "h264.mp4", "codecs": "avc1.640028", "width": 1280, "height": 720,
+                                              "media": None, "list": True}]})
+        if path == "/video/fx1/captions.de.vtt":
+            with open(os.path.join(FIXTURES, "sample-captions.de.vtt"), encoding="utf-8") as vtt:
+                return self.send(200, vtt.read(), "text/vtt; charset=utf-8")
+        if path == "/video/fx1/h264.mp4":
+            calls["card_video_plays"] = calls.get("card_video_plays", 0) + 1
+            return self.send_file(os.path.join(FIXTURES, "sample-video.mp4"), "video/mp4")
         if path == "/calls":
             return self.send(200, calls)
         self.send(404, {})
+
+    def send_file(self, path, kind):
+        """A file with byte ranges, as AVPlayer reads a video."""
+        with open(path, "rb") as f:
+            data = f.read()
+        start, end = 0, len(data) - 1
+        ranged = self.headers.get("Range", "")
+        if ranged.startswith("bytes="):
+            first, _, last = ranged[6:].partition("-")
+            start = int(first) if first else 0
+            end = min(int(last), len(data) - 1) if last else len(data) - 1
+        chunk = data[start:end + 1]
+        self.send_response(206 if ranged else 200)
+        self.send_header("Content-Type", kind)
+        self.send_header("Accept-Ranges", "bytes")
+        if ranged:
+            self.send_header("Content-Range", f"bytes {start}-{end}/{len(data)}")
+        self.send_header("Content-Length", str(len(chunk)))
+        self.end_headers()
+        self.wfile.write(chunk)
 
     def do_POST(self):
         if urllib.parse.urlparse(self.path).path == "/gate/reset":

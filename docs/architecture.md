@@ -99,6 +99,14 @@ hub keep a navigation bar too, with their own header in it (the logo; "#one" and
 with the bar hidden on one side of a push, the back button rode with the page and jumped when a
 back swipe was let go (Philip, 2026-11-20).
 
+**An article's video plays in its card** (Thorsten, 2026-11-20; the field in the WordPress repo's
+blog-card-video.md). The discussion's header shows the poster (the card's image without one)
+with play; a tap plays it right there with the episode player (`EpisodePlayer`, PiP, captions
+drawn and on), the rendition picked from the manifest when playing starts: the smallest listed
+file at least as wide as the screen, `h264.mp4` without a manifest. The title opens the article.
+The video comes from the thread file, which carries the backfilled cards' too, so no Matrix edit
+is read (`CardVideo.swift`).
+
 **Every article has a thread when someone signed in opens it.** A signed-in tap on
 "Diskussion" calls `POST /_iphoneblog/v1/article-thread` with the article's www address and
 the Matrix token; the server makes the thread if there is none (idempotent per post) and the

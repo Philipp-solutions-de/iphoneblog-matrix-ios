@@ -9,7 +9,9 @@ import SwiftUI
 final class EpisodePlayer: ObservableObject {
     static let speeds: [Float] = [1, 1.25, 1.5, 2]
 
-    let episode: Episode
+    /// Nil for an article's card video (CardVideo), which plays through the same player.
+    let episode: Episode?
+    let videoID: String
     let player = AVPlayer()
     @Published private(set) var started = false
     /// Not published: it moves four times a second; what the page shows (caption, labels) is.
@@ -24,21 +26,50 @@ final class EpisodePlayer: ObservableObject {
     private var timeObserver: Any?
     private var rateObserver: NSKeyValueObservation?
     private let progress: PlaybackProgress
+    private let captionURL: URL?
+    /// The file to play, found when playing starts: an episode's by the network, a card video's
+    /// from its manifest, which changes while the encode goes on.
+    private let resolveFile: @MainActor () async -> URL?
+    private var preparing: Task<Void, Never>?
 
     init(episode: Episode, progress: PlaybackProgress) {
         self.episode = episode
+        videoID = episode.videoID
         self.progress = progress
+        captionURL = episode.caption?.url
+        resolveFile = { episode.file(cellular: NetworkKind.shared.cellular)?.url }
         duration = Double(episode.durationS ?? 0)
         if let entry = progress.entry(episode.videoID), entry.started { position = entry.position }
-        hasCaptions = episode.caption != nil
+        hasCaptions = captionURL != nil
     }
 
-    /// Loads the file chosen for this network, seeks to "Weiter ab", fetches the captions.
-    func prepare() {
-        guard player.currentItem == nil, let file = episode.file(cellular: NetworkKind.shared.cellular) else { return }
-        let item = AVPlayerItem(url: file.url)
+    /// An article's video in its Blog card: the same player, controls and captions.
+    init(videoID: String, durationS: Double?, captions: URL?, progress: PlaybackProgress,
+         resolveFile: @escaping @MainActor () async -> URL?) {
+        episode = nil
+        self.videoID = videoID
+        self.progress = progress
+        captionURL = captions
+        self.resolveFile = resolveFile
+        duration = durationS ?? 0
+        if let entry = progress.entry(videoID), entry.started { position = entry.position }
+        hasCaptions = captions != nil
+    }
+
+    /// Loads the chosen file, seeks to "Weiter ab", fetches the captions. Once.
+    func prepare() async {
+        if player.currentItem != nil { return }
+        if let preparing { return await preparing.value }
+        let task = Task { await load() }
+        preparing = task
+        await task.value
+    }
+
+    private func load() async {
+        guard let url = await resolveFile() else { return }
+        let item = AVPlayerItem(url: url)
         player.replaceCurrentItem(with: item)
-        if position > 0 { player.seek(to: CMTime(seconds: position, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) }
+        if position > 0 { player.seek(to: CMTime(seconds: position, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { _ in } }
         timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.25, preferredTimescale: 600), queue: .main) { [weak self] time in
             MainActor.assumeIsolated { self?.tick(time.seconds) }
         }
@@ -49,21 +80,26 @@ final class EpisodePlayer: ObservableObject {
                 if rate > 0 { self.started = true; if Self.speeds.contains(rate) { self.speed = rate } }
             }
         }
-        if let caption = episode.caption {
-            Task { await loadCaptions(caption.url) }
+        if let captionURL {
+            Task { await loadCaptions(captionURL) }
         }
     }
 
     func play() {
-        prepare()
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
-        try? AVAudioSession.sharedInstance().setActive(true)
-        player.playImmediately(atRate: speed)
         started = true
+        Task {
+            await prepare()
+            try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+            try? AVAudioSession.sharedInstance().setActive(true)
+            player.playImmediately(atRate: speed)
+        }
     }
 
     func skip(_ seconds: Double) {
-        prepare()
+        Task { await prepare(); jump(seconds) }
+    }
+
+    private func jump(_ seconds: Double) {
         let target = max(0, min(position + seconds, duration > 0 ? duration : .greatestFiniteMagnitude))
         position = target
         player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
@@ -86,7 +122,7 @@ final class EpisodePlayer: ObservableObject {
     /// Saves where it stands; called on every tick and when the page goes.
     func record() {
         guard duration > 0, position > 0 else { return }
-        progress.record(episode.videoID, position: position, duration: duration)
+        progress.record(videoID, position: position, duration: duration)
     }
 
     func stop() {
