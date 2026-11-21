@@ -95,6 +95,20 @@ final class EpisodePlayer: ObservableObject {
         }
     }
 
+    /// Plays from a given second: a video passage the search found.
+    func play(from seconds: Double) {
+        started = true
+        position = max(0, seconds)
+        Task {
+            await prepare()
+            await player.seek(to: CMTime(seconds: position, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+            updateCaption()
+            try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+            try? AVAudioSession.sharedInstance().setActive(true)
+            player.playImmediately(atRate: speed)
+        }
+    }
+
     func skip(_ seconds: Double) {
         Task { await prepare(); jump(seconds) }
     }

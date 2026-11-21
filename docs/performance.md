@@ -34,7 +34,7 @@ slower than it was, on every pull request; the budget is checked on a device.
 
 ## The tests
 
-`Tests/PerfTests/PerformanceTests.swift`, seven tests, five measured iterations each after one
+`Tests/PerfTests/PerformanceTests.swift`, eight tests, five measured iterations each after one
 warm-up:
 
 | test | what | metrics |
@@ -46,6 +46,7 @@ warm-up:
 | `testScrollThread` | the long thread, 90 replies, 12 photos | hitch ratio, late frames |
 | `testSwitchTabs` | Blog, #one-Chat, @Mentions, Ich, Blog | clock time |
 | `testScrollBlog` | the Blog tab's web view on the blog fixture | hitch ratio, late frames |
+| `testScrollSearch` | the search's list, 60 mixed hits with highlights from the fixture's search API | hitch ratio, late frames |
 
 **The data.** `scripts/perf.sh` starts its own Synapse (a copy of `scripts/test-homeserver.sh`
 on port 8048, `build/perf-synapse`), seeds it with `scripts/seed-perf-data.py`, and starts the

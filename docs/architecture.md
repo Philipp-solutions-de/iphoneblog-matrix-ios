@@ -244,7 +244,24 @@ off on the server.
 and direct rooms stay out of #one, Threads and Für dich; the server refuses to create
 them (Thorsten, 2026-11-16).
 
-**Search is Matrix's own.** The magnifier in #one sends `POST /_matrix/client/v3/search`
+**One search for blog and #one** (ADR-0010 in the WordPress repository, Thorsten 2026-11-21).
+The magnifier in the Blog tab's bar and on the #one hub opens one search as a sheet:
+`GET <homeserver>/_iphoneblog/v1/search` with the Matrix token when signed in, none when not; the
+server decides from the token what the reader may see, the app keeps no rights of its own. It
+searches as you type, 120 ms after the last keystroke, from two letters; a new keystroke
+cancels the request in flight and drops its answer (`SiteSearchModel`). One mixed list in the
+server's order, each hit with its type badge (coral only for #one, the colour rule), and the
+chips Alle · Beiträge · Videos · Links · Chat with the server's counts; Chat holds the Blog's
+discussions too. The snippet's `<mark>` becomes teal semibold text; the answer is decoded and
+every row's text built off the main thread, so scrolling only lays out (`SiteSearchPage.prepare`,
+`testScrollSearch`). A 401 refreshes the token once, then searches as anonymous. A tap closes
+the sheet and opens the hit where it lives (`Router.target(for:chat:)`): a post or #one post in
+the Blog tab's web view (www's address moved to the blog the tab shows), a video passage on the
+episode's page playing from `t` (for #one members; others get the article at `?t=`), a chat
+message in its room scrolled to it or its thread, a discussion reply in the article's discussion,
+a link in Safari. The sheet keeps its query and hits for the next time it opens.
+
+**Search in a room is Matrix's own.** The magnifier in the open room sends `POST /_matrix/client/v3/search`
 (room_events, in every #one room or, with the chip, only the open one; newest first,
 `next_batch` paging); the rooms are
 unencrypted, so Synapse can read them, and there is no index of our own. A hit shows sender,

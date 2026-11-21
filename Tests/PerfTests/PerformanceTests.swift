@@ -25,9 +25,10 @@ final class PerformanceTests: XCTestCase {
         env["IPHONEBLOG_PERF_STATS"] ?? NSTemporaryDirectory() + "perf-stats.json"
     }
 
+    private var fixture: String { env["IPHONEBLOG_FIXTURE"] ?? "http://127.0.0.1:8796" }
+
     private func app(member: Bool = true) throws -> XCUIApplication {
         let app = XCUIApplication()
-        let fixture = env["IPHONEBLOG_FIXTURE"] ?? "http://127.0.0.1:8796"
         app.launchEnvironment = [
             "IPHONEBLOG_BLOG_WEB": "\(fixture)/blog/?app=1",
             "IPHONEBLOG_BLOG_API": "\(fixture)/api",
@@ -214,6 +215,43 @@ final class PerformanceTests: XCTestCase {
     }
 
     /// On a device, the first connection to the Mac's LAN address asks for local network access.
+    // MARK: Search
+
+    /// The search over blog and #one (ADR-0010): the fixture's 60 mixed hits with their marks,
+    /// all three pages loaded, flung up and down. Every row's text and highlights are prepared
+    /// off the main thread when the answer arrives; scrolling only lays them out.
+    func testScrollSearch() throws {
+        let app = try app(member: false)
+        app.launchEnvironment["IPHONEBLOG_SEARCH_URL"] = "\(fixture)/_iphoneblog/v1/search"
+        app.launch()
+        allowLocalNetwork()
+        let button = app.buttons["blog.search"]
+        XCTAssertTrue(button.waitForExistence(timeout: 60), "no search in the Blog tab")
+        button.tap()
+        let field = app.searchFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 10), "no search field")
+        // "Suchen" closes the keyboard, which would otherwise take the lower half's drags.
+        field.typeText("akku\n")
+        let hit = app.descendants(matching: .any).matching(identifier: "site-search-hit").firstMatch
+        XCTAssertTrue(hit.waitForExistence(timeout: 20), "no hits")
+        // Drags from the window's own points, flung at 2500 pt/s. Down to the end first, so all three pages are in before the
+        // measuring starts.
+        func fling(_ from: CGFloat, _ to: CGFloat) {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: from))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: to)),
+                       withVelocity: 2500, thenHoldForDuration: 0)
+        }
+        for _ in 0..<16 { fling(0.8, 0.3) }
+        for _ in 0..<16 { fling(0.3, 0.8) }
+        measure(metrics: [HitchMetric(statsPath: statsPath), XCTOSSignpostMetric.scrollDecelerationMetric, XCTOSSignpostMetric.scrollDraggingMetric],
+                options: options) {
+            fling(0.8, 0.3)
+            fling(0.8, 0.3)
+            fling(0.3, 0.8)
+            fling(0.3, 0.8)
+        }
+    }
+
     private func allowLocalNetwork() {
         #if !targetEnvironment(simulator)
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")

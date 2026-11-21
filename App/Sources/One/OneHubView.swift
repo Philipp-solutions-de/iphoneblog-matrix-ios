@@ -138,7 +138,8 @@ struct OneHubView: View {
 
 extension OneHubView {
     fileprivate var hubSearch: some View {
-        Button { router.openSearch(in: session.oneRooms.map(\.id)) } label: {
+        // The search over blog and #one (ADR-0010); a room's own magnifier keeps Matrix's search.
+        Button { router.showSiteSearch = true } label: {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Theme.ink)
@@ -146,7 +147,7 @@ extension OneHubView {
                 .background(Theme.surface, in: Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("In #one suchen")
+        .accessibilityLabel("Suchen")
         .accessibilityIdentifier("hub.search")
     }
 
