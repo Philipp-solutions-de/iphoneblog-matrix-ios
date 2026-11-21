@@ -20,9 +20,10 @@ jobs:
   check:
     name: Isolation
     # Never a fork's pull request on the Mac (docs/mac-runner.md, "Which runner").
+    # Nor anything while the repository variable MAC_RUNNER is off.
     if: >-
-      github.event_name != 'pull_request' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+      vars.MAC_RUNNER != 'off' && (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: [self-hosted, mac-studio]
     timeout-minutes: 10
     steps:
