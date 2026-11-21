@@ -129,8 +129,11 @@ install_daemon() { # label, plist body
     plutil -lint "$tmp" >/dev/null
     if ! cmp -s "$tmp" "$plist" 2>/dev/null; then
         launchctl bootout "system/$1" 2>/dev/null || true
+        # bootout returns before the service is gone; bootstrapping too soon fails with
+        # "5: Input/output error" (2026-11-21, the runner after its priority change).
+        for _ in $(seq 1 30); do launchctl print "system/$1" >/dev/null 2>&1 || break; sleep 1; done
         install -m 644 -o root -g wheel "$tmp" "$plist"
-        launchctl bootstrap system "$plist"
+        launchctl bootstrap system "$plist" || { sleep 5; launchctl bootstrap system "$plist"; }
         echo "$1 (re)loaded"
     else
         launchctl print "system/$1" >/dev/null 2>&1 || launchctl bootstrap system "$plist"
