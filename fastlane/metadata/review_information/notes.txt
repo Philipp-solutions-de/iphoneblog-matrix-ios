@@ -16,6 +16,7 @@ USER-GENERATED CONTENT (1.2)
 - Block: tap a person → "Blockieren"; their messages disappear for this account on all devices. Ich → "Blockiert" undoes it.
 - Only #one members may write in the chat. Every member is a known account tied to iphoneblog.de with a paid membership; there are no anonymous accounts.
 - Moderation contact, also in the app under Ich: ao@iphoneblog.de (reports reach this address by mail).
+- "Kontaktdaten teilen": a #one member can send their own email address and/or a phone number they type, with a short note, to one other member. It goes as a single email from chat@iphoneblog.de to that member's address on file; nothing appears in the chat, there is no reply in the app, and the recipient's address is never shown. Limits: 5 an hour, 20 a day, 2 a day to the same person. Unwanted mails can be forwarded to ao@iphoneblog.de.
 
 ACCOUNT DELETION (5.1.1(v))
 Ich → "Konto löschen" explains what is deleted and opens the website's deletion page, signed in. Confirming deletes the account at once, ends a running #one subscription at the end of its paid period without further charges, and deletes the chat account the next night.
