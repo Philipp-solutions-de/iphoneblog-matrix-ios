@@ -170,6 +170,16 @@ and refusals counted before it, never count. The app restores its session once p
 second restore after iOS rebuilt the scene ran two clients that refreshed the same token 45 ms
 apart, which MAS treats as reuse and answers by revoking the session (Alex's logouts,
 2026-11-17).
+**The Neu divider.** A room shows "Neu" above the first message after the reader's
+`m.fully_read`, which moves only when the reader leaves the room (Shim `ChatScreens`,
+`moveFullyRead`). The SDK draws its read marker only when that event came with the room's first
+events (about 20), so a reader with more unread, or a room the app had cached before opening,
+got no divider (measured 2026-11-21: 30 new messages, no divider in 6 of 8 local attempts and
+every CI attempt). The timeline controller therefore places the divider itself when the SDK sent
+none: after the read-position event, once it is loaded and a message from someone else follows
+(patch to `TimelineController`). Rejected: a larger room subscription window, which only moves
+the limit.
+
 **Mentions turn read when seen, "read up to here".** Opening a mention's thread or room marks
 it read, without "Alle als gelesen": the timeline sends a read receipt for the newest message
 on screen (Element X), and every mention up to it counts as read, in rooms and in threads
@@ -384,14 +394,6 @@ API change small, which costs less than a monthly jump over eight releases.
      strangers' code on it, so it needs runs from forks switched off or kept on GitHub's
      runners.
 
-- **No Neu divider after about 20 unread messages.** The SDK places the read marker only when
-  the reader's `m.fully_read` event is among the events the room's first sync brings (about
-  20). With more unread, that event arrives later by back-pagination and the room shows no
-  divider; the room still opens at the newest message. Measured 2026-11-21 in
-  `testNeuDividerWithoutJumpPill`: 30 new messages, no divider in 6 of 8 attempts; 10 new
-  messages, a divider every time. Fix not chosen yet: draw the divider in the app after the
-  `fullyReadEventID` item when the SDK sent none, or raise the room subscription's timeline
-  limit.
 - Fonts: the blog uses Foro and Foro Sans, licensed for the web. Using them in the app needs
   an app licence from the foundry; until then the app uses the system font (SF Pro).
 - Licence: AGPL-3.0, because of the transplanted Element X views (above). App Store question before launch.
