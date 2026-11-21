@@ -171,9 +171,6 @@ if [[ ! -x "$dir/config.sh" ]]; then
     as_ci tar -xzf "$tarball" -C "$dir"
     rm -f "$tarball"
 fi
-# What a job finds: the system tools, Xcode's python3 and git, and ~/.local/bin for uv.
-as_ci sh -c "printf '%s\n' '/Users/$user/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin' > '$dir/.path'"
-as_ci sh -c "printf '%s\n' 'LANG=en_US.UTF-8' 'DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer' > '$dir/.env'"
 if [[ ! -f "$dir/.runner" ]]; then
     [[ -s "$token_file" ]] || { echo "No registration token." >&2; exit 1; }
     token="$(cat "$token_file")"
@@ -184,6 +181,10 @@ if [[ ! -f "$dir/.runner" ]]; then
 else
     echo "already registered"
 fi
+# What a job finds: the system tools, Xcode's python3 and git, and ~/.local/bin for uv. After
+# config.sh, which writes the caller's PATH into .path (it held Thorsten's own folders).
+as_ci sh -c "printf '%s\n' '/Users/$user/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin' > '$dir/.path'"
+as_ci sh -c "printf '%s\n' 'LANG=en_US.UTF-8' 'DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer' > '$dir/.env'"
 as_ci mkdir -p "/Users/$user/Library/Logs"
 install_daemon de.iphoneblog.ci-runner "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
