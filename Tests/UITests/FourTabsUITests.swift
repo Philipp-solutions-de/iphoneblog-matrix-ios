@@ -174,6 +174,35 @@ final class FourTabsUITests: XCTestCase {
 
     // MARK: Für dich
 
+    /// The mentions in a preview are the timeline's rounded pills, my name solid teal, another
+    /// name soft teal (Philip, #bugs 2026-11-21: "Highlighted usernames sind eckig"). The shape
+    /// is for the eye: the row's picture is kept with every run; MentionHighlightTests checks
+    /// that no square background is set.
+    func testFuerDichMentionsAreRoundPills() throws {
+        closeRunningApp()
+        let me = try TestServer.signIn(1)
+        let other = try TestServer.signIn(2)
+        defer { me.signOut(); other.signOut() }
+        let stamp = Int(Date().timeIntervalSince1970)
+        let myName = String(me.userID.dropFirst().split(separator: ":")[0])
+        let html = "Pille <a href=\"https://matrix.to/#/\(me.userID)\">@\(myName)</a> und "
+            + "<a href=\"https://matrix.to/#/\(other.userID)\">@Anna</a>, schau mal \(stamp)"
+        _ = try other.sendContent(["msgtype": "m.text",
+                                   "body": "Pille @\(myName) und @Anna, schau mal \(stamp)",
+                                   "format": "org.matrix.custom.html", "formatted_body": html,
+                                   "m.mentions": ["user_ids": [me.userID, other.userID]]], in: room)
+
+        let app = launch(tab: "foryou")
+        let mention = row(app, "schau mal \(stamp)")
+        XCTAssertTrue(mention.waitForExistence(timeout: 120), "the mention is not in Für dich")
+        sleep(1)
+        let shot = XCTAttachment(screenshot: mention.screenshot())
+        shot.name = "fuer-dich-mention-pills"
+        shot.lifetime = .keepAlways
+        add(shot)
+        save(app, "fuer-dich-mention-pills")
+    }
+
     /// Alles · Erwähnungen · Threads, the badge, and "Alle gelesen" for exactly the filter.
     func testFuerDichFiltersBadgeAndAlleGelesen() throws {
         closeRunningApp()
