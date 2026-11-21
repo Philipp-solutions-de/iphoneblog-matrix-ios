@@ -367,6 +367,11 @@ API change small, which costs less than a monthly jump over eight releases.
 - `scripts/build.sh build|test|integration` builds for the arm64 simulator (the SDK ships no
   x86_64 simulator slice), ad-hoc signed.
 - CI runs on GitHub's hosted `xcode-27` image (public preview; free for public repositories).
+- One run per branch at a time. A new push to a pull request's branch cancels its older run;
+  on `main` a new merge waits for the running build, and GitHub keeps only the newest waiting
+  run, so `main` still builds its newest commit next. Cancelling on `main` too stopped every
+  2.5-hour build when merges came hourly, and no build reached TestFlight for a day
+  (2026-11-20/21).
 - TestFlight: `fastlane/Fastfile`, switched on with the repository variable
   `TESTFLIGHT_ENABLED` once the App Store Connect key exists (README).
 
