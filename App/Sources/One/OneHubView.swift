@@ -1,13 +1,16 @@
 import SwiftUI
 
-/// The #one tab's root for members (variant A, Thorsten 2026-11-18; spec-ios.md "Screens"):
-/// "Neu für dich" with the newest episode, the tiles Chat and Videos, "Gerade aktiv" with the
-/// one or two rooms that moved last. Video only in v1.
+/// The #one tab's root for members, draft B (Thorsten, 2026-11-20: "The middle one (B). The
+/// videos at the top with 'coverflow'"): the newest episodes as a cover flow, then Threads and
+/// the rooms with their last message. A tap opens the episode, the Threads list or the room in
+/// Chat under the room bar. It replaces the hub of 2026-11-18 (Neu für dich, Bereiche, Gerade
+/// aktiv).
 struct OneHubView: View {
     @ObservedObject var session: ChatSession
     @ObservedObject var router: Router
     @ObservedObject var episodes: EpisodesModel
     @ObservedObject private var roomList: RoomListModel
+    @ObservedObject private var forYou: ForYouModel
     @ObservedObject private var progress = PlaybackProgress.shared
 
     init(session: ChatSession, router: Router, episodes: EpisodesModel) {
@@ -15,94 +18,65 @@ struct OneHubView: View {
         self.router = router
         self.episodes = episodes
         roomList = session.rooms
+        forYou = session.forYou
     }
 
     private func summary(_ id: String) -> RoomSummary? { roomList.rooms.first { $0.id == id } }
 
-    /// Only #one's rooms count; direct messages show in Für dich (spec "Counts").
-    private var chatUnread: Int {
-        var sum = 0
-        for room in session.oneRooms { sum += summary(room.id)?.unreadMessages ?? 0 }
-        return sum
+    /// The threads you take part in, in #one's rooms, newest first.
+    private var threads: [InvolvedThread] {
+        let rooms = Set(session.oneRooms.map(\.id))
+        return forYou.threads.filter { rooms.contains($0.roomID) }.sorted { $0.lastActivity > $1.lastActivity }
     }
-
-    private struct Active: Identifiable {
-        let room: ChatSession.OneRoom
-        let summary: RoomSummary
-        var id: String { room.id }
-    }
-
-    /// The one or two #one rooms that moved last.
-    private var active: [Active] {
-        var list: [Active] = []
-        for room in session.oneRooms {
-            if let found = summary(room.id), found.lastActivity != nil { list.append(Active(room: room, summary: found)) }
-        }
-        list.sort { ($0.summary.lastActivity ?? 0) > ($1.summary.lastActivity ?? 0) }
-        return Array(list.prefix(2))
-    }
-
-    /// Episodes are shown once the route answered with some; a missing route (404) or an error
-    /// leaves the chat parts alone.
-    private var showsEpisodes: Bool { !episodes.episodes.isEmpty }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                if let newest = episodes.episodes.first {
-                    HubSection("Neu für dich")
-                    Button { router.chatPath.append(.episode(newest)) } label: {
-                        HeroCard(episode: newest, entry: progress.entry(newest.videoID))
+                // Episodes once the route answered with some; until then, or without the route,
+                // the rooms alone.
+                if !episodes.episodes.isEmpty {
+                    HubSection("Videos") {
+                        Button("Alle") { router.chatPath.append(.videos) }
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Theme.teal)
+                            .accessibilityLabel("Alle Videos, \(max(episodes.total, episodes.episodes.count)) Folgen")
+                            .accessibilityIdentifier("one.videos.all")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("hub.hero")
+                    EpisodeCoverFlow(episodes: Array(episodes.episodes.prefix(8)), progress: progress) { episode in
+                        router.chatPath.append(.episode(episode))
+                    }
                 } else if !episodes.hasLoaded {
-                    HubSection("Neu für dich")
+                    HubSection("Videos")
                     RoundedRectangle(cornerRadius: Theme.Size.corner).fill(Theme.surface)
+                        .frame(width: EpisodeCoverFlow.cardWidth)
                         .aspectRatio(16 / 9, contentMode: .fit)
-                        .padding(.horizontal, Theme.Space.page)
+                        .frame(maxWidth: .infinity)
                         .accessibilityHidden(true)
                 }
 
-                HubSection("Bereiche")
-                HStack(spacing: 10) {
-                    Button { router.openChat() } label: {
-                        HubTile(icon: "bubble.left.and.bubble.right", title: "Chat",
-                                detail: session.oneRooms.count == 1 ? "1 Raum" : "\(session.oneRooms.count) Räume", badge: chatUnread)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Chat, \(session.oneRooms.count) Räume" + (chatUnread > 0 ? ", \(chatUnread) ungelesen" : ""))
-                    .accessibilityIdentifier("hub.tile.chat")
-                    if showsEpisodes {
-                        Button { router.chatPath.append(.videos) } label: {
-                            HubTile(icon: "play.rectangle", title: "Videos", detail: "\(max(episodes.total, episodes.episodes.count))", badge: 0)
+                HubSection("Räume")
+                VStack(spacing: 0) {
+                    if let latest = threads.first {
+                        Button { router.openThreadsList() } label: {
+                            OneRow(icon: .threads, title: "Threads", time: OneRow.time(latest.lastActivity),
+                                   sender: latest.latestSenderName ?? latest.rootSenderName,
+                                   line: latest.replies == 1 ? "1 Antwort" : "\(latest.replies) Antworten",
+                                   badge: threads.filter(\.isUnread).count, mention: false)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Videos, \(max(episodes.total, episodes.episodes.count)) Folgen")
-                        .accessibilityIdentifier("hub.tile.videos")
+                        .accessibilityIdentifier("one.threads")
                     }
-                }
-                .padding(.horizontal, Theme.Space.page)
-
-                if !active.isEmpty {
-                    HubSection("Gerade aktiv") {
-                        Button("Alle") { router.openChat() }
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Theme.teal)
-                            .accessibilityLabel("Alle Räume")
-                            .accessibilityIdentifier("hub.active.all")
-                    }
-                    VStack(spacing: 0) {
-                        ForEach(active) { item in
-                            Button { router.openChat(roomID: item.room.id) } label: {
-                                ActiveRow(name: item.room.name, summary: item.summary)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("hub.active.\(item.room.name)")
+                    ForEach(session.oneRooms) { room in
+                        let found = summary(room.id)
+                        Button { router.openChat(roomID: room.id) } label: {
+                            OneRow(icon: .room, title: "# \(room.name)",
+                                   time: found?.lastActivity.map { OneRow.time(Date(timeIntervalSince1970: Double($0) / 1000)) },
+                                   sender: found?.lastSender, line: found?.lastLine,
+                                   badge: found?.unreadMessages ?? 0, mention: (found?.unreadMentions ?? 0) > 0)
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("one.room.\(room.name)")
                     }
-                    .background(Theme.cell, in: RoundedRectangle(cornerRadius: Theme.Size.corner))
-                    .padding(.horizontal, Theme.Space.page)
                 }
             }
             .padding(.bottom, 24)
@@ -113,9 +87,9 @@ struct OneHubView: View {
         .background(Theme.background)
         .navigationTitle("#one")
         .navigationBarTitleDisplayMode(.inline)
-        // The hub keeps a navigation bar, with "#one" and the search in it. Hidden here and shown
-        // in the room, the bar made the back button jump to the screen's edge when a back swipe
-        // was let go (Philip, 2026-11-20); with a bar on both screens it moves as the system's.
+        // The root keeps a navigation bar, with "#one" and the search in it. Hidden here and
+        // shown on the next screen, the bar made the back button jump to the screen's edge when a
+        // back swipe was let go (Philip, 2026-11-20); with a bar on both it moves as the system's.
         .toolbar {
             // A title, not a button: no glass capsule behind it (iOS 26).
             if #available(iOS 26.0, *) {
@@ -124,7 +98,7 @@ struct OneHubView: View {
                 ToolbarItem(placement: .topBarLeading) { hubTitle }
             }
             ToolbarItem(placement: .principal) { Color.clear.frame(width: 1, height: 1).accessibilityHidden(true) }
-            // The search keeps the hub's own small circle, not the bar's glass button.
+            // The search keeps its own small circle, not the bar's glass button.
             if #available(iOS 26.0, *) {
                 ToolbarItem(placement: .topBarTrailing) { hubSearch }.sharedBackgroundVisibility(.hidden)
             } else {
@@ -245,108 +219,147 @@ struct EpisodePoster: View {
     }
 }
 
-private struct HeroCard: View {
+/// The newest episodes as a cover flow: the centred one full size, its neighbours smaller and
+/// turned towards it, snapping to the centre. Reduce Motion gets the same row flat.
+struct EpisodeCoverFlow: View {
+    static let cardWidth: CGFloat = 262
+    let episodes: [Episode]
+    @ObservedObject var progress: PlaybackProgress
+    let open: (Episode) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        GeometryReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 2) {
+                    ForEach(episodes) { episode in
+                        Button { open(episode) } label: {
+                            EpisodeCard(episode: episode, entry: progress.entry(episode.videoID))
+                        }
+                        .buttonStyle(.plain)
+                        .frame(width: Self.cardWidth)
+                        .accessibilityIdentifier("one.episode")
+                        .scrollTransition(.interactive, axis: .horizontal) { content, phase in
+                            content
+                                .scaleEffect(reduceMotion ? 1 : 1 - abs(phase.value) * 0.14)
+                                .rotation3DEffect(.degrees(reduceMotion ? 0 : phase.value * -32),
+                                                  axis: (x: 0, y: 1, z: 0), perspective: 0.5)
+                                .opacity(reduceMotion ? 1 : 1 - abs(phase.value) * 0.25)
+                        }
+                    }
+                }
+                .scrollTargetLayout()
+            }
+            // The first episode starts in the centre, the next ones peek in from the right.
+            .contentMargins(.horizontal, max(Theme.Space.page, (proxy.size.width - Self.cardWidth) / 2), for: .scrollContent)
+            .scrollTargetBehavior(.viewAligned)
+        }
+        .frame(height: EpisodeCard.height)
+        .accessibilityIdentifier("one.coverflow")
+    }
+}
+
+/// One episode in the cover flow: poster, "Folge N", the title, and "Weiter ab", "Gesehen" or
+/// the date.
+struct EpisodeCard: View {
+    static let height: CGFloat = 147 + 74
     let episode: Episode
     let entry: PlaybackProgress.Entry?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 2) {
             EpisodePoster(episode: episode, entry: entry)
-            Text(["Video", episode.numberLabel].compactMap { $0 }.joined(separator: " · "))
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Theme.coralText)
-                .padding(.top, 4)
-            Text(episode.title)
-                .font(.system(size: 19, weight: .bold))
-                .foregroundStyle(Theme.ink)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 10) {
-                Label(resume, systemImage: entry?.finished == true ? "checkmark" : "play.fill")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.teal)
-                    .accessibilityIdentifier("hub.hero.resume")
-                Text(episode.dateLabel).font(Theme.Font.footnote).foregroundStyle(Theme.ink3)
+            if let number = episode.numberLabel {
+                Text(number)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.coralText)
+                    .padding(.top, 6)
             }
+            Text(episode.title)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .padding(.top, episode.numberLabel == nil ? 6 : 0)
+            Text(status)
+                .font(.system(size: 14, weight: entry?.started == true ? .semibold : .regular))
+                .foregroundStyle(entry?.started == true ? Theme.teal : Theme.ink3)
+            Spacer(minLength: 0)
+        }
+        .frame(height: Self.height, alignment: .top)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+
+    /// As the Videos list says it: "Weiter ab 6:12", "Gesehen" (from 95 %), else the date.
+    private var status: String {
+        if let entry, entry.started { return "Weiter ab \(Episode.duration(entry.position))" }
+        if entry?.finished == true { return "Gesehen" }
+        return episode.dateLabel
+    }
+}
+
+/// A row under "Räume": the Threads list or a room, with its newest line and unread count.
+private struct OneRow: View {
+    enum Icon { case threads, room }
+    let icon: Icon
+    let title: String
+    let time: String?
+    let sender: String?
+    let line: String?
+    let badge: Int
+    let mention: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Group {
+                switch icon {
+                case .threads: Image(systemName: "bubble.left.and.text.bubble.right").font(.system(size: 19, weight: .semibold))
+                case .room: Text("#").font(.system(size: 20, weight: .semibold))
+                }
+            }
+            .foregroundStyle(icon == .threads ? Theme.teal : Theme.ink3)
+            .frame(width: 46, height: 46)
+            .background(icon == .threads ? Theme.tealSoft : Theme.surface, in: RoundedRectangle(cornerRadius: 14))
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title).font(.system(size: 16.5, weight: .semibold)).foregroundStyle(Theme.ink).lineLimit(1)
+                    Spacer(minLength: 8)
+                    if let time { Text(time).font(.system(size: 13.5)).foregroundStyle(Theme.ink3) }
+                }
+                HStack(spacing: 8) {
+                    preview.lineLimit(1)
+                    Spacer(minLength: 0)
+                    if badge > 0 {
+                        Text((mention ? "@" : "") + (badge > 99 ? "99+" : "\(badge)"))
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 7)
+                            .frame(minWidth: 22, minHeight: 22)
+                            .background(Theme.teal, in: Capsule())
+                    }
+                }
+            }
+            .padding(.vertical, 10)
+            .overlay(alignment: .bottom) { Theme.line.frame(height: 1) }
         }
         .padding(.horizontal, Theme.Space.page)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
 
-    /// As the Videos list says it: "Weiter ab 6:12", "Gesehen" (from 95 %), else "Ansehen".
-    private var resume: String {
-        if let entry, entry.started { return "Weiter ab \(Episode.duration(entry.position))" }
-        if entry?.finished == true { return "Gesehen" }
-        return "Ansehen"
+    private var preview: Text {
+        let text = Text(line ?? "").font(.system(size: 15)).foregroundStyle(Theme.ink3)
+        guard let sender else { return text }
+        return Text("\(sender): ").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.ink) + text
     }
-}
 
-private struct HubTile: View {
-    let icon: String
-    let title: String
-    let detail: String
-    let badge: Int
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Theme.teal)
-                .frame(width: 36, height: 36)
-                .background(Theme.tealSoft, in: RoundedRectangle(cornerRadius: 10))
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.ink)
-                Text(detail).font(.system(size: 13)).foregroundStyle(Theme.ink3)
-            }
-            Spacer(minLength: 0)
-            if badge > 0 {
-                Text(badge > 99 ? "99+" : "\(badge)")
-                    .font(Theme.Font.badge)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .frame(minWidth: 20, minHeight: 20)
-                    .background(Theme.coralButton, in: Capsule())
-                    .accessibilityIdentifier("hub.tile.chat.badge")
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, minHeight: 64)
-        .background(Theme.cell, in: RoundedRectangle(cornerRadius: Theme.Size.corner))
-        .overlay(RoundedRectangle(cornerRadius: Theme.Size.corner).stroke(Theme.line, lineWidth: 1))
-    }
-}
-
-private struct ActiveRow: View {
-    let name: String
-    let summary: RoomSummary
-
-    var body: some View {
-        // No "#" tile on the left: the name says "# bugs" already (Philip, 2026-11-20).
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("# \(name)" + (summary.unreadMessages > 0 ? " · \(summary.unreadMessages > 99 ? "99+" : "\(summary.unreadMessages)") neu" : ""))
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.ink)
-                if let line = summary.lastLine {
-                    (Text("\(summary.lastSender ?? ""): ").bold() + Text(line))
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.ink2)
-                        .lineLimit(1)
-                }
-            }
-            Spacer(minLength: 0)
-            if summary.unreadMessages > 0 {
-                Text(summary.unreadMessages > 99 ? "99+" : "\(summary.unreadMessages)")
-                    .font(Theme.Font.badge)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .frame(minWidth: 20, minHeight: 20)
-                    .background(Theme.coralButton, in: Capsule())
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .contentShape(Rectangle())
+    /// "09:12" today, "gestern", else the day ("17. Nov.").
+    static func time(_ date: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) { return date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)) }
+        if calendar.isDateInYesterday(date) { return "gestern" }
+        return date.formatted(.dateTime.day().month(.abbreviated).locale(Locale(identifier: "de_DE")))
     }
 }

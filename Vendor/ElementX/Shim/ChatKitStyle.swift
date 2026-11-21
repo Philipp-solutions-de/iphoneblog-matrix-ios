@@ -29,9 +29,14 @@ public struct ChatKitStyle {
         public var line: Color
         /// Initials avatars, one colour per person.
         public var avatars: [Color]
+        /// The bot marks, the "Bot" pill and a bot's name: teal everywhere, inside #one too, where
+        /// the accent turns red (Thorsten, 2026-11-20).
+        public var bot: Color
 
         public init(accent: Color, accentBright: Color, accentSoft: Color, highlight: Color, highlightSoft: Color,
-                    ink: Color, ink2: Color, ink3: Color, background: Color, surface: Color, line: Color, avatars: [Color]) {
+                    ink: Color, ink2: Color, ink3: Color, background: Color, surface: Color, line: Color, avatars: [Color],
+                    bot: Color? = nil) {
+            self.bot = bot ?? accent
             self.accent = accent
             self.accentBright = accentBright
             self.accentSoft = accentSoft

@@ -154,6 +154,24 @@ final class FourTabsUITests: XCTestCase {
         save(app, "neu-divider")
     }
 
+    /// Most coloured pixels of the image are teal (hue 165–195°), not red.
+    private static func isMostlyTeal(_ image: UIImage) -> Bool {
+        guard let cg = image.cgImage else { return false }
+        let width = cg.width, height = cg.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        guard let context = CGContext(data: &pixels, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+        context.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
+        var teal = 0, red = 0
+        for i in stride(from: 0, to: pixels.count, by: 4) {
+            let r = Double(pixels[i]) / 255, g = Double(pixels[i + 1]) / 255, b = Double(pixels[i + 2]) / 255
+            let maxC = max(r, g, b), delta = maxC - min(r, g, b)
+            guard maxC > 0.25, delta / maxC > 0.35 else { continue }
+            if maxC == r { red += 1 } else if g > r && b > r { teal += 1 }
+        }
+        return teal > red && teal > 20
+    }
+
     /// A bot listed by the server gets a "Bot" pill; nobody else does.
     func testBotBadgeOnlyForListedBots() throws {
         let other = try TestServer.signIn(2)
@@ -161,8 +179,11 @@ final class FourTabsUITests: XCTestCase {
         try other.send("Botnachricht \(Int(Date().timeIntervalSince1970))", in: room)
         let app = launch(tab: "chat", room: room, extra: ["IPHONEBLOG_BOTS": other.userID])
         XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "the room did not open")
-        XCTAssertTrue(app.descendants(matching: .any)["bot-badge"].waitForExistence(timeout: 30), "no Bot pill for a listed bot")
+        let pill = app.descendants(matching: .any)["bot-badge"].firstMatch
+        XCTAssertTrue(pill.waitForExistence(timeout: 30), "no Bot pill for a listed bot")
         save(app, "bot-badge")
+        // Teal inside #one too, where every other accent is red (Thorsten, 2026-11-20).
+        XCTAssertTrue(Self.isMostlyTeal(pill.screenshot().image), "the Bot pill is not teal inside #one")
         app.terminate()
         let plain = launch(tab: "chat", room: room, extra: ["IPHONEBLOG_BOTS": "@nobody:localhost"])
         XCTAssertTrue(plain.buttons["room-send_button"].waitForExistence(timeout: 120))

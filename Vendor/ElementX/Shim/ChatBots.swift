@@ -24,7 +24,7 @@ public struct ChatBotPill: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 6)
         .frame(minHeight: 17)
-        .background(ChatKitStyle.current.colors.accent, in: Capsule())
+        .background(ChatKitStyle.current.colors.bot, in: Capsule())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Bot")
         .accessibilityIdentifier("bot-badge")

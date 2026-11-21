@@ -10,6 +10,7 @@ struct IphoneblogApp: App {
             RootView()
                 .environmentObject(model)
                 .tint(Theme.teal)
+                .preferredColorScheme(Self.forcedScheme)
                 .task { await model.restore() }
                 // Chat links on chat.iphoneblog.de (universal links) open the message in the app.
                 .onOpenURL { model.open($0) }
@@ -17,6 +18,22 @@ struct IphoneblogApp: App {
                 .background(PerfInstrumentsHook().frame(width: 0, height: 0))
                 .onAppear { MetricsReporter.shared.start() }
         }
+    }
+}
+
+extension IphoneblogApp {
+    /// Screenshot runs in dark or light without touching the simulator's setting
+    /// (IPHONEBLOG_APPEARANCE=dark|light, debug builds); otherwise the system's.
+    static var forcedScheme: ColorScheme? {
+        #if DEBUG
+        switch ProcessInfo.processInfo.environment["IPHONEBLOG_APPEARANCE"] {
+        case "dark": return .dark
+        case "light": return .light
+        default: return nil
+        }
+        #else
+        return nil
+        #endif
     }
 }
 
