@@ -273,7 +273,7 @@ That code is AGPL-3.0, so this app is AGPL-3.0 too; the repository is public, as
 | Timeline | `Timeline`: pagination, local echo, send queue, edits, reactions, receipts | `Screens/Timeline` (cells, list, reactions, replies, thread summaries), `Services/Timeline` (SDK wrapper, view items) | adapters, our colours and type, cells we do not want removed |
 | Threads | thread focus, `ThreadListService`, thread subscriptions | `Screens/ThreadTimelineScreen`, `Screens/RoomThreadListScreen` | the article discussions and the threads in #one |
 | Composer | send queue, replies, edits, `Mentions`, markdown to HTML, media upload | the composer, its formatting toolbar (+ › Textformatierung) and mention suggestions from `Screens/RoomScreen`, `Other/Pills` | no polls, no voice messages |
-| Media | thumbnails, files, upload with progress | `Screens/FilePreviewScreen`, `Screens/MediaPickerScreen`, `Screens/MediaUploadPreviewScreen`; link previews through Apple's `LPMetadataProvider` (the phone fetches the page, not Synapse's preview_url) | the upload progress bar under a sending photo, video or file (`Shim/ChatUploadProgress.swift`); animated GIFs play from the original and go out unchanged (Element X), with Reduce Motion as their first frame (patch); with a caption, the picture alone gets the rounded corners, so the caption keeps its first letter (patch) |
+| Media | thumbnails, files, upload with progress | `Screens/FilePreviewScreen`, `Screens/MediaPickerScreen`, `Screens/MediaUploadPreviewScreen`; link previews through Apple's `LPMetadataProvider` (the phone fetches the page, not Synapse's preview_url) | the upload progress bar under a sending photo, video or file (`Shim/ChatUploadProgress.swift`); animated GIFs play from the original and go out unchanged (Element X), with Reduce Motion as their first frame (patch); with a caption, the picture alone gets the rounded corners, so the caption keeps its first letter (patch); Markieren in the upload preview draws on a photo, not a GIF, with PencilKit and sends the marked-up copy (`Shim/ChatMarkup.swift`) |
 | Design system | | `compound-ios` (needed by the views), recoloured through its override API | our tokens: teal, coral, greys; teal for all content, coral only for #one and sign-in (the colour rule in `App/Sources/Theme.swift`; it overrides the coral badges and mentions in `design/screens.html`) |
 | Push | `NotificationClient` | | extension text, pusher registration, tap routing |
 | Sign-in | OAuth 2.0, PKCE, dynamic registration | | one button, `ASWebAuthenticationSession` |
@@ -376,6 +376,14 @@ API change small, which costs less than a monthly jump over eight releases.
      strangers' code on it, so it needs runs from forks switched off or kept on GitHub's
      runners.
 
+- **No Neu divider after about 20 unread messages.** The SDK places the read marker only when
+  the reader's `m.fully_read` event is among the events the room's first sync brings (about
+  20). With more unread, that event arrives later by back-pagination and the room shows no
+  divider; the room still opens at the newest message. Measured 2026-11-21 in
+  `testNeuDividerWithoutJumpPill`: 30 new messages, no divider in 6 of 8 attempts; 10 new
+  messages, a divider every time. Fix not chosen yet: draw the divider in the app after the
+  `fullyReadEventID` item when the SDK sent none, or raise the room subscription's timeline
+  limit.
 - Fonts: the blog uses Foro and Foro Sans, licensed for the web. Using them in the app needs
   an app licence from the foundry; until then the app uses the system font (SF Pro).
 - Licence: AGPL-3.0, because of the transplanted Element X views (above). App Store question before launch.
