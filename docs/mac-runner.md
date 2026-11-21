@@ -131,6 +131,31 @@ job when the Mac has another major version, or no simulator runtime for its SDK.
 - **Disk:** a job needs about 40 GB free (iOS runtime, derived data, Swift packages,
   simulators). The checkout wipes `build/` at the start of every job.
 
+## Measured
+
+PR #53, 2026-11-20, the same code on both runners:
+
+| Step | GitHub `xcode-27` | Mac Studio |
+|---|---:|---:|
+| waiting for a runner | 60 min (53 on a second run) | 0 |
+| build | 5.3 | 1.1 |
+| unit tests | 9.2 | 2.5 |
+| sign-in test | 5.7 | 2.5 |
+| UI tests | 84.2 | 80.2 |
+| the job | 108 | 88 |
+| push to result | 168 | 89 |
+
+Building and unit testing are four times as fast; the UI tests are not, so the gain is the
+queue and the first 20 minutes. RichMessagesUITests alone takes 22.5 minutes on the Mac. The
+runner has no window session (a LaunchDaemon), so the simulator may render without the GPU;
+splitting the UI tests into parallel simulators is the next lever (architecture.md, "Open
+points", CI time).
+
+**The simulator is an iPhone 17 Pro, chosen by name.** The iOS 27.2 runtime's default devices
+hold only the iPhone Duo, a foldable whose inner screen gets the iPad layout without a tab bar;
+53 UI test runs failed on it before `scripts/build.sh` stopped taking the first iPhone listed.
+It creates the iPhone 17 Pro when the machine has none (`DEVICE_TYPE` picks another).
+
 ## Removal
 
 ```bash

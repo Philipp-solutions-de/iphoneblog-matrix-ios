@@ -356,8 +356,9 @@ API change small, which costs less than a monthly jump over eight releases.
      `TestServer.swift` change. 15 to 40 minutes per PR, free, half a day's work. A break the
      map misses shows up on `main` after the merge, where the build also gates TestFlight.
   3. **A self-hosted Mac.** Decided 2026-11-20: Thorsten's Mac Studio, as its own user, with
-     forks kept on GitHub's runners (docs/mac-runner.md). Options 1 and 2 stay open for the
-     runs that fall back to GitHub.
+     forks kept on GitHub's runners (docs/mac-runner.md). Measured: 89 minutes from push to
+     result against 168 on GitHub, but the UI tests take 80 minutes on both; the gain is the
+     queue and a four times faster build. Option 1 (parallel UI test shards) is the next step.
 
 - Fonts: the blog uses Foro and Foro Sans, licensed for the web. Using them in the app needs
   an app licence from the foundry; until then the app uses the system font (SF Pro).
