@@ -63,10 +63,10 @@ final class SiteSearchUITests: XCTestCase {
         XCTAssertTrue(sent.allSatisfy { ($0["q"] as? String ?? "").count >= 2 }, "a one-letter search went out")
 
         // The end of the list asks for page 2.
-        // Default-speed swipes: XCUITest's fast fling did not move this list in the sheet.
-        let list = app.collectionViews["site-search.list"].firstMatch
-        XCTAssertTrue(list.exists, "no result list")
-        for _ in 0..<8 { list.swipeUp() }
+        // The keyboard covers the lower half: "Suchen" closes it, then the finger drags the list.
+        app.searchFields.firstMatch.typeText("\n")
+        XCTAssertTrue(waitFor(5) { !app.keyboards.firstMatch.exists }, "the keyboard stayed")
+        for _ in 0..<10 { drag(app, from: 0.8, to: 0.3) }
         XCTAssertTrue(waitFor(10) { (try? self.searches().contains { $0["page"] as? Int == 2 }) ?? false }, "no second page")
 
         app.buttons["site-search.filter.videos"].tap()
@@ -134,6 +134,13 @@ final class SiteSearchUITests: XCTestCase {
             RunLoop.current.run(until: Date().addingTimeInterval(0.25))
         }
         return condition()
+    }
+
+    /// A finger drag over the middle of the screen, from one height to another (0 top, 1 bottom).
+    private func drag(_ app: XCUIApplication, from: CGFloat, to: CGFloat) {
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: from))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: to))
+        start.press(forDuration: 0.05, thenDragTo: end, withVelocity: 1500, thenHoldForDuration: 0)
     }
 
     private func attach(_ app: XCUIApplication, _ name: String) {

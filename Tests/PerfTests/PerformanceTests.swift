@@ -222,21 +222,25 @@ final class PerformanceTests: XCTestCase {
         button.tap()
         let field = app.searchFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 10), "no search field")
-        field.typeText("akku")
+        // "Suchen" closes the keyboard, which would otherwise take the lower half's drags.
+        field.typeText("akku\n")
         let hit = app.descendants(matching: .any).matching(identifier: "site-search-hit").firstMatch
         XCTAssertTrue(hit.waitForExistence(timeout: 20), "no hits")
-        let list = app.collectionViews["site-search.list"].firstMatch
-        XCTAssertTrue(list.exists, "no result list")
-        // Down to the end, so the next pages are in before the measuring starts. Default-speed
-        // swipes: XCUITest's fast fling did not move this list in the sheet.
-        for _ in 0..<14 { list.swipeUp() }
-        for _ in 0..<14 { list.swipeDown() }
+        // Drags from the window's own points, flung at 2500 pt/s. Down to the end first, so all three pages are in before the
+        // measuring starts.
+        func fling(_ from: CGFloat, _ to: CGFloat) {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: from))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: to)),
+                       withVelocity: 2500, thenHoldForDuration: 0)
+        }
+        for _ in 0..<16 { fling(0.8, 0.3) }
+        for _ in 0..<16 { fling(0.3, 0.8) }
         measure(metrics: [HitchMetric(statsPath: statsPath), XCTOSSignpostMetric.scrollDecelerationMetric, XCTOSSignpostMetric.scrollDraggingMetric],
                 options: options) {
-            list.swipeUp()
-            list.swipeUp()
-            list.swipeDown()
-            list.swipeDown()
+            fling(0.8, 0.3)
+            fling(0.8, 0.3)
+            fling(0.3, 0.8)
+            fling(0.3, 0.8)
         }
     }
 
