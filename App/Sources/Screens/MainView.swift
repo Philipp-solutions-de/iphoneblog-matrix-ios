@@ -28,25 +28,25 @@ struct MainView: View {
 
     var body: some View {
         TabView(selection: $router.tab) {
-            BlogTab(router: router, session: session, web: model.blogWeb)
+            LazyTab(.blog, router: router) { BlogTab(router: router, session: session, web: model.blogWeb) }
                 .tabItem { Label("Blog", systemImage: "doc.richtext") }
                 .tag(Router.Tab.blog)
 
             // #one for everyone: the rooms for members, otherwise sign-in or "Nur für
             // #one-Mitglieder". Für dich and Ich for members only (Thorsten, 2026-11-16/17).
-            OneChatGate(router: router, session: session)
+            LazyTab(.chat, router: router) { OneChatGate(router: router, session: session) }
                 // One "#": the big symbol; the label says "one" (Thorsten, 2026-11-20).
                 .tabItem { Label("one", systemImage: "number") }
                 .tag(Router.Tab.chat)
                 .badge(router.chatBadge)
 
             if let session, router.isMember {
-                ForYouView(session: session, model: session.forYou, router: router)
+                LazyTab(.forYou, router: router) { ForYouView(session: session, model: session.forYou, router: router) }
                     .tabItem { Label("Für dich", systemImage: "bell") }
                     .tag(Router.Tab.forYou)
                     .badge(router.forYouBadge)
 
-                MeView(session: session, prefs: session.notificationPrefs, router: router)
+                LazyTab(.me, router: router) { MeView(session: session, prefs: session.notificationPrefs, router: router) }
                     .tabItem { Label("Ich", systemImage: "person") }
                     .tag(Router.Tab.me)
             }
@@ -134,3 +134,27 @@ struct MainView: View {
 
     /// #one-Chat counts unread messages in the channel, for members.
 }
+
+/// A tab's screens, built the first time the tab shows. At launch only the selected tab is
+/// built; the Blog's web view, Für dich and Ich cost about 0.4 s before #one could open a room
+/// (2026-11-21, docs/performance.md). Badges sit on the tab item and count from the start.
+private struct LazyTab<Content: View>: View {
+    let tab: Router.Tab
+    @ObservedObject var router: Router
+    let content: () -> Content
+
+    init(_ tab: Router.Tab, router: Router, @ViewBuilder content: @escaping () -> Content) {
+        self.tab = tab
+        self.router = router
+        self.content = content
+    }
+
+    var body: some View {
+        if router.visitedTabs.contains(tab) {
+            content()
+        } else {
+            Theme.background
+        }
+    }
+}
+
