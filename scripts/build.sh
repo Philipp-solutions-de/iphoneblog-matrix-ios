@@ -3,6 +3,7 @@
 # simulator slice). Signing is ad hoc, which the simulator accepts.
 #
 #   scripts/build.sh build              build the app
+#   scripts/build.sh build-for-testing  build the app and every test bundle once, for CI's shards
 #   scripts/build.sh test               build and run the unit tests
 #   scripts/build.sh ui                 run the UI tests (blog → discussion → swipe back)
 #   scripts/build.sh integration        run the sign-in test against a test homeserver
@@ -15,23 +16,35 @@ cd "$here"
 mkdir -p build
 action="${1:-build}"
 
-# The newest available iPhone simulator, by runtime version; DEVICE=<udid> picks one (the
-# 393 pt screenshots for design pages).
+# An iPhone 17 Pro on the newest iOS runtime, created when the machine has none; DEVICE=<udid>
+# picks another (the 393 pt screenshots for design pages). Never "the first iPhone": the
+# iOS 27.2 runtime's default set holds only the iPhone Duo, a foldable whose inner screen gets
+# the iPad layout without a tab bar, and every tab test failed on it (docs/mac-runner.md).
+# DEVICE_NAME gives each Mac runner instance its own simulator (its .env sets it).
+device_type="${DEVICE_TYPE:-iPhone 17 Pro}"
+device_name="${DEVICE_NAME:-$device_type}"
 device="${DEVICE:-}"
-[[ -n "$device" ]] || device="$(xcrun simctl list devices available -j | python3 -c '
-import json, sys, re
-data = json.load(sys.stdin)["devices"]
-best = None
-for runtime, devices in data.items():
-    m = re.search(r"iOS-(\d+)-(\d+)", runtime)
-    if not m:
-        continue
-    version = (int(m.group(1)), int(m.group(2)))
-    for d in devices:
-        if d["name"].startswith("iPhone") and (best is None or version > best[0]):
-            best = (version, d["udid"], d["name"])
-print(best[1] if best else "")
-')"
+if [[ -z "$device" && "$action" != build && "$action" != build-for-testing ]]; then
+    read -r runtime device < <(xcrun simctl list -j devices available runtimes | DEVICE_TYPE="$device_name" python3 -c '
+import json, os, re, sys
+data = json.load(sys.stdin)
+want = os.environ["DEVICE_TYPE"]
+runtimes = [r for r in data["runtimes"] if r.get("platform") == "iOS" and r.get("isAvailable")]
+# The general runtime before a device-specific one of the same version (iOS-27-2-iPhone19-4
+# runs only the Duo).
+runtimes.sort(key=lambda r: (tuple(int(x) for x in r["version"].split(".")),
+                             re.search(r"iOS-\d+(-\d+)*$", r["identifier"]) is not None))
+if not runtimes:
+    sys.exit(1)
+newest = runtimes[-1]["identifier"]
+match = [d["udid"] for d in data["devices"].get(newest, []) if d["name"] == want]
+print(newest, match[0] if match else "")
+') || true
+    if [[ -z "$device" && -n "${runtime:-}" ]]; then
+        device="$(xcrun simctl create "$device_name" "$device_type" "$runtime")"
+        echo "build.sh: created $device_name ($device_type) on $runtime ($device)" >&2
+    fi
+fi
 
 common=(
     -project iphoneblog.xcodeproj
@@ -55,29 +68,67 @@ run() {
     return "$status"
 }
 
-# The app's own settings live in its data container (no simctl command reaches them).
+# The app's own settings live in its data container (no simctl command reaches them). On a
+# booted simulator a failed lookup means the app is not installed, so there is nothing to clear.
 clear_app_settings() {
     local data
     data="$(xcrun simctl get_app_container "$device" de.iphoneblog.matrix.preview data 2>/dev/null)" || return 0
     rm -f "${data:?}/Library/Preferences/de.iphoneblog.matrix.preview.plist"
 }
 
+# A simulator without the last run's state. A session from an earlier test server survives in
+# its keychain, even an uninstall, and its token is dead on a fresh server; and every fresh test
+# server has the same @tester, whose "Neue Artikel" rule the app would remember as seeded.
+# Both commands fail on a shut-down simulator ("Unable to lookup in current state: Shutdown"),
+# which hid the leftovers on machines that keep their simulators (the Mac Studio runner, a
+# laptop): boot first, and stop if the reset fails.
+fresh_simulator() {
+    xcrun simctl bootstatus "$device" -b >/dev/null
+    xcrun simctl keychain "$device" reset
+    clear_app_settings
+}
+
+# How a test action reaches its tests: by building the scheme, or, with TEST_WITHOUT_BUILDING=1
+# (CI's shards), from the products build-for-testing left in build/DerivedData.
+test_args() { # scheme: where the tests come from
+    if [[ "${TEST_WITHOUT_BUILDING:-}" == 1 ]]; then
+        local xctestrun
+        xctestrun="$(ls build/DerivedData/Build/Products/"$1"_*.xctestrun 2>/dev/null | head -1)"
+        [[ -n "$xctestrun" ]] || { echo "build.sh: no $1 xctestrun; run build-for-testing first" >&2; exit 1; }
+        echo -xctestrun "$xctestrun" -destination "id=$device"
+    else
+        echo "${common[@]}" -scheme "$1" -destination "id=$device"
+    fi
+}
+test_verb() { if [[ "${TEST_WITHOUT_BUILDING:-}" == 1 ]]; then echo test-without-building; else echo test; fi; }
+
 case "$action" in
+    build-for-testing)
+        for scheme in iphoneblog Integration UITests; do
+            run "build-for-testing-$scheme" "${common[@]}" -scheme "$scheme" \
+                -destination 'generic/platform=iOS Simulator' build-for-testing
+        done
+        ;;
+    enumerate-ui)
+        # Every UI test the built products hold, for scripts/ui-shards.py.
+        [[ -n "$device" ]] || { echo "build.sh: no iPhone simulator" >&2; exit 1; }
+        TEST_WITHOUT_BUILDING=1
+        # shellcheck disable=SC2046
+        xcodebuild $(test_args UITests) test-without-building -enumerate-tests -test-enumeration-format json \
+            -test-enumeration-style flat -test-enumeration-output-path build/ui-tests.json >build/enumerate.log 2>&1 \
+            || { tail -20 build/enumerate.log >&2; exit 1; }
+        ;;
     build)
         run build "${common[@]}" -scheme iphoneblog -destination 'generic/platform=iOS Simulator' build
         ;;
     test)
         [[ -n "$device" ]] || { echo "build.sh: no iPhone simulator" >&2; exit 1; }
-        run test "${common[@]}" -scheme iphoneblog -destination "id=$device" test
+        # shellcheck disable=SC2046
+        run test $(test_args iphoneblog) "$(test_verb)"
         ;;
     integration)
         [[ -n "$device" ]] || { echo "build.sh: no iPhone simulator" >&2; exit 1; }
-        # A session from an earlier test server survives in the simulator's keychain, even an
-        # uninstall, and its token is dead on a fresh server.
-        xcrun simctl keychain "$device" reset 2>/dev/null || true
-        # And the app's settings: every fresh test server has the same @tester, whose "Neue
-        # Artikel" rule the app would remember as seeded.
-        clear_app_settings
+        fresh_simulator
         # xcodebuild hands TEST_RUNNER_<NAME> to the test process as <NAME>.
         export TEST_RUNNER_IPHONEBLOG_TEST_HOMESERVER="${IPHONEBLOG_TEST_HOMESERVER:?}"
         export TEST_RUNNER_IPHONEBLOG_TEST_USER="${IPHONEBLOG_TEST_USER:?}"
@@ -87,41 +138,47 @@ case "$action" in
         export TEST_RUNNER_IPHONEBLOG_ONE_ALIAS="${IPHONEBLOG_ONE_ALIAS:-}"
         export TEST_RUNNER_IPHONEBLOG_BLOG_ALIAS="${IPHONEBLOG_BLOG_ALIAS:-}"
         export TEST_RUNNER_IPHONEBLOG_CHANNEL_ALIAS="${IPHONEBLOG_CHANNEL_ALIAS:-}"
-        run integration "${common[@]}" -scheme Integration -destination "id=$device" test
+        # shellcheck disable=SC2046
+        run integration $(test_args Integration) "$(test_verb)"
         ;;
     ui)
         # The reader's way from the blog into a discussion and back. Starts the blog fixture;
         # the member test also runs when IPHONEBLOG_TEST_* name a test homeserver.
         [[ -n "$device" ]] || { echo "build.sh: no iPhone simulator" >&2; exit 1; }
-        xcrun simctl keychain "$device" reset 2>/dev/null || true # as for integration
-        # addmedia needs a booted simulator, and xcodebuild boots it only later: on a shut-down
-        # one every import failed without a word (2026-11-20).
-        xcrun simctl bootstatus "$device" -b >/dev/null
+        # Booted, too, because addmedia fails without a word on a shut-down simulator.
+        fresh_simulator
         # An animated GIF in the photo library, for the test that sends one (GifUITests).
         xcrun simctl addmedia "$device" scripts/fixtures/animation.gif
         # A photo dated 2001-01-01, so the picker labels it with "2001" and the Markup test finds
         # it among the GIFs other tests add (RichMessagesUITests.testPhotoMarkupIsSent).
         xcrun simctl addmedia "$device" scripts/fixtures/markup-photo.jpg
-        clear_app_settings
-        if curl -s -o /dev/null http://127.0.0.1:8793/calls; then
-            echo "build.sh: port 8793 is taken; stop the old fixture server first" >&2; exit 1
+        fixture_port="${FIXTURE_PORT:-8793}" # another port beside a running one (docs/mac-runner.md)
+        if curl -s -o /dev/null "http://127.0.0.1:$fixture_port/calls"; then
+            echo "build.sh: port $fixture_port is taken; stop the old fixture server first" >&2; exit 1
         fi
-        python3 scripts/blog-fixture-server.py 8793 "${IPHONEBLOG_TEST_ARTICLE_ROOT:-\$madebypost}" &
+        python3 scripts/blog-fixture-server.py "$fixture_port" "${IPHONEBLOG_TEST_ARTICLE_ROOT:-\$madebypost}" &
         fixture=$!
         trap 'kill "$fixture" 2>/dev/null' EXIT
         sleep 1
-        export TEST_RUNNER_IPHONEBLOG_FIXTURE="http://127.0.0.1:8793"
+        export TEST_RUNNER_IPHONEBLOG_FIXTURE="http://127.0.0.1:$fixture_port"
         for name in TEST_HOMESERVER TEST_USER TEST_PASSWORD TEST_USER2 TEST_PASSWORD2 TEST_USER3 TEST_PASSWORD3 TEST_ADMIN TEST_ADMIN_PASSWORD ONE_ALIAS BLOG_ALIAS CHANNEL_ALIAS TEST_CHANNEL_ROOM TEST_ROOM2 TEST_BLOG_ROOM TEST_CHANNEL_THREAD TEST_ARTICLE_ROOT TEST_SYNAPSE_LOG; do
             var="IPHONEBLOG_$name"
             [[ -n "${!var:-}" ]] && export "TEST_RUNNER_$var=${!var}"
         done
         rm -rf build/ui.xcresult
-        # UI_ONLY=RichMessagesUITests (or Class/test) runs a part.
+        # UI_ONLY=RichMessagesUITests (or Class/test) runs a part; UI_TESTS_FILE names a file with
+        # one UITests/Class/test per line (a CI shard, scripts/ui-shards.py).
+        only=()
+        [[ -n "${UI_ONLY:-}" ]] && only+=(-only-testing:"UITests/$UI_ONLY")
+        if [[ -n "${UI_TESTS_FILE:-}" ]]; then
+            while read -r t; do [[ -n "$t" ]] && only+=(-only-testing:"$t"); done < "$UI_TESTS_FILE"
+            (( ${#only[@]} > 0 )) || { echo "build.sh: $UI_TESTS_FILE is empty" >&2; exit 1; }
+        fi
         # A failed test runs once more: on CI's slow runners the simulator now and then fails to
         # launch the app at all ("does not have a process ID").
-        run ui "${common[@]}" -scheme UITests -destination "id=$device" -resultBundlePath build/ui.xcresult \
-            -retry-tests-on-failure -test-iterations 2 \
-            ${UI_ONLY:+-only-testing:"UITests/$UI_ONLY"} test
+        # shellcheck disable=SC2046
+        run ui $(test_args UITests) -resultBundlePath build/ui.xcresult \
+            -retry-tests-on-failure -test-iterations 2 ${only[@]+"${only[@]}"} "$(test_verb)"
         ;;
     *)
         echo "usage: scripts/build.sh build|test|integration|ui" >&2; exit 2 ;;

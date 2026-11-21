@@ -1,0 +1,33 @@
+name: Mac runner check
+
+# Proves from inside a job that the Mac Studio runner is walled off (docs/mac-runner.md,
+# "Isolation"): user ci, no admin, no sudo, other homes closed, iron, LAN and NAS unreachable.
+# Weekly, by hand, and on pull requests of this repository that change the runner's scripts.
+
+on:
+  schedule:
+    - cron: "41 4 * * 1"   # Mondays 04:41 UTC
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/mac-runner/**
+      - .github/workflows/mac-runner-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Isolation
+    # Never a fork's pull request on the Mac (docs/mac-runner.md, "Which runner").
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, mac-studio]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/mac-runner
+      - run: scripts/mac-runner/check-isolation.sh

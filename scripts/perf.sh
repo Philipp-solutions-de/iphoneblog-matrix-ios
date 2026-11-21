@@ -101,16 +101,13 @@ start_servers() {
 import os
 port = os.environ["PERF_PORT"]
 s = open("scripts/test-homeserver.sh").read()
-bind = "sed -i.bak 's/bind_addresses"
-assert "127.0.0.1:8008" in s and "/build/synapse" in s and bind in s, "test-homeserver.sh changed shape"
-s = (s.replace("127.0.0.1:8008", f"127.0.0.1:{port}")
-      .replace("/build/synapse", "/build/perf-synapse")
-      .replace("build/test-homeserver.env", "build/perf-homeserver.env")
-      .replace(bind, f"sed -i.bak 's/port: 8008/port: {port}/' homeserver.yaml\n" + bind, 1))
+assert "TEST_HOMESERVER_PORT" in s and "/build/synapse" in s, "test-homeserver.sh changed shape"
+s = (s.replace("/build/synapse", "/build/perf-synapse")
+      .replace("build/test-homeserver.env", "build/perf-homeserver.env"))
 open("build/perf-homeserver.sh", "w").write(s)
 PY
     chmod +x build/perf-homeserver.sh
-    build/perf-homeserver.sh start
+    TEST_HOMESERVER_PORT="$port" build/perf-homeserver.sh start
     python3 scripts/seed-perf-data.py
     set -a; . build/perf-homeserver.env; . build/perf-data.env; set +a
     python3 scripts/blog-fixture-server.py "$fixture_port" "$IPHONEBLOG_TEST_ARTICLE_ROOT" >build/perf-fixture.log 2>&1 &
