@@ -187,6 +187,7 @@ final class AppModel: ObservableObject {
         try? await session.client.logout()
         if let stored = store.load() { MatrixClientFactory.deleteStore(storeID: stored.storeID) }
         store.delete()
+        WarmStart.forget(for: session.userID)
         pendingClient = nil
         router.reset()
         AvatarStore.shared.reset()
@@ -205,6 +206,7 @@ final class AppModel: ObservableObject {
         // no longer accepts the token and may take their time doing so.
         let stored = store.load()
         store.delete()
+        WarmStart.forget(for: session.userID)
         pendingClient = nil
         router.reset()
         AvatarStore.shared.reset()

@@ -91,7 +91,15 @@ final class PerformanceTests: XCTestCase {
         measure(metrics: [FirstMessagesMetric(path: startFile)], options: measured) {
             app.launch()
             XCTAssertTrue(message.waitForExistence(timeout: 60), "#one shows no seeded messages after a launch")
-            sleep(1) // the app writes its time a moment after the timeline fills
+            // The app writes "first messages" as the timeline fills, "fresh" when the server's
+            // answers have replaced a warm launch's cache: wait for both.
+            let until = Date().addingTimeInterval(15)
+            while Date() < until {
+                if let data = FileManager.default.contents(atPath: startFile),
+                   let object = try? JSONSerialization.jsonObject(with: data) as? [String: Double],
+                   object["first_messages_s"] != nil, object["fresh_s"] != nil { break }
+                usleep(200_000)
+            }
             stopMeasuring()
             app.terminate()
         }
