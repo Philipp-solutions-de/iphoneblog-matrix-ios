@@ -83,7 +83,7 @@ The app uses HTTPS, which is exempt, and ships the Matrix SDK's own cryptography
 Curve25519, Ed25519, AES-256, HMAC-SHA-256, HKDF), standard algorithms not provided by iOS.
 Thorsten's answer (2026-11-16): standard encryption, with the French declaration.
 
-- **France**: Alex (the publisher, Account Holder), as supplier, files a "déclaration de fourniture" with ANSSI
+- **France**: Thorsten (the Account Holder), as supplier, files a "déclaration de fourniture" with ANSSI
   (online at demarche.numerique.gouv.fr) and uploads ANSSI's attestation in App Store Connect →
   App Information → App Encryption Documentation. Until it arrives, France stays unticked under
   Pricing and Availability.
@@ -105,7 +105,7 @@ to #one without In-App Purchase. Until Apple grants it the app shows no link and
 - **Eligible:** apps whose primary functionality is magazines, newspapers, books, audio, music or
   video; people sign in to an account and reach content bought outside the app. Not eligible:
   apps with In-App Purchase on iOS, and real-time person-to-person services.
-- **Who and how:** the **Account Holder** only (Alex), one request **per bundle id**, through the
+- **Who and how:** the **Account Holder** only (Thorsten), one request **per bundle id**, through the
   form `developer.apple.com/contact/request/external-link-account/` (behind sign-in; its questions
   are not readable without it).
 - **The link:** shown once per screen, the same text wherever it appears; styled as a plain link
@@ -125,8 +125,8 @@ to #one without In-App Purchase. Until Apple grants it the app shows no link and
   account link itself costs nothing in any storefront, because nothing is sold through it, and
   that the EU's commission applies to out-of-app *offers* under a different entitlement
   (StoreKit External Purchases or Offers, from 2026-10-01), which we do not use. **Unverified
-  against Apple's own terms:** the terms Alex accepts in the request form are where this is
-  settled; he reads the fee and reporting clauses before agreeing and sends them here.
+  against Apple's own terms:** the terms Thorsten accepts in the request form are where this is
+  settled; he reads the fee and reporting clauses before agreeing.
 - **United States:** since May 2025 US apps may link out without the entitlement. We still
   request it, because it covers every storefront.
 
@@ -137,24 +137,23 @@ the website. The members' room exists to talk about that news, a side effect of 
 not a product of its own (Thorsten, 2026-11-17). There are no direct messages (2026-11-16).
 **The risk** is still that room: Apple may count it as real-time person-to-person. If Apple refuses, the app stays as it is (3.1.3(f), no link).
 
-### Alex's steps (Account Holder)
+### Thorsten's steps (Account Holder)
 
-1. Wait until `de.iphoneblog.app` exists in his team and the app record exists in App Store
-   Connect (the bundle-id switch, iphoneblog-wordpress `docs/TODO.md`).
+1. Wait until `de.iphoneblog.app` exists in team W9N692KH39 and the app record exists in App
+   Store Connect ([apple-setup.md](apple-setup.md), "The release id replaces the preview").
 2. Sign in at developer.apple.com, open the reader-apps page above and follow its link to the
    **External Link Account Entitlement** request form.
 3. Choose the app `de.iphoneblog.app`. Paste the answers below. Where the form asks something
-   they do not cover, write it down and send it to Thorsten before answering.
+   they do not cover, answer it in the form and add the answer here.
 4. Read the terms before agreeing: **the clauses on commission, reporting and storefronts.**
-   Send Thorsten a copy or a screenshot of them.
-5. Apple answers by mail. If granted, tell Thorsten: he adds the entitlement to the app id and
-   the provisioning profile, and the app gets the link (below) in the next build, with
-   screenshots of link and sheet in the review notes.
+5. Apple answers by mail. If granted, add the entitlement to the app id and the provisioning
+   profile; the app gets the link (below) in the next build, with screenshots of link and sheet
+   in the review notes.
 
 ### The request text (English, to paste)
 
 > **About the app.** iPhoneBlog is the app of iPhoneBlog.de, an independent German news
-> publication about Apple, the iPhone and the App Store, published since [YEAR, Alex fills in].
+> publication about Apple, the iPhone and the App Store, published since [YEAR, Alex tells Thorsten].
 > The app's primary functionality is the publication itself: every article, readable without an
 > account, as on the website. Each article has a discussion section where readers comment on it.
 >
@@ -255,6 +254,5 @@ Not through the lane, because Apple's API does not take them with an API key: th
 labels and the age rating. Thorsten answers them as Admin in App Store Connect, from the sections
 above.
 
-The lane runs only against the team in the `apple` environment, today Thorsten's, which has no
-App Store record for this app. It is for Alex's team after the switch (the bundle-id plan,
-iphoneblog-wordpress `docs/TODO.md`).
+The lane runs only against the team in the `apple` environment, Thorsten's, and needs the app
+record `iPhoneBlog` for `de.iphoneblog.app` ([apple-setup.md](apple-setup.md)).

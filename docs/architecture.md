@@ -64,12 +64,12 @@ encrypted room. A second or third device signs in and sees all history at once; 
 room list loads in one round trip whatever the number of rooms.
 
 **Push through our own Sygnal.** The app registers a pusher with app id
-`<BUNDLE_ID>.ios.prod` (today `de.iphoneblog.matrix.preview.ios.prod`, Thorsten's team; see apple-setup.md) and the gateway `https://chat.iphoneblog.de/_matrix/push/v1/notify`.
+`<BUNDLE_ID>.ios.prod` (`de.iphoneblog.app.ios.prod`, Thorsten's team; see apple-setup.md) and the gateway `https://chat.iphoneblog.de/_matrix/push/v1/notify`.
 A notification service extension (second target, shared app group) receives each push,
 fetches the event with the SDK's notification client and writes "Name in #channel: text".
 A tap opens the channel or the thread. Unencrypted rooms make this simple: no keys to share
-with the extension. Apple's notification-filtering entitlement is requested for Alex's
-account so the extension may drop pushes it cannot show.
+with the extension. Apple's notification-filtering entitlement can be requested for Thorsten's
+team so the extension may drop pushes it cannot show.
 
 **Four tabs for members, two for everyone else; the blog as the front page.** #one members see
 Blog, #one, Für dich and Ich (Thorsten, 2026-11-17); the #one tab shows one "#", its big symbol,
@@ -348,7 +348,7 @@ App/Sources/...             our shell: sign-in, room list, settings, navigation,
 
 **Licence.** `LICENSE` is AGPL-3.0. `NOTICE` names Element Creations Ltd and New Vector Ltd
 for the files under `Vendor/ElementX/` (their headers stay), and the Apache-2.0 matrix-rust-sdk.
-Publishing AGPL code on the App Store under Alex's company is a question to settle before
+Publishing AGPL code on the App Store under Thorsten's account is a question to settle before
 launch, not before TestFlight.
 
 **What the screens offer** (see the design proposal): channel list with unread markers,

@@ -78,8 +78,8 @@ fails the TestFlight lane if one does.
 
 ## TestFlight
 
-The upload is written and switched off. Until Alex's company account exists the app ships as
-`de.iphoneblog.matrix.preview` under Thorsten's personal team. The steps a person does at
+The upload is written and switched off. The app ships as `de.iphoneblog.app` under Thorsten's
+team W9N692KH39, to TestFlight and the App Store. The steps a person does at
 Apple, in order, with the commands that put the key into the repository:
 [docs/apple-setup.md](docs/apple-setup.md).
 

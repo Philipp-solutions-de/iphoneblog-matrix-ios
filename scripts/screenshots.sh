@@ -7,7 +7,7 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")/.." && pwd)"
 dev="$1"; api="$2"; web="$3"; out="${4:-$here/build/shots/screens}"
 app="$here/build/DerivedData/Build/Products/Debug-iphonesimulator/iphoneblog.app"
-id="de.iphoneblog.matrix.preview"
+id="$(sed -n 's/^BUNDLE_ID="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "$here/brand.env")"
 mkdir -p "$out"
 # A fresh install: no settings left from a test run on the same simulator.
 xcrun simctl uninstall "$dev" "$id" 2>/dev/null || true
