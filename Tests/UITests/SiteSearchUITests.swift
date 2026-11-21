@@ -32,8 +32,9 @@ final class SiteSearchUITests: XCTestCase {
         button.tap()
         let field = app.searchFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 10), "no search field")
-        // The field is focused when the search opens.
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "the field did not take the keyboard")
+        // The field is focused when the search opens (with a hardware keyboard the simulator
+        // shows no on-screen one, so the focus itself is checked).
+        XCTAssertTrue(waitFor(5) { (field.value(forKey: "hasKeyboardFocus") as? Bool) == true }, "the field is not focused")
         field.typeText(text)
     }
 
@@ -62,15 +63,17 @@ final class SiteSearchUITests: XCTestCase {
         XCTAssertTrue(sent.allSatisfy { ($0["q"] as? String ?? "").count >= 2 }, "a one-letter search went out")
 
         // The end of the list asks for page 2.
+        // Default-speed swipes: XCUITest's fast fling did not move this list in the sheet.
         let list = app.collectionViews["site-search.list"].firstMatch
-        for _ in 0..<6 { list.swipeUp(velocity: .fast) }
+        XCTAssertTrue(list.exists, "no result list")
+        for _ in 0..<8 { list.swipeUp() }
         XCTAssertTrue(waitFor(10) { (try? self.searches().contains { $0["page"] as? Int == 2 }) ?? false }, "no second page")
 
         app.buttons["site-search.filter.videos"].tap()
         XCTAssertTrue(waitFor(10) { (try? self.searches().last?["types"] as? [String]) == ["video"] }, "the chip did not ask for videos")
+        XCTAssertTrue(waitFor(10) { !self.hits(app, containing: "Beitrag").firstMatch.exists }, "a post under Videos")
         let video = hits(app, containing: "Video").firstMatch
         XCTAssertTrue(video.waitForExistence(timeout: 10))
-        XCTAssertFalse(hits(app, containing: "Beitrag").firstMatch.exists, "a post under Videos")
         attach(app, "site-search-videos")
 
         let loads = try articleLoads().count
@@ -98,6 +101,8 @@ final class SiteSearchUITests: XCTestCase {
 
         app.buttons["blog.search"].tap()
         app.buttons["site-search.filter.chat"].tap()
+        XCTAssertTrue(waitFor(10) { (try? self.searches().last?["types"] as? [String]) == ["chat", "discussion"] }, "the chip did not ask for chat")
+        XCTAssertTrue(waitFor(10) { !self.hits(app, containing: "Beitrag").firstMatch.exists }, "posts under Chat")
         let reply = hits(app, containing: "Diskussion").firstMatch
         XCTAssertTrue(reply.waitForExistence(timeout: 10), "no discussion hit")
         reply.tap()

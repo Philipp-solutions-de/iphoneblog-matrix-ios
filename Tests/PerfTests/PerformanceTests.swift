@@ -226,15 +226,17 @@ final class PerformanceTests: XCTestCase {
         let hit = app.descendants(matching: .any).matching(identifier: "site-search-hit").firstMatch
         XCTAssertTrue(hit.waitForExistence(timeout: 20), "no hits")
         let list = app.collectionViews["site-search.list"].firstMatch
-        // Down to the end, so the next pages are in before the measuring starts.
-        for _ in 0..<12 { list.swipeUp(velocity: .fast) }
-        for _ in 0..<12 { list.swipeDown(velocity: .fast) }
+        XCTAssertTrue(list.exists, "no result list")
+        // Down to the end, so the next pages are in before the measuring starts. Default-speed
+        // swipes: XCUITest's fast fling did not move this list in the sheet.
+        for _ in 0..<14 { list.swipeUp() }
+        for _ in 0..<14 { list.swipeDown() }
         measure(metrics: [HitchMetric(statsPath: statsPath), XCTOSSignpostMetric.scrollDecelerationMetric, XCTOSSignpostMetric.scrollDraggingMetric],
                 options: options) {
-            list.swipeUp(velocity: .fast)
-            list.swipeUp(velocity: .fast)
-            list.swipeDown(velocity: .fast)
-            list.swipeDown(velocity: .fast)
+            list.swipeUp()
+            list.swipeUp()
+            list.swipeDown()
+            list.swipeDown()
         }
     }
 

@@ -65,7 +65,7 @@ struct SiteSearchView: View {
             case .failed:
                 ContentUnavailableView("Die Suche ist gerade nicht erreichbar", systemImage: "wifi.exclamationmark")
             case .idle:
-                ContentUnavailableView("Blog und #one durchsuchen", systemImage: "magnifyingglass",
+                ContentUnavailableView(model.signedIn ? "Blog und #one durchsuchen" : "Blog durchsuchen", systemImage: "magnifyingglass",
                                        description: Text(model.signedIn
                                                          ? "Beiträge, Videos, Links und Chat."
                                                          : "Beiträge, Links und Diskussionen."))

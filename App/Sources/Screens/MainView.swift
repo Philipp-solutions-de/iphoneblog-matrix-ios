@@ -22,6 +22,9 @@ struct MainView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.scenePhase) private var scenePhase
     @State private var confirmReadAll = false
+    /// A search hit's place, opened once the search sheet has gone: a navigation push while the
+    /// sheet was still closing was dropped.
+    @State private var searchTarget: Router.SearchTarget?
     @ObservedObject var router: Router
     /// Nil while signed out.
     let session: ChatSession?
@@ -101,15 +104,10 @@ struct MainView: View {
         }
         // The search over blog and #one, from the Blog tab and the #one hub. A hit closes it and
         // opens where it lives; a link goes to Safari, as links from the blog do.
-        .sheet(isPresented: $router.showSiteSearch) {
+        .sheet(isPresented: $router.showSiteSearch, onDismiss: openSearchTarget) {
             SiteSearchView(model: model.siteSearch) { hit in
-                let target = Router.target(for: hit, chat: session != nil && router.isMember)
+                searchTarget = Router.target(for: hit, chat: session != nil && router.isMember)
                 router.showSiteSearch = false
-                if case .outside(let url) = target {
-                    if !model.open(url) { UIApplication.shared.open(url) }
-                } else {
-                    router.open(target)
-                }
             }
         }
         // The search sends the reader's token: the server decides what they may see.
@@ -152,6 +150,16 @@ struct MainView: View {
             }
         }
         #endif
+    }
+
+    private func openSearchTarget() {
+        guard let target = searchTarget else { return }
+        searchTarget = nil
+        if case .outside(let url) = target {
+            if !model.open(url) { UIApplication.shared.open(url) }
+        } else {
+            router.open(target)
+        }
     }
 
     /// #one-Chat counts unread messages in the channel, for members.
