@@ -84,6 +84,12 @@ jobs:
         with:
           persist-credentials: false
 
+      # Lowest CPU priority for everything this job starts on the Mac, simulators included
+      # (docs/mac-runner.md, "Priority"); MAC_RUNNER_PRIORITY=normal turns it off.
+      - name: Lowest priority (Mac Studio)
+        if: runner.environment == 'self-hosted' && vars.MAC_RUNNER_PRIORITY != 'normal'
+        run: nohup scripts/mac-runner/lower-priority.sh >/dev/null 2>&1 &
+
       - name: Xcode
         run: scripts/ci-xcode.sh
 
@@ -107,6 +113,10 @@ jobs:
 
       - name: Build the app and every test bundle
         run: scripts/build.sh build-for-testing
+
+      - name: The job's processes and their priority (Mac Studio)
+        if: always() && runner.environment == 'self-hosted'
+        run: scripts/mac-runner/lower-priority.sh report
 
       # The shards test these products without building. On the Mac they stay on its disk; on
       # GitHub every shard is another machine, so they travel as an artifact, in a tar because
@@ -155,6 +165,12 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
+
+      # Lowest CPU priority for everything this job starts on the Mac, simulators included
+      # (docs/mac-runner.md, "Priority"); MAC_RUNNER_PRIORITY=normal turns it off.
+      - name: Lowest priority (Mac Studio)
+        if: runner.environment == 'self-hosted' && vars.MAC_RUNNER_PRIORITY != 'normal'
+        run: nohup scripts/mac-runner/lower-priority.sh >/dev/null 2>&1 &
 
       - name: Xcode
         run: scripts/ci-xcode.sh
@@ -207,6 +223,10 @@ jobs:
       - name: Stop the test homeserver
         if: always()
         run: scripts/test-homeserver.sh stop
+
+      - name: The job's processes and their priority (Mac Studio)
+        if: always() && runner.environment == 'self-hosted'
+        run: scripts/mac-runner/lower-priority.sh report
 
       - name: Keep the logs
         if: always()

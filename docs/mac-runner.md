@@ -69,6 +69,18 @@ this run's upload is the job "TestFlight (after the tests …)", which waits for
 fix therefore still reaches TestFlight once its tests pass. Pull requests need all four shards
 green to merge.
 
+## Priority
+
+Every job on the Mac runs at the lowest CPU priority, so Thorsten's own work never stutters
+(his rule, 2026-11-21). The job's first step starts `scripts/mac-runner/lower-priority.sh`,
+which every 5 seconds gives each process of the user `ci` nice 20 and the background QoS class
+(`taskpolicy -b`): on Apple silicon such a process runs only on the efficiency cores and yields
+the disk. A loop over the user rather than a wrapper around the job, because the simulators,
+`XCBBuildService`, `SWBBuildService` and the compilers they start come from launchd and XPC,
+outside the job's process tree. The runner ends the loop with the job. The step "The job's
+processes and their priority" lists them with nice and priority at the end of each job. The
+repository variable `MAC_RUNNER_PRIORITY=normal` turns it off.
+
 ## Isolation
 
 `scripts/mac-runner/setup.sh` builds all of this; each part answers one way in.

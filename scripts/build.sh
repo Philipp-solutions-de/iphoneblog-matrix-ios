@@ -82,7 +82,14 @@ clear_app_settings() {
 # Both commands fail on a shut-down simulator ("Unable to lookup in current state: Shutdown"),
 # which hid the leftovers on machines that keep their simulators (the Mac Studio runner, a
 # laptop): boot first, and stop if the reset fails.
+# In CI (CI=true) the simulator is erased instead: the Mac Studio keeps its simulators, and their
+# photo library grew by two pictures every run until the photo picker's UI query timed out
+# (RichMessagesUITests, 2026-11-21); GitHub's runners start with an empty one.
 fresh_simulator() {
+    if [[ "${CI:-}" == true ]]; then
+        xcrun simctl shutdown "$device" 2>/dev/null || true
+        xcrun simctl erase "$device"
+    fi
     xcrun simctl bootstatus "$device" -b >/dev/null
     xcrun simctl keychain "$device" reset
     clear_app_settings
