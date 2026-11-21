@@ -13,14 +13,19 @@
 #   3. closes every other home folder to other users (chmod go-rwx)
 #   4. keeps `ci` off private networks with a pf anchor (iron's WireGuard, the LAN, the NAS)
 #   5. a daily root job that keeps Xcode's licence, first launch and iOS runtime in step
-#   6. downloads the Actions runner (checksum checked), registers it for this one repository
-#      with the label `mac-studio`, and starts it as a LaunchDaemon under `ci`
+#   6. downloads the Actions runner (checksum checked), registers four instances for this one
+#      repository with the label `mac-studio`, and starts each as a LaunchDaemon under `ci`
 set -euo pipefail
 
 repo="Philipp-solutions-de/iphoneblog-matrix-ios"
 user="ci"
-runner_name="mac-studio"
+# Four instances, so the four test shards of a run go side by side (docs/mac-runner.md, "Test
+# shards"). The first keeps the names it had before there were four.
+runner_count=4
 labels="mac-studio"
+slot_name()  { if [[ "$1" == 1 ]]; then echo mac-studio; else echo "mac-studio-$1"; fi; }
+slot_dir()   { if [[ "$1" == 1 ]]; then echo "/Users/$user/actions-runner"; else echo "/Users/$user/actions-runner-$1"; fi; }
+slot_label() { if [[ "$1" == 1 ]]; then echo de.iphoneblog.ci-runner; else echo "de.iphoneblog.ci-runner-$1"; fi; }
 runner_version="2.338.2"
 runner_sha256="25a065af409ffa317ab4d5a3b614dd15fc9c40f2172bc1b35a1b1258e919a388"
 support="/Library/Application Support/ci-runner"
@@ -39,7 +44,9 @@ if [[ "${1:-}" != "--as-root" ]]; then
     token_file="$(mktemp)"
     chmod 600 "$token_file"
     trap 'rm -f "$token_file"' EXIT
-    if [[ ! -f "/Users/$user/actions-runner/.runner" ]]; then
+    missing=no
+    for slot in $(seq 1 "$runner_count"); do [[ -f "$(slot_dir "$slot")/.runner" ]] || missing=yes; done
+    if [[ "$missing" == yes ]]; then
         # Prints nothing: the token goes straight into a file only root and you can read.
         gh api -X POST "repos/$repo/actions/runners/registration-token" --jq .token > "$token_file"
         [[ -s "$token_file" ]] || { echo "No registration token (gh login with admin on $repo?)." >&2; exit 1; }
@@ -158,38 +165,45 @@ install_daemon de.iphoneblog.ci-runner.xcode "<?xml version=\"1.0\" encoding=\"U
 </dict></plist>"
 
 # 6. The runner.
-step "runner"
-dir="/Users/$user/actions-runner"
+step "runners"
 # From /, because the caller sits in a home ci may not read (getcwd warnings otherwise).
 as_ci() { (cd / && sudo -u "$user" -H "$@"); }
-if [[ ! -x "$dir/config.sh" ]]; then
-    tarball="/Users/$user/actions-runner-$runner_version.tar.gz"
-    as_ci curl -fsSL -o "$tarball" \
-        "https://github.com/actions/runner/releases/download/v$runner_version/actions-runner-osx-arm64-$runner_version.tar.gz"
-    echo "$runner_sha256  $tarball" | shasum -a 256 -c -
-    as_ci mkdir -p "$dir"
-    as_ci tar -xzf "$tarball" -C "$dir"
-    rm -f "$tarball"
-fi
-if [[ ! -f "$dir/.runner" ]]; then
-    [[ -s "$token_file" ]] || { echo "No registration token." >&2; exit 1; }
-    token="$(cat "$token_file")"
-    (cd "$dir" && sudo -u "$user" -H ./config.sh --unattended --replace \
-        --url "https://github.com/$repo" --token "$token" \
-        --name "$runner_name" --labels "$labels" --work _work)
-    unset token
-else
-    echo "already registered"
-fi
-# What a job finds: the system tools, Xcode's python3 and git, and ~/.local/bin for uv. After
-# config.sh, which writes the caller's PATH into .path (it held Thorsten's own folders).
-as_ci sh -c "printf '%s\n' '/Users/$user/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin' > '$dir/.path'"
-as_ci sh -c "printf '%s\n' 'LANG=en_US.UTF-8' 'DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer' > '$dir/.env'"
 as_ci mkdir -p "/Users/$user/Library/Logs"
-install_daemon de.iphoneblog.ci-runner "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+tarball="/Users/$user/actions-runner-$runner_version.tar.gz"
+for slot in $(seq 1 "$runner_count"); do
+    dir="$(slot_dir "$slot")"
+    name="$(slot_name "$slot")"
+    label="$(slot_label "$slot")"
+    if [[ ! -x "$dir/config.sh" ]]; then
+        if [[ ! -f "$tarball" ]]; then
+            as_ci curl -fsSL -o "$tarball" \
+                "https://github.com/actions/runner/releases/download/v$runner_version/actions-runner-osx-arm64-$runner_version.tar.gz"
+            echo "$runner_sha256  $tarball" | shasum -a 256 -c -
+        fi
+        as_ci mkdir -p "$dir"
+        as_ci tar -xzf "$tarball" -C "$dir"
+    fi
+    if [[ ! -f "$dir/.runner" ]]; then
+        [[ -s "$token_file" ]] || { echo "No registration token." >&2; exit 1; }
+        token="$(cat "$token_file")"
+        (cd "$dir" && sudo -u "$user" -H ./config.sh --unattended --replace \
+            --url "https://github.com/$repo" --token "$token" \
+            --name "$name" --labels "$labels" --work _work)
+        unset token
+    else
+        echo "$name: registered"
+    fi
+    # What a job finds: the system tools, Xcode's python3 and git, ~/.local/bin for uv. After
+    # config.sh, which writes the caller's PATH into .path (it held Thorsten's own folders).
+    # Each instance has its own ports and simulator, so four jobs side by side never meet, and
+    # none meets Thorsten's own test runs on 8008 and 8793.
+    as_ci sh -c "printf '%s\n' '/Users/$user/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin' > '$dir/.path'"
+    as_ci sh -c "printf '%s\n' 'LANG=en_US.UTF-8' 'DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer' \
+        'TEST_HOMESERVER_PORT=180${slot}8' 'FIXTURE_PORT=180${slot}9' 'DEVICE_NAME=iPhone 17 Pro (CI $slot)' > '$dir/.env'"
+    install_daemon "$label" "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
 <plist version=\"1.0\"><dict>
-  <key>Label</key><string>de.iphoneblog.ci-runner</string>
+  <key>Label</key><string>$label</string>
   <key>UserName</key><string>$user</string>
   <key>GroupName</key><string>$user</string>
   <key>InitGroups</key><true/>
@@ -206,16 +220,18 @@ install_daemon de.iphoneblog.ci-runner "<?xml version=\"1.0\" encoding=\"UTF-8\"
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>ProcessType</key><string>Interactive</string>
-  <key>StandardOutPath</key><string>/Users/$user/Library/Logs/actions-runner.log</string>
-  <key>StandardErrorPath</key><string>/Users/$user/Library/Logs/actions-runner.log</string>
+  <key>StandardOutPath</key><string>/Users/$user/Library/Logs/$label.log</string>
+  <key>StandardErrorPath</key><string>/Users/$user/Library/Logs/$label.log</string>
 </dict></plist>"
-# xcode-upkeep.sh starts the runner once Xcode is ready; until then GitHub sees it offline.
+done
+rm -f "$tarball"
+# xcode-upkeep.sh starts the runners once Xcode is ready; until then GitHub sees them offline.
 sdk="$(DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -showsdks 2>/dev/null |
     sed -nE 's/.*-sdk iphonesimulator([0-9.]+).*/\1/p' | tail -1)"
 if ! xcrun simctl list runtimes 2>/dev/null | grep -q "^iOS $sdk "; then
-    launchctl bootout system/de.iphoneblog.ci-runner 2>/dev/null || true
-    echo "runner waits for the iOS $sdk runtime; de.iphoneblog.ci-runner.xcode starts it (/var/log/ci-runner-xcode.log)"
+    for slot in $(seq 1 "$runner_count"); do launchctl bootout "system/$(slot_label "$slot")" 2>/dev/null || true; done
+    echo "runners wait for the iOS $sdk runtime; de.iphoneblog.ci-runner.xcode starts them (/var/log/ci-runner-xcode.log)"
 fi
 
 step "done"
-echo "Runner '$runner_name' runs as $user. Check: gh api repos/$repo/actions/runners --jq '.runners[] | {name,status,busy}'"
+echo "$runner_count runners run as $user. Check: gh api repos/$repo/actions/runners --jq '.runners[] | {name,status,busy}'"

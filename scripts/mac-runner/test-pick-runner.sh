@@ -9,6 +9,9 @@ runner online false idle.json
 runner online true busy.json
 runner offline false offline.json
 echo '{"total_count":0,"runners":[]}' > "$tmp/none.json"
+printf '%s' '{"runners":[{"name":"mac-studio","status":"online","busy":false},{"name":"mac-studio-2","status":"online","busy":true}]}' > "$tmp/one-busy.json"
+printf '%s' '{"runners":[{"name":"mac-studio","status":"offline","busy":false},{"name":"mac-studio-2","status":"online","busy":false}]}' > "$tmp/one-off.json"
+printf '%s' '{"runners":[{"name":"other","status":"online","busy":false}]}' > "$tmp/other.json"
 fails=0
 check() { # expected-where, description, env...
     local want="$1" what="$2"; shift 2
@@ -29,6 +32,9 @@ check hosted "MAC_RUNNER=off"                      EVENT_NAME=push MAC_RUNNER=of
 check hosted "Mac offline"                         EVENT_NAME=push RUNNERS_JSON="$tmp/offline.json"
 check hosted "Mac not registered"                  EVENT_NAME=push RUNNERS_JSON="$tmp/none.json"
 check hosted "Mac busy past the wait"              EVENT_NAME=push RUNNERS_JSON="$tmp/busy.json"
+check hosted "one of four instances busy"          EVENT_NAME=push RUNNERS_JSON="$tmp/one-busy.json"
+check mac    "one instance offline, the rest idle" EVENT_NAME=push RUNNERS_JSON="$tmp/one-off.json"
+check hosted "only other runners registered"       EVENT_NAME=push RUNNERS_JSON="$tmp/other.json"
 check hosted "no status token"                     EVENT_NAME=push
 check hosted "API error"                           EVENT_NAME=push STATUS_TOKEN=bad RUNNERS_JSON=
 (( fails == 0 )) || { echo "$fails failed"; exit 1; }

@@ -1,8 +1,10 @@
 name: Build
 
-# Every push and pull request: build, unit tests, and the sign-in test against a
-# throwaway Synapse on the runner. Weekly as well, so a broken runner image shows up
-# before a release needs it; a red scheduled run opens an issue.
+# Every push and pull request: one build, then the unit, sign-in and UI tests in four shards
+# side by side, each against its own throwaway Synapse (docs/mac-runner.md, "Test shards").
+# Weekly as well, so a broken runner image shows up before a release needs it; a red scheduled
+# run opens an issue. On main, TestFlight uploads right after the build, without waiting for the
+# tests, unless the last main build's tests were red (docs/mac-runner.md, "TestFlight").
 # TestFlight runs only when the repository variable TESTFLIGHT_ENABLED is "true".
 
 on:
@@ -35,14 +37,18 @@ jobs:
     # image otherwise (docs/mac-runner.md, "Which runner").
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
     outputs:
       runs-on: ${{ steps.pick.outputs.runs-on }}
       where: ${{ steps.pick.outputs.where }}
+      last-main-tests: ${{ steps.last.outputs.tests }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
-          sparse-checkout: scripts/mac-runner
+          sparse-checkout: scripts
       - name: Test the choice
         run: scripts/mac-runner/test-pick-runner.sh
       - name: Pick
@@ -58,53 +64,31 @@ jobs:
           scripts/mac-runner/pick-runner.sh >> "$GITHUB_OUTPUT" 2> reason.txt || { cat reason.txt; exit 1; }
           cat reason.txt
           echo "Runner: $(tail -1 reason.txt)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Were the last main build's tests red?
+        id: last
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tests="$(scripts/ci-last-main-tests.sh)"
+          echo "tests=$tests" >> "$GITHUB_OUTPUT"
+          echo "Last main build's tests: $tests" >> "$GITHUB_STEP_SUMMARY"
 
   build:
-    name: Build and test
+    name: Build
     needs: pick
     runs-on: ${{ fromJSON(needs.pick.outputs.runs-on) }}
-    # Build, unit, sign-in and 20 UI tests on a hosted runner: 70 minutes in the morning, past
-    # two hours on a busy evening (2026-11-19: two builds cut off at 120 with no test failed).
-    timeout-minutes: 180
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
 
-      - name: Select Xcode
-        if: runner.environment == 'github-hosted'
-        run: |
-          xcode="$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app 2>/dev/null | sort -V | tail -1)"
-          [ -n "$xcode" ] || { ls -d /Applications/Xcode*; exit 1; }
-          sudo xcode-select -s "$xcode"
-          xcodebuild -version
-
-      # The runner's user has no sudo; its .env sets DEVELOPER_DIR to /Applications/Xcode.app.
-      - name: Check Xcode and the iOS runtime (Mac Studio)
-        if: runner.environment == 'self-hosted'
-        run: |
-          xcodebuild -version
-          version="$(xcodebuild -version | sed -n 's/^Xcode //p')"
-          [ "${version%%.*}" = "$XCODE_MAJOR" ] ||
-            { echo "::error::The Mac Studio has Xcode $version, the workflow wants $XCODE_MAJOR.x"; exit 1; }
-          sdk="$(xcodebuild -showsdks | sed -nE 's/.*-sdk iphonesimulator([0-9.]+).*/\1/p' | tail -1)"
-          xcrun simctl list runtimes | grep "^iOS $sdk " ||
-            { echo "::error::No iOS $sdk simulator runtime on the Mac Studio (docs/mac-runner.md, Xcode)"; exit 1; }
-          # Ports of its own: Thorsten's local test runs on this Mac hold 8008 and 8793.
-          echo "TEST_HOMESERVER_PORT=18008" >> "$GITHUB_ENV"
-          echo "FIXTURE_PORT=18793" >> "$GITHUB_ENV"
-          # A cancelled run can leave its servers behind; end ci's own by PID.
-          for port in 18008 18793; do
-            pids="$(lsof -a -ti "tcp:$port" -sTCP:LISTEN -u ci || true)"
-            [ -z "$pids" ] || { echo "ending leftover server on $port: $pids"; kill $pids; }
-          done
+      - name: Xcode
+        run: scripts/ci-xcode.sh
 
       - name: Install tools
         run: scripts/install-xcodegen.sh build/tools >> "$GITHUB_PATH"
-
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          enable-cache: false
 
       - name: Vendor/ElementX matches its Element X release plus our patches
         run: scripts/sync-elementx.sh --check
@@ -121,24 +105,104 @@ jobs:
           key: spm-${{ runner.environment }}-${{ hashFiles('project.yml') }}
           restore-keys: spm-${{ runner.environment }}-
 
-      - name: Build
-        run: scripts/build.sh build
+      - name: Build the app and every test bundle
+        run: scripts/build.sh build-for-testing
 
-      - name: Unit tests
-        run: scripts/build.sh test
+      # The shards test these products without building. On the Mac they stay on its disk; on
+      # GitHub every shard is another machine, so they travel as an artifact, in a tar because
+      # an artifact drops the executable bits.
+      - name: Hand the products to the shards (Mac Studio)
+        if: runner.environment == 'self-hosted'
+        run: |
+          mkdir -p "$HOME/ci-products"
+          find "$HOME/ci-products" -mindepth 1 -maxdepth 1 -mtime +1 -exec rm -rf {} +
+          rm -rf "$HOME/ci-products/$GITHUB_RUN_ID"
+          cp -Rp build/DerivedData/Build/Products "$HOME/ci-products/$GITHUB_RUN_ID"
+      - name: Pack the products (GitHub)
+        if: runner.environment == 'github-hosted'
+        run: tar -cf build/products.tar -C build/DerivedData/Build Products
+      - name: Hand the products to the shards (GitHub)
+        if: runner.environment == 'github-hosted'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: products
+          path: build/products.tar
+          retention-days: 1
+          compression-level: 1
+
+      - name: Keep the logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: logs-build
+          path: build/*.log
+          if-no-files-found: ignore
+
+  test:
+    name: Tests (${{ matrix.shard }}/4)
+    needs: [pick, build]
+    runs-on: ${{ fromJSON(needs.pick.outputs.runs-on) }}
+    # About 25 minutes a shard on the Mac Studio; GitHub's runners are slower and busier.
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      SHARD: ${{ matrix.shard }}
+      TEST_WITHOUT_BUILDING: "1"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Xcode
+        run: scripts/ci-xcode.sh
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: false
+
+      - name: Take the products (Mac Studio)
+        if: runner.environment == 'self-hosted'
+        run: |
+          mkdir -p build/DerivedData/Build
+          cp -Rp "$HOME/ci-products/$GITHUB_RUN_ID" build/DerivedData/Build/Products
+      - name: Take the products (GitHub)
+        if: runner.environment == 'github-hosted'
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: products
+          path: build
+      - name: Unpack the products (GitHub)
+        if: runner.environment == 'github-hosted'
+        run: |
+          mkdir -p build/DerivedData/Build
+          tar -xf build/products.tar -C build/DerivedData/Build
 
       - name: Start a test homeserver
         run: scripts/test-homeserver.sh start
 
+      # Shard 1 carries the unit and sign-in tests; ui-shards.py gives it that much less UI.
+      - name: Unit tests
+        if: matrix.shard == 1
+        run: scripts/build.sh test
       - name: Sign-in test
+        if: matrix.shard == 1
         run: |
           set -a; . build/test-homeserver.env; set +a
           scripts/build.sh integration
 
-      - name: UI tests (blog, discussion, swipe back, rich messages, uploads)
+      - name: Which UI tests this shard runs
+        run: |
+          scripts/build.sh enumerate-ui
+          scripts/ui-shards.py build/ui-tests.json 4 "$SHARD" --preload 360 > build/ui-shard.txt
+          cat build/ui-shard.txt
+
+      - name: UI tests
         run: |
           set -a; . build/test-homeserver.env; set +a
-          scripts/build.sh ui
+          UI_TESTS_FILE=build/ui-shard.txt scripts/build.sh ui
 
       - name: Stop the test homeserver
         if: always()
@@ -148,55 +212,71 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: logs
+          name: logs-${{ matrix.shard }}
           path: |
             build/*.log
             build/synapse/homeserver.log
           if-no-files-found: ignore
 
+  # Two TestFlight jobs, one of which runs on main. Normally the upload starts once the build
+  # compiles and the tests run beside it; a red test then shows on this run and holds back the
+  # next upload. When the last main build's tests were red, the upload waits for this run's own
+  # tests instead (docs/mac-runner.md, "TestFlight").
+  # The Apple key lives in the environment `apple`, which only main may use: reviewed code,
+  # never a pull request, fork or other branch. GitHub's runner only; no Apple secret on the Mac.
   testflight:
     name: TestFlight
-    needs: build
-    # The Apple key lives in the environment `apple`, which only main may use. This job runs
-    # only for a push to main or a hand run on main: reviewed code, never a pull request,
-    # fork or other branch. It stays on GitHub's runner: no Apple secret on the Mac Studio.
+    needs: [pick, build]
     if: >-
       vars.TESTFLIGHT_ENABLED == 'true' && github.ref == 'refs/heads/main' &&
-      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      needs.pick.outputs.last-main-tests != 'red'
     environment: apple
     runs-on: xcode-27
-    timeout-minutes: 150
+    timeout-minutes: 60
     env:
       BUNDLE_FROZEN: "true"
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+      DIST_CERT_P12_BASE64: ${{ secrets.DIST_CERT_P12_BASE64 }}
+      DIST_CERT_PASSWORD: ${{ secrets.DIST_CERT_PASSWORD }}
+      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+      BUILD_NUMBER: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
-      - name: Select Xcode
-        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_27*.app | sort -V | tail -1)"
-      - name: Install tools (pinned)
-        run: |
-          scripts/install-xcodegen.sh build/tools >> "$GITHUB_PATH"
-          bundle install
-      - name: Vendor/ElementX matches its Element X release plus our patches
-        run: scripts/sync-elementx.sh --check
+      - uses: ./.github/actions/testflight
 
-      - name: Generate the project
-        run: scripts/configure.sh
-      - name: Build and upload
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
-          DIST_CERT_P12_BASE64: ${{ secrets.DIST_CERT_P12_BASE64 }}
-          DIST_CERT_PASSWORD: ${{ secrets.DIST_CERT_PASSWORD }}
-          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
-          BUILD_NUMBER: ${{ github.run_number }}
-        run: bundle exec fastlane ios beta
+  testflight-after-tests:
+    name: TestFlight (after the tests; the last main build's were red)
+    needs: [pick, build, test]
+    if: >-
+      vars.TESTFLIGHT_ENABLED == 'true' && github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      needs.pick.outputs.last-main-tests == 'red'
+    environment: apple
+    runs-on: xcode-27
+    timeout-minutes: 60
+    env:
+      BUNDLE_FROZEN: "true"
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+      DIST_CERT_P12_BASE64: ${{ secrets.DIST_CERT_P12_BASE64 }}
+      DIST_CERT_PASSWORD: ${{ secrets.DIST_CERT_PASSWORD }}
+      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+      BUILD_NUMBER: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/testflight
 
   report:
     name: Report a red scheduled build
-    needs: [pick, build, testflight]
+    needs: [pick, build, test, testflight, testflight-after-tests]
     if: failure() && github.event_name == 'schedule'
     runs-on: ubuntu-latest
     permissions:

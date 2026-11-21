@@ -15,7 +15,7 @@ set -euo pipefail
 
 mac='["self-hosted","mac-studio"]'
 hosted='"xcode-27"'
-runner_name="mac-studio"
+runner_prefix="mac-studio"   # the instances mac-studio, mac-studio-2 … (setup.sh)
 wait_minutes="${WAIT_MINUTES:-20}"
 poll_seconds="${POLL_SECONDS:-30}"
 
@@ -48,11 +48,14 @@ status() { # prints "online busy", "online idle", "offline" or "missing"; fails 
             -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/$REPO/actions/runners?per_page=100")" || return 1
     fi
-    jq -r --arg n "$runner_name" '
-        [.runners[] | select(.name == $n)][0] |
-        if . == null then "missing"
-        elif .status != "online" then "offline"
-        elif .busy then "online busy" else "online idle" end' <<<"$json"
+    # Idle means every online instance is free: a run needs one for its build and then one per
+    # test shard. An instance that is offline alone does not send the run away.
+    jq -r --arg p "$runner_prefix" '
+        [.runners[] | select(.name | startswith($p))] as $r |
+        [$r[] | select(.status == "online")] as $on |
+        if ($r | length) == 0 then "missing"
+        elif ($on | length) == 0 then "offline"
+        elif any($on[]; .busy) then "online busy" else "online idle" end' <<<"$json"
 }
 
 [[ -n "${STATUS_TOKEN:-}" || -n "${RUNNERS_JSON:-}" ]] ||
@@ -63,7 +66,7 @@ while :; do
     state="$(status)" || answer hosted "GitHub's runner API did not answer (token expired?)"
     case "$state" in
     "online idle") answer mac "the Mac Studio is online and idle" ;;
-    missing) answer hosted "no runner named $runner_name is registered" ;;
+    missing) answer hosted "no runner named $runner_prefix… is registered" ;;
     offline) answer hosted "the Mac Studio is offline" ;;
     esac
     (( $(date +%s) + poll_seconds <= deadline )) ||

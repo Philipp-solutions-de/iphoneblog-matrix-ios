@@ -12,8 +12,9 @@ his mail. A job must reach none of it, so isolation is the point of everything b
 ## Which runner
 
 The job "Pick a runner" in `.github/workflows/build.yml` runs `scripts/mac-runner/pick-runner.sh`
-on `ubuntu-latest` and hands `runs-on` to "Build and test". Its tests,
-`scripts/mac-runner/test-pick-runner.sh`, run in the same job first.
+on `ubuntu-latest` and hands `runs-on` to "Build" and the four "Tests" shards: a run stays on one
+kind of runner. Its tests, `scripts/mac-runner/test-pick-runner.sh`, run in the same job first.
+"Idle" means no online instance of the four is busy.
 
 | Event | Runner |
 |---|---|
@@ -36,6 +37,37 @@ One gap: two runs that ask in the same second both see an idle Mac, and the seco
 Mac for the first to finish (about one run's length) instead of going to GitHub.
 
 The TestFlight job stays on GitHub. No Apple secret ever reaches the Mac.
+
+## Test shards
+
+"Build" runs `scripts/build.sh build-for-testing` once: the app and the unit, sign-in and UI test
+bundles. Four jobs "Tests (n/4)" then test those products without building
+(`TEST_WITHOUT_BUILDING=1`), each against its own test homeserver. Shard 1 also runs the unit and
+sign-in tests.
+
+`scripts/ui-shards.py` splits the UI tests: it takes every test the built products hold
+(`build.sh enumerate-ui`), gives each its time from `scripts/ui-test-times.json` (seconds per
+test, measured on the Mac Studio; a new test counts as the median), and deals them out longest
+first to the shard with the least time. Every shard computes the same split, and the script
+fails unless the four together hold every test exactly once. Refresh the times file from a green
+run's `ui.log` when the split drifts.
+
+On the Mac the four shards run side by side on four runner instances (`mac-studio`,
+`mac-studio-2` … `-4`, LaunchDaemons `de.iphoneblog.ci-runner`, `-2` … `-4`). Each instance's
+`.env` gives it its own ports (`180n8` for the homeserver, `180n9` for the blog fixture) and its
+own simulator (`iPhone 17 Pro (CI n)`), so shards never meet each other or Thorsten's own test
+runs on 8008 and 8793. The products pass from "Build" to the shards on the Mac's disk
+(`~ci/ci-products/<run>`, cleared after a day); on GitHub every shard is another machine, so
+they travel as a one-day artifact, in a tar because an artifact drops the executable bits.
+
+## TestFlight
+
+On `main` the upload starts as soon as "Build" is green and does not wait for the tests. A red
+test then shows on that run and holds back the next upload: "Pick a runner" asks
+`scripts/ci-last-main-tests.sh` whether the last finished `main` build had red tests, and if so
+this run's upload is the job "TestFlight (after the tests …)", which waits for its own tests. A
+fix therefore still reaches TestFlight once its tests pass. Pull requests need all four shards
+green to merge.
 
 ## Isolation
 
@@ -79,11 +111,12 @@ scripts/mac-runner/setup.sh
 ```
 
 It fetches a registration token with his `gh` login, asks for the Mac password once, and then
-creates the user, the wall and the three LaunchDaemons:
+creates the user, the wall and the LaunchDaemons. Run it while no job runs: a changed service
+definition restarts its runner.
 
 | LaunchDaemon | Runs | What |
 |---|---|---|
-| `de.iphoneblog.ci-runner` | always, as `ci` | the Actions runner, `/Users/ci/actions-runner`, label `mac-studio`, log `/Users/ci/Library/Logs/actions-runner.log` |
+| `de.iphoneblog.ci-runner`, `-2` … `-4` | always, as `ci` | the four runner instances, `/Users/ci/actions-runner`, `-2` … `-4`, label `mac-studio`, logs `/Users/ci/Library/Logs/<label>.log` |
 | `de.iphoneblog.ci-runner.pf` | at boot, every 5 minutes, as root | loads the network wall if it is missing |
 | `de.iphoneblog.ci-runner.xcode` | at boot, daily 05:10, after an Xcode update, as root | Xcode licence, first launch, iOS runtime; holds the runner back until they are ready (below) |
 
@@ -122,10 +155,10 @@ job when the Mac has another major version, or no simulator runtime for its SDK.
 - **State:** `gh api repos/Philipp-solutions-de/iphoneblog-matrix-ios/actions/runners --jq '.runners[] | {name,status,busy}'`
 - **Send everything to GitHub for a while:** `gh variable set MAC_RUNNER -b off -R Philipp-solutions-de/iphoneblog-matrix-ios`;
   `gh variable delete MAC_RUNNER …` brings the Mac back.
-- **Restart the runner:** `sudo launchctl kickstart -k system/de.iphoneblog.ci-runner`
-- **Ports:** the Mac is shared with Thorsten's own test runs, which hold 8008 (test
-  homeserver) and 8793 (blog fixture). Jobs here use 18008 and 18793
-  (`TEST_HOMESERVER_PORT`, `FIXTURE_PORT`).
+- **Restart a runner:** `sudo launchctl kickstart -k system/de.iphoneblog.ci-runner` (`-2` … `-4`
+  for the others)
+- **Ports:** each instance's own (Test shards, above); `TEST_HOMESERVER_PORT` and
+  `FIXTURE_PORT` default to 8008 and 8793 everywhere else.
 - **Swift package cache:** one per kind of runner (`spm-self-hosted-…`, `spm-github-hosted-…`),
   because the packages record absolute paths and the workspaces differ.
 - **Disk:** a job needs about 40 GB free (iOS runtime, derived data, Swift packages,
@@ -162,7 +195,7 @@ It creates the iPhone 17 Pro when the machine has none (`DEVICE_TYPE` picks anot
 scripts/mac-runner/remove.sh
 ```
 
-unregisters the runner, stops and deletes the three LaunchDaemons and the network wall, and ends
+unregisters the four runners, stops and deletes the LaunchDaemons and the network wall, and ends
 whatever still runs as `ci`. CI carries on at once on GitHub's runner. `--delete-user` deletes
 the user `ci` and its home as well. The home folders stay closed; the script prints the modes
 they had. Developer mode (`DevToolsSecurity`) stays on.

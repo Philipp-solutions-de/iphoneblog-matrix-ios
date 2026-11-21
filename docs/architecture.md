@@ -366,9 +366,14 @@ API change small, which costs less than a monthly jump over eight releases.
   with xcodegen; neither is committed.
 - `scripts/build.sh build|test|integration` builds for the arm64 simulator (the SDK ships no
   x86_64 simulator slice), ad-hoc signed.
-- CI runs "Build and test" on Thorsten's Mac Studio when it is online and idle and the code is
-  ours, on GitHub's hosted `xcode-27` image otherwise: forks, the weekly run, and every fallback
-  (docs/mac-runner.md). TestFlight always runs on GitHub.
+- CI builds once, then runs the unit, sign-in and UI tests in four shards side by side, balanced
+  by measured test time (`scripts/ui-shards.py`). It runs on Thorsten's Mac Studio, four runner
+  instances under their own user, when it is online and idle and the code is ours; on GitHub's
+  hosted `xcode-27` image otherwise: forks, the weekly run, and every fallback
+  (docs/mac-runner.md).
+- On `main`, TestFlight uploads right after the build, without waiting for the tests; a red test
+  holds back the next upload, not the current one (docs/mac-runner.md, "TestFlight"). TestFlight
+  always runs on GitHub, so no Apple secret reaches the Mac. Pull requests need every shard green.
 - One run per branch at a time. A new push to a pull request's branch cancels its older run;
   on `main` a new merge waits for the running build, and GitHub keeps only the newest waiting
   run, so `main` still builds its newest commit next. Cancelling on `main` too stopped every

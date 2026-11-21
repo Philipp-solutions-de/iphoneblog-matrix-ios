@@ -3,6 +3,7 @@
 # simulator slice). Signing is ad hoc, which the simulator accepts.
 #
 #   scripts/build.sh build              build the app
+#   scripts/build.sh build-for-testing  build the app and every test bundle once, for CI's shards
 #   scripts/build.sh test               build and run the unit tests
 #   scripts/build.sh ui                 run the UI tests (blog → discussion → swipe back)
 #   scripts/build.sh integration        run the sign-in test against a test homeserver
@@ -19,10 +20,12 @@ action="${1:-build}"
 # picks another (the 393 pt screenshots for design pages). Never "the first iPhone": the
 # iOS 27.2 runtime's default set holds only the iPhone Duo, a foldable whose inner screen gets
 # the iPad layout without a tab bar, and every tab test failed on it (docs/mac-runner.md).
+# DEVICE_NAME gives each Mac runner instance its own simulator (its .env sets it).
 device_type="${DEVICE_TYPE:-iPhone 17 Pro}"
+device_name="${DEVICE_NAME:-$device_type}"
 device="${DEVICE:-}"
-if [[ -z "$device" ]]; then
-    read -r runtime device < <(xcrun simctl list -j devices available runtimes | DEVICE_TYPE="$device_type" python3 -c '
+if [[ -z "$device" && "$action" != build && "$action" != build-for-testing ]]; then
+    read -r runtime device < <(xcrun simctl list -j devices available runtimes | DEVICE_TYPE="$device_name" python3 -c '
 import json, os, re, sys
 data = json.load(sys.stdin)
 want = os.environ["DEVICE_TYPE"]
@@ -38,8 +41,8 @@ match = [d["udid"] for d in data["devices"].get(newest, []) if d["name"] == want
 print(newest, match[0] if match else "")
 ') || true
     if [[ -z "$device" && -n "${runtime:-}" ]]; then
-        device="$(xcrun simctl create "$device_type" "$device_type" "$runtime")"
-        echo "build.sh: created $device_type on $runtime ($device)" >&2
+        device="$(xcrun simctl create "$device_name" "$device_type" "$runtime")"
+        echo "build.sh: created $device_name ($device_type) on $runtime ($device)" >&2
     fi
 fi
 
@@ -85,13 +88,43 @@ fresh_simulator() {
     clear_app_settings
 }
 
+# How a test action reaches its tests: by building the scheme, or, with TEST_WITHOUT_BUILDING=1
+# (CI's shards), from the products build-for-testing left in build/DerivedData.
+test_args() { # scheme: where the tests come from
+    if [[ "${TEST_WITHOUT_BUILDING:-}" == 1 ]]; then
+        local xctestrun
+        xctestrun="$(ls build/DerivedData/Build/Products/"$1"_*.xctestrun 2>/dev/null | head -1)"
+        [[ -n "$xctestrun" ]] || { echo "build.sh: no $1 xctestrun; run build-for-testing first" >&2; exit 1; }
+        echo -xctestrun "$xctestrun" -destination "id=$device"
+    else
+        echo "${common[@]}" -scheme "$1" -destination "id=$device"
+    fi
+}
+test_verb() { if [[ "${TEST_WITHOUT_BUILDING:-}" == 1 ]]; then echo test-without-building; else echo test; fi; }
+
 case "$action" in
+    build-for-testing)
+        for scheme in iphoneblog Integration UITests; do
+            run "build-for-testing-$scheme" "${common[@]}" -scheme "$scheme" \
+                -destination 'generic/platform=iOS Simulator' build-for-testing
+        done
+        ;;
+    enumerate-ui)
+        # Every UI test the built products hold, for scripts/ui-shards.py.
+        [[ -n "$device" ]] || { echo "build.sh: no iPhone simulator" >&2; exit 1; }
+        TEST_WITHOUT_BUILDING=1
+        # shellcheck disable=SC2046
+        xcodebuild $(test_args UITests) test-without-building -enumerate-tests -test-enumeration-format json \
+            -test-enumeration-style flat -test-enumeration-output-path build/ui-tests.json >build/enumerate.log 2>&1 \
+            || { tail -20 build/enumerate.log >&2; exit 1; }
+        ;;
     build)
         run build "${common[@]}" -scheme iphoneblog -destination 'generic/platform=iOS Simulator' build
         ;;
     test)
         [[ -n "$device" ]] || { echo "build.sh: no iPhone simulator" >&2; exit 1; }
-        run test "${common[@]}" -scheme iphoneblog -destination "id=$device" test
+        # shellcheck disable=SC2046
+        run test $(test_args iphoneblog) "$(test_verb)"
         ;;
     integration)
         [[ -n "$device" ]] || { echo "build.sh: no iPhone simulator" >&2; exit 1; }
@@ -105,7 +138,8 @@ case "$action" in
         export TEST_RUNNER_IPHONEBLOG_ONE_ALIAS="${IPHONEBLOG_ONE_ALIAS:-}"
         export TEST_RUNNER_IPHONEBLOG_BLOG_ALIAS="${IPHONEBLOG_BLOG_ALIAS:-}"
         export TEST_RUNNER_IPHONEBLOG_CHANNEL_ALIAS="${IPHONEBLOG_CHANNEL_ALIAS:-}"
-        run integration "${common[@]}" -scheme Integration -destination "id=$device" test
+        # shellcheck disable=SC2046
+        run integration $(test_args Integration) "$(test_verb)"
         ;;
     ui)
         # The reader's way from the blog into a discussion and back. Starts the blog fixture;
@@ -132,12 +166,19 @@ case "$action" in
             [[ -n "${!var:-}" ]] && export "TEST_RUNNER_$var=${!var}"
         done
         rm -rf build/ui.xcresult
-        # UI_ONLY=RichMessagesUITests (or Class/test) runs a part.
+        # UI_ONLY=RichMessagesUITests (or Class/test) runs a part; UI_TESTS_FILE names a file with
+        # one UITests/Class/test per line (a CI shard, scripts/ui-shards.py).
+        only=()
+        [[ -n "${UI_ONLY:-}" ]] && only+=(-only-testing:"UITests/$UI_ONLY")
+        if [[ -n "${UI_TESTS_FILE:-}" ]]; then
+            while read -r t; do [[ -n "$t" ]] && only+=(-only-testing:"$t"); done < "$UI_TESTS_FILE"
+            (( ${#only[@]} > 0 )) || { echo "build.sh: $UI_TESTS_FILE is empty" >&2; exit 1; }
+        fi
         # A failed test runs once more: on CI's slow runners the simulator now and then fails to
         # launch the app at all ("does not have a process ID").
-        run ui "${common[@]}" -scheme UITests -destination "id=$device" -resultBundlePath build/ui.xcresult \
-            -retry-tests-on-failure -test-iterations 2 \
-            ${UI_ONLY:+-only-testing:"UITests/$UI_ONLY"} test
+        # shellcheck disable=SC2046
+        run ui $(test_args UITests) -resultBundlePath build/ui.xcresult \
+            -retry-tests-on-failure -test-iterations 2 ${only[@]+"${only[@]}"} "$(test_verb)"
         ;;
     *)
         echo "usage: scripts/build.sh build|test|integration|ui" >&2; exit 2 ;;

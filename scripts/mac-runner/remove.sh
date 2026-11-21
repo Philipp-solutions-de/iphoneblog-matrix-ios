@@ -13,7 +13,7 @@ set -euo pipefail
 
 repo="Philipp-solutions-de/iphoneblog-matrix-ios"
 user="ci"
-runner_name="mac-studio"
+runner_prefix="mac-studio"   # mac-studio, mac-studio-2 … (setup.sh)
 support="/Library/Application Support/ci-runner"
 
 if [[ "${1:-}" != "--as-root" ]]; then
@@ -30,31 +30,32 @@ if [[ "${1:-}" != "--as-root" ]]; then
     gh api -X POST "repos/$repo/actions/runners/remove-token" --jq .token > "$token_file" || true
     echo "Now sudo asks for your Mac password."
     sudo "$0" --as-root "$token_file" "$delete_user"
-    # The runner may already be gone from the Mac but still listed on GitHub (offline).
-    id_="$(gh api "repos/$repo/actions/runners" --jq ".runners[] | select(.name == \"$runner_name\") | .id" || true)"
-    if [[ -n "$id_" ]]; then
+    # A runner may already be gone from the Mac but still listed on GitHub (offline).
+    for id_ in $(gh api "repos/$repo/actions/runners" --jq ".runners[] | select(.name | startswith(\"$runner_prefix\")) | .id" || true); do
         gh api -X DELETE "repos/$repo/actions/runners/$id_" && echo "deleted runner $id_ on GitHub"
-    fi
+    done
     echo "Runner removed. GitHub lists: $(gh api "repos/$repo/actions/runners" --jq '[.runners[].name] | join(", ")')"
     exit 0
 fi
 
 token_file="$2"
 delete_user="$3"
-dir="/Users/$user/actions-runner"
-
-for label in de.iphoneblog.ci-runner de.iphoneblog.ci-runner.xcode de.iphoneblog.ci-runner.pf; do
+for plist in /Library/LaunchDaemons/de.iphoneblog.ci-runner*.plist; do
+    [[ -f "$plist" ]] || continue
+    label="$(basename "$plist" .plist)"
     launchctl bootout "system/$label" 2>/dev/null && echo "stopped $label" || true
-    rm -f "/Library/LaunchDaemons/$label.plist"
+    rm -f "$plist"
 done
 # Jobs leave simulators and test servers running under the user; end them.
 if id "$user" >/dev/null 2>&1; then
     pkill -u "$user" 2>/dev/null || true
 fi
 
-if [[ -f "$dir/.runner" && -s "$token_file" ]]; then
-    (cd "$dir" && sudo -u "$user" -H ./config.sh remove --token "$(cat "$token_file")") || true
-fi
+for dir in /Users/"$user"/actions-runner /Users/"$user"/actions-runner-*; do
+    if [[ -f "$dir/.runner" && -s "$token_file" ]]; then
+        (cd "$dir" && sudo -u "$user" -H ./config.sh remove --token "$(cat "$token_file")") || true
+    fi
+done
 
 /sbin/pfctl -a com.apple/ci-runner -F all 2>/dev/null && echo "network wall removed" || true
 

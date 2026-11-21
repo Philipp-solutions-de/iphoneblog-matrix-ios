@@ -7,14 +7,22 @@
 # it offline and build.yml sends every job to GitHub's runner instead of failing it here.
 set -eu
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-runner=de.iphoneblog.ci-runner
 log() { echo "$(date '+%F %T') $*"; }
-running() { launchctl print "system/$runner" >/dev/null 2>&1; }
-stop_runner() { if running; then launchctl bootout "system/$runner"; log "runner stopped until Xcode is ready"; fi; }
+# The runner instances: de.iphoneblog.ci-runner, de.iphoneblog.ci-runner-2 … (setup.sh).
+runners() {
+    for plist in /Library/LaunchDaemons/de.iphoneblog.ci-runner.plist /Library/LaunchDaemons/de.iphoneblog.ci-runner-[0-9]*.plist; do
+        [ -f "$plist" ] && basename "$plist" .plist
+    done
+}
+stop_runner() {
+    for r in $(runners); do
+        if launchctl print "system/$r" >/dev/null 2>&1; then launchctl bootout "system/$r"; log "$r stopped until Xcode is ready"; fi
+    done
+}
 start_runner() {
-    if ! running && [ -f "/Library/LaunchDaemons/$runner.plist" ]; then
-        launchctl bootstrap system "/Library/LaunchDaemons/$runner.plist"; log "runner started"
-    fi
+    for r in $(runners); do
+        if ! launchctl print "system/$r" >/dev/null 2>&1; then launchctl bootstrap system "/Library/LaunchDaemons/$r.plist"; log "$r started"; fi
+    done
 }
 
 # The App Store writes the new Xcode in place; wait until the bundle stops changing.
