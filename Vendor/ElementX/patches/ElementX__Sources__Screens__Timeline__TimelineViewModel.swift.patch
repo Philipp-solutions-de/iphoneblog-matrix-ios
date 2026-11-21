@@ -1,6 +1,17 @@
 --- a/ElementX/Sources/Screens/Timeline/TimelineViewModel.swift
 +++ b/ElementX/Sources/Screens/Timeline/TimelineViewModel.swift
-@@ -118,7 +118,9 @@
+@@ -17,6 +17,10 @@
+ class TimelineViewModel: TimelineViewModelType, TimelineViewModelProtocol {
+     private enum Constants {
+         static let paginationEventLimit: UInt16 = 20
++        // iphoneblog: 50 back: reactions, edits and state events take up most of a page of 20,
++        // and a room filled its first screen only after four round trips one after another
++        // (2026-11-20, docs/performance.md, testOneChatAfterLaunch).
++        static let backPaginationEventLimit: UInt16 = 50
+         static let detachedTimelineSize: UInt16 = 100
+         static let focusTimelineToastIndicatorID = "RoomScreenFocusTimelineToastIndicator"
+         static let toastErrorID = "RoomScreenToastError"
+@@ -118,7 +122,9 @@
                     mediaProvider: userSession.mediaProvider,
                     contentScannerService: userSession.contentScannerService)
          
@@ -11,7 +22,7 @@
              // The timeline controller will start loading a detached timeline.
              showFocusLoadingIndicator()
          }
-@@ -318,6 +320,12 @@
+@@ -318,6 +324,12 @@
      // MARK: - Private
      
      private func handleTappedOnSenderDetails(sender: TimelineItemSender) {
@@ -24,7 +35,7 @@
          let memberDetails: ManageRoomMemberDetails = if let memberProxy = roomProxy.membersPublisher.value.first(where: { $0.userID == sender.id }) {
              .memberDetails(roomMember: .init(withProxy: memberProxy))
          } else {
-@@ -584,9 +592,9 @@
+@@ -584,9 +596,9 @@
      }
      
      private func setupUserSettingsSubscriptions() {
@@ -37,7 +48,16 @@
          
          userSettings.app.viewSourceEnabledPublisher
              .weakAssign(to: \.state.isViewSourceEnabled, on: self)
-@@ -719,6 +727,11 @@
+@@ -653,7 +665,7 @@
+                 return
+             }
+             
+-            switch await timelineController.paginateBackwards(requestSize: Constants.paginationEventLimit) {
++            switch await timelineController.paginateBackwards(requestSize: Constants.backPaginationEventLimit) {
+             case .failure:
+                 displayErrorToast(L10n.errorFailedLoadingMessages)
+             default:
+@@ -719,6 +731,11 @@
      
      private func sendReadReceiptIfNeeded(for lastVisibleItemID: TimelineItemIdentifier) async {
          guard appMediator.appState == .active else { return }
@@ -49,3 +69,11 @@
          
          await timelineController.sendReadReceipt(for: lastVisibleItemID)
      }
+@@ -899,6 +916,7 @@
+     // MARK: - Timeline Item Building
+     
+     private func buildTimelineViews(timelineItems: [RoomTimelineItemProtocol], isSwitchingTimelines: Bool = false) {
++        defer { ChatOpenTrace.items(timelineItems.count) } // iphoneblog: room-open timing
+         var timelineItemsDictionary = OrderedDictionary<TimelineItemIdentifier.UniqueID, RoomTimelineItemViewState>()
+         
+         timelineItems.filter { $0 is RedactedRoomTimelineItem }.forEach { timelineItem in

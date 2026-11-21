@@ -113,8 +113,12 @@ public final class ChatKitSession {
     public func roomView(roomID: String, host: ChatKitHost) -> AnyView {
         AnyView(ChatScreenLoader(id: roomID) { [weak self, weak host] presenter in
             guard let self, let host else { throw ChatKitError.sessionEnded }
+            ChatOpenTrace.begin("room \(roomID.prefix(8))")
             let roomProxy = try await joinedRoomProxy(roomID)
-            return ChatRoomCoordinator(session: self, roomProxy: roomProxy, presenter: presenter, host: host)
+            ChatOpenTrace.mark("proxy")
+            let coordinator = ChatRoomCoordinator(session: self, roomProxy: roomProxy, presenter: presenter, host: host)
+            ChatOpenTrace.mark("coordinator")
+            return coordinator
         })
     }
 

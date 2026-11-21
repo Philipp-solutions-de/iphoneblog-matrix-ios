@@ -17,6 +17,10 @@ typealias TimelineViewModelType = StateStoreViewModel<TimelineViewState, Timelin
 class TimelineViewModel: TimelineViewModelType, TimelineViewModelProtocol {
     private enum Constants {
         static let paginationEventLimit: UInt16 = 20
+        // iphoneblog: 50 back: reactions, edits and state events take up most of a page of 20,
+        // and a room filled its first screen only after four round trips one after another
+        // (2026-11-20, docs/performance.md, testOneChatAfterLaunch).
+        static let backPaginationEventLimit: UInt16 = 50
         static let detachedTimelineSize: UInt16 = 100
         static let focusTimelineToastIndicatorID = "RoomScreenFocusTimelineToastIndicator"
         static let toastErrorID = "RoomScreenToastError"
@@ -661,7 +665,7 @@ class TimelineViewModel: TimelineViewModelType, TimelineViewModelProtocol {
                 return
             }
             
-            switch await timelineController.paginateBackwards(requestSize: Constants.paginationEventLimit) {
+            switch await timelineController.paginateBackwards(requestSize: Constants.backPaginationEventLimit) {
             case .failure:
                 displayErrorToast(L10n.errorFailedLoadingMessages)
             default:
@@ -912,6 +916,7 @@ class TimelineViewModel: TimelineViewModelType, TimelineViewModelProtocol {
     // MARK: - Timeline Item Building
     
     private func buildTimelineViews(timelineItems: [RoomTimelineItemProtocol], isSwitchingTimelines: Bool = false) {
+        defer { ChatOpenTrace.items(timelineItems.count) } // iphoneblog: room-open timing
         var timelineItemsDictionary = OrderedDictionary<TimelineItemIdentifier.UniqueID, RoomTimelineItemViewState>()
         
         timelineItems.filter { $0 is RedactedRoomTimelineItem }.forEach { timelineItem in

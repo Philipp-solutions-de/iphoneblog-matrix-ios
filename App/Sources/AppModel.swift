@@ -79,6 +79,8 @@ final class AppModel: ObservableObject {
     private var restoreStarted = false
 
     func restore() async {
+        StartTrace.begin()
+        defer { StartTrace.mark("restore done") }
         guard !restoreStarted else { return }
         restoreStarted = true
         #if DEBUG

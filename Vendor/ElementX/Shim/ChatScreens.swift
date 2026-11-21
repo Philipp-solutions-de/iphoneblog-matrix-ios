@@ -84,6 +84,7 @@ struct ChatScreenLoader: View {
                 let coordinator = try await make(presenter)
                 coordinator.start()
                 holder.coordinator = coordinator
+                ChatOpenTrace.mark("screen shown")
             } catch {
                 MXLog.error("ChatKit could not open \(id): \(error)")
                 #if DEBUG
