@@ -17,6 +17,11 @@ final class AppModel: ObservableObject {
     }
     /// Navigation lives here, not in the session: the Blog tab exists signed out too.
     let router = Router()
+    /// The Blog tab's one web view, for the app's whole life. The root view builds a new tab
+    /// bar when the sign-in state changes; a web model owned by the tab came new with it and
+    /// loaded the blog again, several at once during a restore, which raced at beta's staff
+    /// gate (Philip's 500, build 220, 2026-11-20).
+    lazy var blogWeb = BlogWebModel(start: BlogTab.startURL)
     @Published var errorMessage: String?
     /// True when the server offers only username and password (a test server).
     /// Our own server signs in through the blog only.

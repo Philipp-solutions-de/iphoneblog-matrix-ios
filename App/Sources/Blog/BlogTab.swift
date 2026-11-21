@@ -10,9 +10,9 @@ struct BlogTab: View {
     @ObservedObject var router: Router
     /// Nil while signed out.
     let session: ChatSession?
-    /// One web view for the app's life: switching tabs, signing in or opening a discussion
-    /// never reloads the page the reader is on.
-    @StateObject private var web = BlogWebModel(start: BlogTab.startURL)
+    /// One web view for the app's life (AppModel.blogWeb): switching tabs, signing in or
+    /// opening a discussion never reloads the page the reader is on.
+    @ObservedObject var web: BlogWebModel
 
     var body: some View {
         NavigationStack(path: $router.blogPath) {

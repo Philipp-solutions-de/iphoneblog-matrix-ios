@@ -86,8 +86,13 @@ paywall included, exactly as the site does, and the app adds only the discussion
 view routes taps only: a "Diskussion" link opens the native discussion, a link to the blog
 keeps `app=1`, any other site opens in Safari. Redirects and the page's own loads go where the
 server sends them, so beta's staff gate (Authelia at `auth.phso.de`) signs in inside the view.
-One web view lives as long as the app (`BlogWebModel`): a tab switch, a sign-in or a
-discussion never reloads the page the reader is on. The discussion uses the system back
+One web view lives as long as the app (`AppModel.blogWeb`): a tab switch, a sign-in or a
+discussion never reloads the page the reader is on. It belongs to `AppModel`, not to the tab,
+because the root builds a new tab bar when the sign-in state changes; a web view per tab bar
+loaded the blog several times at once and raced at beta's gate (Philip's 500, 2026-11-20).
+The hub's episode request (`LiveEpisodesSource`) carries that web view's cookies for the blog's
+host, so the gate session on beta, and never follows a redirect: without a session the gate's
+302 means no episodes, not a sign-in started outside the web view. The discussion uses the system back
 button, so a swipe from the left edge returns to the blog where the reader was; a custom back
 button would switch that swipe off (Thorsten's test of build 70). The Blog home and the #one
 hub keep a navigation bar too, with their own header in it (the logo; "#one" and the search):
