@@ -25,9 +25,10 @@ final class PerformanceTests: XCTestCase {
         env["IPHONEBLOG_PERF_STATS"] ?? NSTemporaryDirectory() + "perf-stats.json"
     }
 
+    private var fixture: String { env["IPHONEBLOG_FIXTURE"] ?? "http://127.0.0.1:8796" }
+
     private func app(member: Bool = true) throws -> XCUIApplication {
         let app = XCUIApplication()
-        let fixture = env["IPHONEBLOG_FIXTURE"] ?? "http://127.0.0.1:8796"
         app.launchEnvironment = [
             "IPHONEBLOG_BLOG_WEB": "\(fixture)/blog/?app=1",
             "IPHONEBLOG_BLOG_API": "\(fixture)/api",
@@ -206,6 +207,37 @@ final class PerformanceTests: XCTestCase {
     }
 
     /// On a device, the first connection to the Mac's LAN address asks for local network access.
+    // MARK: Search
+
+    /// The search over blog and #one (ADR-0010): the fixture's 60 mixed hits with their marks,
+    /// all three pages loaded, flung up and down. Every row's text and highlights are prepared
+    /// off the main thread when the answer arrives; scrolling only lays them out.
+    func testScrollSearch() throws {
+        let app = try app(member: false)
+        app.launchEnvironment["IPHONEBLOG_SEARCH_URL"] = "\(fixture)/_iphoneblog/v1/search"
+        app.launch()
+        allowLocalNetwork()
+        let button = app.buttons["blog.search"]
+        XCTAssertTrue(button.waitForExistence(timeout: 60), "no search in the Blog tab")
+        button.tap()
+        let field = app.searchFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 10), "no search field")
+        field.typeText("akku")
+        let hit = app.descendants(matching: .any).matching(identifier: "site-search-hit").firstMatch
+        XCTAssertTrue(hit.waitForExistence(timeout: 20), "no hits")
+        let list = app.collectionViews["site-search.list"].firstMatch
+        // Down to the end, so the next pages are in before the measuring starts.
+        for _ in 0..<12 { list.swipeUp(velocity: .fast) }
+        for _ in 0..<12 { list.swipeDown(velocity: .fast) }
+        measure(metrics: [HitchMetric(statsPath: statsPath), XCTOSSignpostMetric.scrollDecelerationMetric, XCTOSSignpostMetric.scrollDraggingMetric],
+                options: options) {
+            list.swipeUp(velocity: .fast)
+            list.swipeUp(velocity: .fast)
+            list.swipeDown(velocity: .fast)
+            list.swipeDown(velocity: .fast)
+        }
+    }
+
     private func allowLocalNetwork() {
         #if !targetEnvironment(simulator)
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")

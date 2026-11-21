@@ -99,6 +99,28 @@ struct MainView: View {
         .sheet(item: $router.moderation) { request in
             if let session { ModerationSheet(request: request, session: session) }
         }
+        // The search over blog and #one, from the Blog tab and the #one hub. A hit closes it and
+        // opens where it lives; a link goes to Safari, as links from the blog do.
+        .sheet(isPresented: $router.showSiteSearch) {
+            SiteSearchView(model: model.siteSearch) { hit in
+                let target = Router.target(for: hit, chat: session != nil && router.isMember)
+                router.showSiteSearch = false
+                if case .outside(let url) = target {
+                    if !model.open(url) { UIApplication.shared.open(url) }
+                } else {
+                    router.open(target)
+                }
+            }
+        }
+        // The search sends the reader's token: the server decides what they may see.
+        .task(id: session?.userID) {
+            if let session {
+                model.siteSearch.setAccount(token: { [weak session] in await MainActor.run { try? session?.client.session().accessToken } },
+                                            refresh: { [weak session] in _ = try? await session?.client.displayName() })
+            } else {
+                model.siteSearch.setAccount(token: nil, refresh: { })
+            }
+        }
         .sheet(isPresented: $router.showSignIn) {
             SignInView()
                 .environmentObject(model)

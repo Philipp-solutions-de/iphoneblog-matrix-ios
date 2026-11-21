@@ -195,6 +195,8 @@ struct OneChatTab: View {
             ChatScreens.provider.threadsScreen(host: session)
                 .navigationTitle("Threads")
                 .navigationBarTitleDisplayMode(.inline)
+        case .video(let postID, let seconds, let page):
+            SearchVideoPage(postID: postID, seconds: seconds, page: page, episodes: episodes, players: players, router: router)
         case .search(let roomIDs, let current):
             ChatSearchView(model: ChatSearchModel(session: session, roomIDs: roomIDs, current: current), router: router,
                            roomName: session.oneRooms.first { $0.id == current }?.name)

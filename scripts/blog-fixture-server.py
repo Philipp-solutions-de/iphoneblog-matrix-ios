@@ -19,6 +19,11 @@
 /wp-json/iphoneblog/v1/one/episodes
                 the bundled episodes with the gate's cookie; without it 302 to /gate/start,
                 as the real gate answers (BlogLoadUITests)
+/_iphoneblog/v1/search
+                the search API of ADR-0010 (SiteSearchUITests, testScrollSearch): 60 mixed hits
+                for any query of two letters or more, chat only with a token, none for "nichts";
+                each request is counted in /calls ("search")
+/20…/           an article page, as a search hit opens it; counted in /calls ("article_loads")
 """
 import html, json, os, secrets, sys, urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -44,6 +49,61 @@ def page():
     return ('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
             '<style>body{font:17px -apple-system;margin:16px}@media(prefers-color-scheme:dark){body{background:#111;color:#eee}}'
             'a{color:#0f7d78}</style></head><body class="app-view">' + "".join(body) + "</body></html>")
+
+SEARCH_KINDS = ["post", "video", "link", "discussion", "one", "post", "chat", "video", "post", "link"]
+LABELS = {"post": "Beitrag", "one": "#one", "video": "Video", "link": "Link", "chat": "Chat", "discussion": "Diskussion"}
+
+def search_hits(q, signed_in):
+    """60 hits of every kind, as search-api answers them; the query is marked in each snippet."""
+    word = html.escape(q)
+    hits = []
+    for i in range(60):
+        kind = SEARCH_KINDS[i % len(SEARCH_KINDS)]
+        if kind == "chat" and not signed_in:
+            continue
+        n = i + 1
+        url = f"https://www.iphoneblog.de/2026/11/{(n % 28) + 1:02d}/{kind}-{n}/"
+        hit = {"id": f"{kind}:{n}", "type": kind, "label": LABELS[kind], "title": f"{LABELS[kind]} {n} über {word}",
+               "snippet": f"… und dann hält der <mark>{word}</mark> jetzt zwei Tage, sagt Nummer {n} &amp; noch "
+                          f"ein Satz dazu, damit die Zeile umbricht und der <mark>{word}</mark> zweimal vorkommt …",
+               "url": url, "deep_link": url, "t": None, "room_id": None, "event_id": None, "thread_root": None,
+               "room_name": None, "sender_name": None, "domain": None, "mentions": None, "post_id": 60000 + n,
+               "published": f"2026-11-{(n % 20) + 1:02d}T12:00:00Z", "score": round(1 - n / 100, 3)}
+        if kind == "video":
+            hit.update({"t": 60 * n + 14, "deep_link": url + f"?t={60 * n + 14}"})
+        elif kind == "link":
+            hit.update({"title": f"Apple-Seite {n} zu {word}", "url": f"https://www.apple.com/de/{word}-{n}/",
+                        "deep_link": f"https://www.apple.com/de/{word}-{n}/", "domain": "apple.com", "mentions": 3, "post_id": None})
+        elif kind == "discussion":
+            hit.update({"title": f"„Artikel 2“", "sender_name": "Jana Sommer", "event_id": f"$reply{n}",
+                        "thread_root": "$existing", "deep_link": f"https://chat.iphoneblog.de/#/room/!blog/$reply{n}"})
+        elif kind == "chat":
+            hit.update({"title": "", "sender_name": "Philip", "room_name": "one-chat", "room_id": "!fixture:iphoneblog.de",
+                        "event_id": f"$chat{n}", "deep_link": f"https://chat.iphoneblog.de/#/room/!fixture/$chat{n}", "post_id": None})
+        elif kind == "one" and not signed_in:
+            hit["locked"] = True
+        hits.append(hit)
+    return hits
+
+def search(query, headers):
+    params = urllib.parse.parse_qs(query)
+    q = params.get("q", [""])[0].strip()
+    types = [t for t in params.get("types", [""])[0].split(",") if t]
+    page, limit = int(params.get("page", ["1"])[0]), int(params.get("limit", ["20"])[0])
+    signed_in = headers.get("Authorization", "").startswith("Bearer ")
+    calls.setdefault("search", []).append({"q": q, "types": types, "page": page, "auth": signed_in})
+    if not 1 <= len(q) <= 200 or not 1 <= page <= 5 or not 1 <= limit <= 20:
+        return 400, {"code": "search_query"}
+    hits = [] if q.lower() == "nichts" or len(q) < 2 else search_hits(q, signed_in)
+    counts = {k: sum(1 for h in hits if h["type"] == k) for k in LABELS}
+    if types:
+        hits = [h for h in hits if h["type"] in types]
+    return 200, {"q": q, "page": page, "total": len(hits), "counts": counts, "took_ms": 3,
+                 "hits": hits[(page - 1) * limit:page * limit]}
+
+def article(path):
+    return ('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>'
+            f'<body class="app-view"><article><h1>Artikel unter {html.escape(path)}</h1><p>Text.</p></article></body></html>')
 
 def thread(root):
     title = next((t for _, l, t in ARTICLES if EXISTING.get(l) == root or made.get(l) == root), "Artikel")
@@ -87,6 +147,12 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(200, fixture.read())
             calls["episodes_gated"] += 1
             return self.send(302, "", "text/plain", [("Location", "/gate/start?rd=" + urllib.parse.quote(self.path, safe=""))])
+        if path == "/_iphoneblog/v1/search":
+            status, answer = search(parsed.query, self.headers)
+            return self.send(status, answer)
+        if path.startswith("/20"):
+            calls.setdefault("article_loads", []).append(self.path)
+            return self.send(200, article(path), "text/html; charset=utf-8")
         if path == "/api/links.json":
             return self.send(200, {"generated_ts": 0, "links": {**EXISTING, **made}})
         if path.startswith("/api/threads/") and path.endswith(".json"):
