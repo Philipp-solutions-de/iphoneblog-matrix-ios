@@ -104,8 +104,14 @@ case "$action" in
         # the member test also runs when IPHONEBLOG_TEST_* name a test homeserver.
         [[ -n "$device" ]] || { echo "build.sh: no iPhone simulator" >&2; exit 1; }
         xcrun simctl keychain "$device" reset 2>/dev/null || true # as for integration
+        # addmedia needs a booted simulator, and xcodebuild boots it only later: on a shut-down
+        # one every import failed without a word (2026-11-20).
+        xcrun simctl bootstatus "$device" -b >/dev/null
         # An animated GIF in the photo library, for the test that sends one (GifUITests).
-        xcrun simctl addmedia "$device" scripts/fixtures/animation.gif 2>/dev/null || true
+        xcrun simctl addmedia "$device" scripts/fixtures/animation.gif
+        # A photo dated 2001-01-01, so the picker labels it with "2001" and the Markup test finds
+        # it among the GIFs other tests add (RichMessagesUITests.testPhotoMarkupIsSent).
+        xcrun simctl addmedia "$device" scripts/fixtures/markup-photo.jpg
         clear_app_settings
         fixture_port="${FIXTURE_PORT:-8793}" # another port beside a running one (docs/mac-runner.md)
         if curl -s -o /dev/null "http://127.0.0.1:$fixture_port/calls"; then

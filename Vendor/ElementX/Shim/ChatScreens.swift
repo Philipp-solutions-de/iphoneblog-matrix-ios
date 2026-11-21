@@ -84,6 +84,7 @@ struct ChatScreenLoader: View {
                 let coordinator = try await make(presenter)
                 coordinator.start()
                 holder.coordinator = coordinator
+                ChatOpenTrace.mark("screen shown")
             } catch {
                 MXLog.error("ChatKit could not open \(id): \(error)")
                 #if DEBUG
@@ -211,6 +212,7 @@ final class ChatRoomCoordinator: ChatScreenCoordinator {
     private weak var host: ChatKitHost?
     private let screenViewModel: ThreadTimelineScreenViewModel
     private let timelineViewModel: TimelineViewModel
+    private let timelineController: TimelineControllerProtocol
     private let composerViewModel: ComposerToolbarViewModel
     private let sheets: ChatSheets
     private var cancellables = Set<AnyCancellable>()
@@ -221,10 +223,15 @@ final class ChatRoomCoordinator: ChatScreenCoordinator {
         self.host = host
 
         let itemFactory = session.timelineItemFactory()
+        // Where the reader stopped here (ChatReadPositions), unless a search result is about to
+        // show a message of its own.
+        let readPosition = ChatFocusRequests.shared.pending?.roomID == roomProxy.id ? nil
+            : ChatReadPositions.shared.restore(user: roomProxy.ownUserID, room: roomProxy.id, thread: nil)
         let timelineController = session.timelineControllerFactory.buildTimelineController(roomProxy: roomProxy,
-                                                                                            initialFocussedEventID: nil,
+                                                                                            initialFocussedEventID: readPosition,
                                                                                             timelineItemFactory: itemFactory,
                                                                                             mediaProvider: session.userSession.mediaProvider)
+        self.timelineController = timelineController
         sheets = ChatSheets(session: session, presenter: presenter, timelineController: timelineController, roomProxy: roomProxy)
 
         // The thread screen's view model holds what a conversation screen needs: title, avatar,
@@ -232,7 +239,7 @@ final class ChatRoomCoordinator: ChatScreenCoordinator {
         screenViewModel = ThreadTimelineScreenViewModel(roomProxy: roomProxy, userSession: session.userSession)
 
         timelineViewModel = TimelineViewModel(roomProxy: roomProxy,
-                                              focussedEventID: nil,
+                                              focussedEventID: readPosition,
                                               timelineController: timelineController,
                                               userSession: session.userSession,
                                               mediaPlayerProvider: session.mediaPlayerProvider,
@@ -271,8 +278,28 @@ final class ChatRoomCoordinator: ChatScreenCoordinator {
     }
 
     func stop() {
+        moveFullyRead()
         composerViewModel.stop()
         screenViewModel.stop()
+    }
+
+    /// The Neu divider follows m.fully_read, and Element X moves it only on "mark all read", so it
+    /// stayed days old (Thorsten's #one/Allgemein, build 178). On leaving, it moves to the newest
+    /// message the reader's receipts named this visit; never backwards.
+    func moveFullyRead() {
+        let seen = Set(ChatReadPositions.shared.takeSeen(room: roomProxy.id))
+        guard !seen.isEmpty else { return }
+        let loaded = timelineController.timelineItems.compactMap { $0.id.eventID } // oldest first
+        guard let newest = loaded.lastIndex(where: seen.contains) else { return }
+        if let current = roomProxy.infoPublisher.value.fullyReadEventID {
+            if let index = loaded.firstIndex(of: current) {
+                guard newest > index else { return }
+            } else if timelineController.timelineKind != .live {
+                return // a window of older messages: the marker may be newer than all of it
+            }
+        }
+        let eventID = loaded[newest]
+        Task { [roomProxy] in _ = await roomProxy.timeline.sendReadReceipt(for: eventID, type: .fullyRead) }
     }
 
     func toPresentable() -> AnyView {
@@ -280,7 +307,7 @@ final class ChatRoomCoordinator: ChatScreenCoordinator {
         let title = info.isDirect ? info.displayNameOrID : ChatKitStrings.channel(info.displayNameOrID)
         return AnyView(ChatRoomScreen(context: screenViewModel.context,
                                       timelineContext: timelineViewModel.context,
-                                      unread: roomProxy.infoPublisher.map(\.unreadMessagesCount).removeDuplicates().eraseToAnyPublisher(),
+                                      onLeave: { [weak self] in self?.moveFullyRead() },
                                       composerToolbar: ComposerToolbar(context: composerViewModel.context),
                                       title: title,
                                       // The room's topic if it has one; no member count, which is the same
@@ -361,10 +388,8 @@ private struct RoomHeader: ViewModifier {
 private struct ChatRoomScreen: View {
     @ObservedObject var context: ThreadTimelineScreenViewModelType.Context
     @ObservedObject var timelineContext: TimelineViewModelType.Context
-    /// The room's unread count, live, for the jump pill ("137 neue · zur ersten springen"). The
-    /// screen is built once, when the tab bar is; a count taken then would be stale.
-    let unread: AnyPublisher<UInt, Never>
-    @State private var unreadCount: UInt = 0
+    /// The room goes out of sight: m.fully_read follows what was read (ChatRoomCoordinator).
+    let onLeave: () -> Void
     let composerToolbar: ComposerToolbar
     let title: String
     let subtitle: String?
@@ -373,17 +398,6 @@ private struct ChatRoomScreen: View {
 
     @Environment(\.chatRoomHeaderHidden) private var headerHidden
 
-    /// The messages after the Neu divider among those loaded, else the room's unread count.
-    private var newCount: UInt {
-        let state = timelineContext.viewState.timelineState
-        if let marker = state.readMarkerUniqueID, let index = state.itemsDictionary.index(forKey: marker) {
-            let values = state.itemsDictionary.values
-            let messages = values[(index + 1)...].filter { $0.identifier.eventID != nil }.count
-            if messages > 0 { return UInt(messages) }
-        }
-        return unreadCount
-    }
-
     var body: some View {
         TimelineView(timelineContext: timelineContext)
             .background(.compound.bgCanvasDefault)
@@ -391,31 +405,17 @@ private struct ChatRoomScreen: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarBackground(style.colors.background, for: .navigationBar)
             .timelineMediaPreview(viewModel: $context.mediaPreviewViewModel)
-            .onReceive(unread) { unreadCount = $0 }
+            .onDisappear(perform: onLeave)
             .overlay(alignment: .top) {
-                if timelineContext.viewState.shouldShowJumpToReadMarker {
-                    // The web's pill (v0.6.5): the first unread message is above, out of sight.
-                    Button { timelineContext.send(viewAction: .scrollToReadMarker) } label: {
-                        Label(ChatKitStrings.jumpToUnread(newCount), systemImage: "arrow.up")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 14)
-                            .frame(minHeight: 34)
-                            .background(style.colors.accent, in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, 10)
-                    .accessibilityLabel(ChatKitStrings.jumpToUnread(newCount))
-                    .accessibilityIdentifier("room.jumpToUnread")
-                } else {
-                    FloatingDateBadge(dateText: timelineContext.floatingDate?.formattedDateSeparator()) {
-                        timelineContext.send(viewAction: .scrollToFirstItemForCurrentDate)
-                    }
-                    .padding(.top, 13)
+                FloatingDateBadge(dateText: timelineContext.floatingDate?.formattedDateSeparator()) {
+                    timelineContext.send(viewAction: .scrollToFirstItemForCurrentDate)
                 }
+                .padding(.top, 13)
             }
-            .overlay(alignment: .bottomTrailing) {
-                TimelineScrollButton(isHidden: !timelineContext.viewState.shouldShowScrollToBottomButton) {
+            .overlay(alignment: .bottom) {
+                // Tweetbot's way (Thorsten, 2026-11-19): the room opens where the reader stopped;
+                // this goes to the newest. It replaces the "zur ersten springen" pill.
+                ChatJumpToEndButton(isHidden: !timelineContext.viewState.shouldShowScrollToBottomButton) {
                     timelineContext.send(viewAction: .scrollToBottom)
                 }
             }
@@ -462,9 +462,12 @@ final class ChatThreadCoordinator: ChatScreenCoordinator {
         guard case let .success(timelineController) = result else { throw ChatKitError.threadUnavailable }
         sheets = ChatSheets(session: session, presenter: presenter, timelineController: timelineController, roomProxy: roomProxy)
 
+        // Where the reader stopped in this thread (ChatReadPositions). Only the view model gets it:
+        // the controller would focus the room's timeline, not the thread's, on an event it lacks.
+        let readPosition = ChatReadPositions.shared.restore(user: roomProxy.ownUserID, room: roomProxy.id, thread: rootEventID)
         let parameters = ThreadTimelineScreenCoordinatorParameters(userSession: session.userSession,
                                                                    roomProxy: roomProxy,
-                                                                   focussedEventID: nil,
+                                                                   focussedEventID: readPosition,
                                                                    timelineController: timelineController,
                                                                    mediaPlayerProvider: session.mediaPlayerProvider,
                                                                    emojiProvider: session.emojiProvider,
@@ -552,13 +555,6 @@ enum ChatComposer {
 
 /// Texts ChatKit adds to Element X's. German, like the rest of the app.
 enum ChatKitStrings {
-
-    /// "Noch keine Antworten", "1 Antwort", "5 Antworten".
-    /// "137 neue · zur ersten springen"; without a count, "Neue Nachrichten · zur ersten springen".
-    static func jumpToUnread(_ count: UInt) -> String {
-        count > 0 ? "\(count > 999 ? "999+" : "\(count)") neue · zur ersten springen" : "Neue Nachrichten · zur ersten springen"
-    }
-
     static func replies(_ count: Int) -> String {
         count == 0 ? "Noch keine Antworten" : count == 1 ? "1 Antwort" : "\(count) Antworten"
     }
@@ -603,4 +599,29 @@ extension EnvironmentValues {
 @MainActor
 final class ChatTimelineContextBox {
     weak var context: TimelineViewModel.Context?
+}
+
+/// "Zum Ende springen": the capsule over the composer while the reader is not at the newest
+/// message, in the style of the pill it replaces (ChatReadPositions).
+struct ChatJumpToEndButton: View {
+    let isHidden: Bool
+    let action: () -> Void
+
+    var body: some View {
+        if !isHidden {
+            Button(action: action) {
+                Label("Zum Ende springen", systemImage: "arrow.down")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 34)
+                    .background(ChatKitStyle.current.colors.accent, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.bottom, 10)
+            .accessibilityLabel("Zum Ende springen")
+            .accessibilityIdentifier("room.jumpToEnd")
+            .transition(.opacity)
+        }
+    }
 }

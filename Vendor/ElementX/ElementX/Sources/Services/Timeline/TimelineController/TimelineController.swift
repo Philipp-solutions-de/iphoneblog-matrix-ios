@@ -142,6 +142,7 @@ class TimelineController: TimelineControllerProtocol {
             var threadRootEventID: String?
             if case let .thread(rootEventID) = timelineKind { threadRootEventID = rootEventID }
             ChatKitReads.seen?(roomProxy.id, threadRootEventID, eventID, receiptType == .readPrivate)
+            ChatReadPositions.shared.noteSeen(room: roomProxy.id, thread: threadRootEventID, event: eventID)
         }
     }
     
@@ -522,6 +523,13 @@ class TimelineController: TimelineControllerProtocol {
             }
             
             return (activeTimelineProvider.itemProxies, activeTimelineProvider.paginationState)
+        }, roomProxy.infoPublisher.map(\.fullyReadEventID).removeDuplicates().dropFirst().compactMap { [weak self] _ in
+            // iphoneblog: the read position can arrive after the items; place the Neu divider then.
+            guard let activeTimelineProvider = self?.activeTimelineItemProvider else {
+                return nil
+            }
+            
+            return (activeTimelineProvider.itemProxies, activeTimelineProvider.paginationState)
         })
         
         updateTimelineItemsCancellable = Task { [weak self] in
@@ -529,6 +537,26 @@ class TimelineController: TimelineControllerProtocol {
                 await self?.updateTimelineItems(itemProxies: items, paginationState: paginationState)
             }
         }.asCancellable()
+    }
+    
+    /// iphoneblog: the Neu divider when the SDK placed none. The SDK draws its read marker only
+    /// when `m.fully_read` came with the room's first events; with more unread than that first
+    /// batch, or a room the app had cached before opening, it drew nothing (architecture.md,
+    /// "The Neu divider"). Here it goes after the read-position event whenever that event is
+    /// loaded and a message from someone else follows it, which is the SDK's own rule.
+    private func insertReadMarkerIfMissing(into items: inout [RoomTimelineItemProtocol]) {
+        switch timelineKind {
+        case .live, .detached: break
+        default: return
+        }
+        guard !items.contains(where: { $0 is ReadMarkerRoomTimelineItem }),
+              let fullyRead = roomProxy.infoPublisher.value.fullyReadEventID,
+              let index = items.firstIndex(where: { $0.id.eventID == fullyRead }) else {
+            return
+        }
+        let later = items[(index + 1)...]
+        guard later.contains(where: { ($0 as? EventBasedTimelineItemProtocol)?.isOutgoing == false }) else { return }
+        items.insert(ReadMarkerRoomTimelineItem(id: .virtual(uniqueID: .init("iphoneblog-read-marker"))), at: index + 1)
     }
     
     private func updateTimelineItems(itemProxies: [TimelineItemProxy], paginationState: TimelinePaginationState) async {
@@ -575,6 +603,8 @@ class TimelineController: TimelineControllerProtocol {
             
             return newTimelineItems
         }.value
+        
+        insertReadMarkerIfMissing(into: &newTimelineItems)
         
         // Check if we need to add anything to the top of the timeline.
         switch paginationState.backward {

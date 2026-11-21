@@ -59,9 +59,16 @@ final class RichMessagesUITests: XCTestCase {
         let app = try openChannel()
         // Tests that run earlier write into Allgemein too (the hub's, for one), so the seeded set
         // may sit above the screen: wait for the timeline, then scroll up to the PDF.
+        // Each suite added there pushes it further up (25 swipes; 10 stopped short on CI once
+        // the hub's and the long-press tests had written), and a swipe can carry past the row
+        // while the list still moves, so the search also comes back down.
         if !fileRow(app).waitForExistence(timeout: 30) {
-            for _ in 0..<10 where !fileRow(app).isHittable {
+            for _ in 0..<25 where !onScreen(fileRow(app), app) {
                 app.swipeDown(velocity: .slow)
+                _ = fileRow(app).waitForExistence(timeout: 2)
+            }
+            for _ in 0..<25 where !onScreen(fileRow(app), app) {
+                app.swipeUp(velocity: .slow)
                 _ = fileRow(app).waitForExistence(timeout: 2)
             }
         }
@@ -150,6 +157,61 @@ final class RichMessagesUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["timeline-image.loaded"].exists, "no loaded picture in sight")
     }
 
+    /// A picture's caption keeps its first letter: the rounded corners belong to the picture,
+    /// not to the caption below it (Philip, 2026-11-20, "Ein Kreis" lost the left of its E).
+    func testCaptionIsNotClippedByThePicturesCorner() throws {
+        let anna = try TestServer.signIn(2)
+        defer { anna.signOut() }
+        let room = try XCTUnwrap(env["IPHONEBLOG_TEST_CHANNEL_ROOM"])
+        let text = "Ein Kreis \(Int(Date().timeIntervalSince1970) % 100_000)"
+        try anna.sendContent(["msgtype": "m.image", "body": text, "filename": "picture.png",
+                              "url": try anna.uploadPNG(colored: .systemGray4, width: 240, height: 160),
+                              "info": ["mimetype": "image/png", "w": 240, "h": 160]], in: room)
+        let app = try openChannel()
+        // The caption's own text view: on screen (a frame), narrower than the row.
+        let candidates = app.descendants(matching: .any).matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@", text, text))
+        let until = Date().addingTimeInterval(60)
+        var found: XCUIElement?
+        while found == nil, Date() < until {
+            found = candidates.allElementsBoundByIndex.first { element in
+                let frame = element.frame
+                return frame.width > 20 && frame.height > 8 && frame.width < app.frame.width * 0.9 && app.frame.contains(frame)
+            }
+            if found == nil { sleep(1) }
+        }
+        let element = try XCTUnwrap(found, "the caption is not in the channel")
+        attach(app, "caption-timeline")
+        // The E's stem is the caption's leftmost ink. Cut by the picture's rounded corner, it
+        // lost its lower part; whole, it is as tall as the rest of the text.
+        let shot = try XCTUnwrap(element.screenshot().image.cgImage)
+        let width = shot.width, height = shot.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let context = try XCTUnwrap(CGContext(data: &pixels, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                              space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(shot, in: CGRect(x: 0, y: 0, width: width, height: height))
+        func isInk(_ x: Int, _ y: Int) -> Bool {
+            let i = (y * width + x) * 4
+            return (Int(pixels[i]) + Int(pixels[i + 1]) + Int(pixels[i + 2])) / 3 < 110
+        }
+        func rows(columns: Range<Int>) -> (top: Int, bottom: Int) {
+            var top = height, bottom = -1
+            for x in columns { for y in 0..<height where isInk(x, y) { top = min(top, y); bottom = max(bottom, y) } }
+            return (top, bottom)
+        }
+        let first = try XCTUnwrap((0..<width).first { x in (0..<height).contains { isInk(x, $0) } }, "no text in the caption")
+        // The first letters only, so no other text in the element counts.
+        let whole = rows(columns: first..<min(first + 60, width))
+        let stem = rows(columns: first..<min(first + 3, width))
+        let measured = XCTAttachment(string: "first ink column \(first), stem rows \(stem), text rows \(whole), width \(width)")
+        measured.name = "caption-measure"
+        measured.lifetime = .keepAlways
+        add(measured)
+        // Where the rounded corner cut, the stem stopped short of the line's foot (measured
+        // 2026-11-20: 6 px short before the fix, 1 px after).
+        XCTAssertGreaterThanOrEqual(stem.bottom, whole.bottom - 2,
+                                    "the caption's first letter is cut at the lower left (stem rows \(stem), text rows \(whole))")
+    }
+
     /// "@Anna" in a picture's caption (Philip, 2026-11-18: a caption's mention reached nobody):
     /// picked from the @ suggestions, sent as a mention (m.mentions, a link in formatted_body,
     /// the name as plain text in body), and Anna gets a mention.
@@ -189,7 +251,6 @@ final class RichMessagesUITests: XCTestCase {
         XCTAssertEqual(relation?["event_id"] as? String, root)
     }
 
-    /// + › Fotos, the first library picture, Senden in the upload preview; returns the server's event.
     /// A GIF pasted from a keyboard app or copied in Safari arrives animated (Thorsten, 2026-11-19).
     /// Gboard and Safari put a still JPEG beside the GIF on the pasteboard; the JPEG used to win.
     func testPastedGifIsSentAsAGif() throws {
@@ -233,6 +294,69 @@ final class RichMessagesUITests: XCTestCase {
         }.jpegData(compressionQuality: 0.8))
     }
 
+    /// "Markieren" in the upload preview opens a PencilKit canvas over the photo; the marked-up
+    /// photo is what is sent (Thorsten, 2026-11-19; PencilKit approved 2026-11-20).
+    func testPhotoMarkupIsSent() throws {
+        let app = try openChannel()
+        let before = Date()
+        app.buttons["composer_toolbar-open_compose_options"].tap()
+        let photos = app.buttons["room-attachment_picker_photo_library"]
+        XCTAssertTrue(photos.waitForExistence(timeout: 5), "no Fotos in the + menu")
+        photos.tap()
+        // build.sh's photo dated 2001-01-01, not a GIF other tests saved: Markieren is for
+        // photos only, and only that date puts "2001" in the picker's label.
+        let picture = app.images.matching(NSPredicate(format: "label CONTAINS '2001'")).firstMatch
+        // The picker shows the newest pictures first; this one, the oldest, is further down.
+        // Swipe up only: a swipe down closes the picker sheet.
+        let anyPicture = app.images.matching(NSPredicate(format: "label BEGINSWITH 'Foto' OR label BEGINSWITH 'Photo'")).firstMatch
+        XCTAssertTrue(anyPicture.waitForExistence(timeout: 45), "the photo picker did not open")
+        for _ in 0..<15 where !picture.isHittable {
+            app.swipeUp(velocity: .fast)
+            _ = picture.waitForExistence(timeout: 1)
+        }
+        XCTAssertTrue(picture.isHittable, "photo picker shows no photo from 2001 (build.sh adds it)")
+        sleep(1)
+        picture.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        app.buttons["Add"].tap()
+        XCTAssertTrue(app.textViews["Bildunterschrift hinzufügen"].waitForExistence(timeout: 60), "no upload preview")
+
+        let markup = app.buttons["upload.markup"]
+        XCTAssertTrue(markup.waitForExistence(timeout: 10), "no Markieren in the upload preview")
+        markup.tap()
+        // Our PencilKit editor: a red stroke across the photo, then Fertig. The canvas is a
+        // scroll view to XCTest, so it is looked up by identifier alone.
+        let canvas = app.descendants(matching: .any)["markup.canvas"]
+        XCTAssertTrue(canvas.waitForExistence(timeout: 10), "Markieren opened no drawing canvas")
+        let finish = app.buttons["markup.done"]
+        XCTAssertFalse(finish.isEnabled, "Fertig is on before anything is drawn")
+        canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.4))
+            .press(forDuration: 0.1, thenDragTo: canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.6)))
+        attach(app, "markup-drawn")
+        XCTAssertTrue(finish.isEnabled, "the stroke did not reach the canvas")
+        finish.tap()
+        XCTAssertTrue(app.textViews["Bildunterschrift hinzufügen"].waitForExistence(timeout: 20), "not back in the upload preview")
+        attach(app, "markup-preview")
+        app.buttons.matching(NSPredicate(format: "label == 'Senden' AND identifier != 'room-send_button'")).firstMatch.tap()
+        let event = try latestOwnMessage(msgtype: "m.image", after: before)
+        let mxc = try XCTUnwrap(event["url"] as? String, "the marked-up photo was not sent: \(event)")
+        // The photo has no red; the pen draws red. Red pixels in what the server holds prove
+        // the drawing went out, not the untouched photo.
+        let sent = try XCTUnwrap(UIImage(data: try TestServer.signIn(1).download(mxc)), "the sent photo does not decode")
+        XCTAssertGreaterThan(Self.redPixels(in: sent), 200, "the sent photo carries no drawing")
+    }
+
+    /// Pixels that are clearly red, the pen's colour.
+    private static func redPixels(in image: UIImage) -> Int {
+        guard let cg = image.cgImage else { return 0 }
+        let width = cg.width, height = cg.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        guard let context = CGContext(data: &pixels, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return 0 }
+        context.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return stride(from: 0, to: pixels.count, by: 4).filter { pixels[$0] > 190 && pixels[$0 + 1] < 90 && pixels[$0 + 2] < 90 }.count
+    }
+
+    /// + › Fotos, the first library picture, Senden in the upload preview; returns the server's event.
     private func sendPhoto(_ app: XCUIApplication, shotPrefix: String = "",
                            caption typed: String? = nil, mention pick: String? = nil) throws -> [String: Any] {
         let before = Date()
@@ -281,6 +405,15 @@ final class RichMessagesUITests: XCTestCase {
     // MARK: Helpers
 
     /// The PDF's row; Element X labels a file "Datei" for VoiceOver.
+    /// Inside the window, by its frame. Not isHittable: for a row the list has laid out off
+    /// screen, XCTest fails the test with "Failed to determine hittability" instead of answering
+    /// false (CI, #54 and #56, 2026-11-21).
+    private func onScreen(_ element: XCUIElement, _ app: XCUIApplication) -> Bool {
+        guard element.exists else { return false }
+        let frame = element.frame
+        return !frame.isEmpty && app.windows.firstMatch.frame.contains(CGPoint(x: frame.midX, y: frame.midY))
+    }
+
     private func fileRow(_ app: XCUIApplication) -> XCUIElement {
         app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Datei' OR label CONTAINS 'dokument.pdf'")).firstMatch
     }

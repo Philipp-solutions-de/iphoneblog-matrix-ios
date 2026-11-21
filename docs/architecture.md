@@ -72,7 +72,8 @@ with the extension. Apple's notification-filtering entitlement is requested for 
 account so the extension may drop pushes it cannot show.
 
 **Four tabs for members, two for everyone else; the blog as the front page.** #one members see
-Blog, #one, Für dich and Ich (Thorsten, 2026-11-17). Everyone else sees Blog and #one: signed out, a neutral
+Blog, #one, Für dich and Ich (Thorsten, 2026-11-17); the #one tab shows one "#", its big symbol,
+over the label "one" (Thorsten, 2026-11-20). Everyone else sees Blog and #one: signed out, a neutral
 sign-in ("Der Chat für #one-Mitglieder", Anmelden); signed in without #one, "Nur für
 #one-Mitglieder" with Abmelden and Konto löschen (App Store 5.1.1(v), since they have no Ich).
 No price, no way to buy, no hint where to get #one; they read discussions without writing
@@ -85,10 +86,26 @@ paywall included, exactly as the site does, and the app adds only the discussion
 view routes taps only: a "Diskussion" link opens the native discussion, a link to the blog
 keeps `app=1`, any other site opens in Safari. Redirects and the page's own loads go where the
 server sends them, so beta's staff gate (Authelia at `auth.phso.de`) signs in inside the view.
-One web view lives as long as the app (`BlogWebModel`): a tab switch, a sign-in or a
-discussion never reloads the page the reader is on. The discussion uses the system back
+One web view lives as long as the app (`AppModel.blogWeb`): a tab switch, a sign-in or a
+discussion never reloads the page the reader is on. It belongs to `AppModel`, not to the tab,
+because the root builds a new tab bar when the sign-in state changes; a web view per tab bar
+loaded the blog several times at once and raced at beta's gate (Philip's 500, 2026-11-20).
+The hub's episode request (`LiveEpisodesSource`) carries that web view's cookies for the blog's
+host, so the gate session on beta, and never follows a redirect: without a session the gate's
+302 means no episodes, not a sign-in started outside the web view. The discussion uses the system back
 button, so a swipe from the left edge returns to the blog where the reader was; a custom back
-button would switch that swipe off (Thorsten's test of build 70).
+button would switch that swipe off (Thorsten's test of build 70). The Blog home and the #one
+hub keep a navigation bar too, with their own header in it (the logo; "#one" and the search):
+with the bar hidden on one side of a push, the back button rode with the page and jumped when a
+back swipe was let go (Philip, 2026-11-20).
+
+**An article's video plays in its card** (Thorsten, 2026-11-20; the field in the WordPress repo's
+blog-card-video.md). The discussion's header shows the poster (the card's image without one)
+with play; a tap plays it right there with the episode player (`EpisodePlayer`, PiP, captions
+drawn and on), the rendition picked from the manifest when playing starts: the smallest listed
+file at least as wide as the screen, `h264.mp4` without a manifest. The title opens the article.
+The video comes from the thread file, which carries the backfilled cards' too, so no Matrix edit
+is read (`CardVideo.swift`).
 
 **Every article has a thread when someone signed in opens it.** A signed-in tap on
 "Diskussion" calls `POST /_iphoneblog/v1/article-thread` with the article's www address and
@@ -113,11 +130,14 @@ replies, pictures, video, files and the composer against the test homeserver.
 chips holds every #one room from the server, each with its unread count, "@" for a mention and
 99+ as the cap; tap only, no swipe; a teal dot at the bar's edge marks a room with news out of
 sight. The open room sits under the bar and shows no title of its own; the tab opens the last
-room read (`Router.currentRoomID`, forgotten on sign-out). When the open room has nothing new
-and another has, "Weiter: # <room> · n neu" leads there. Above the first unread message a teal
+room read (`Router.currentRoomID`, forgotten on sign-out). The bar's counts and dots are the
+way to the next room with news; there is no "Weiter" bar over the room (Thorsten, 2026-11-20).
+Above the first unread message a teal
 "Neu" divider; when it is out of sight a pill "n neue · zur ersten springen" jumps to it, as on
 the web. Bots the server lists (`GET /_iphoneblog/v1/bots`) get their name in the strong teal
-and a "Bot" pill with a robot, never by name.
+and a "Bot" pill with a robot, never by name. A room where members may not post (power levels, as on the
+server's read-only #releases) shows "Nur das Team schreibt hier" in place of the composer;
+reactions stay open.
 
 **Für dich: what concerns me, in one list.** Mentions of me (@me, @room, replies to my
 messages), threads I take part in with new replies (#one and the Blog's discussions), and the
@@ -150,6 +170,16 @@ and refusals counted before it, never count. The app restores its session once p
 second restore after iOS rebuilt the scene ran two clients that refreshed the same token 45 ms
 apart, which MAS treats as reuse and answers by revoking the session (Alex's logouts,
 2026-11-17).
+**The Neu divider.** A room shows "Neu" above the first message after the reader's
+`m.fully_read`, which moves only when the reader leaves the room (Shim `ChatScreens`,
+`moveFullyRead`). The SDK draws its read marker only when that event came with the room's first
+events (about 20), so a reader with more unread, or a room the app had cached before opening,
+got no divider (measured 2026-11-21: 30 new messages, no divider in 6 of 8 local attempts and
+every CI attempt). The timeline controller therefore places the divider itself when the SDK sent
+none: after the read-position event, once it is loaded and a message from someone else follows
+(patch to `TimelineController`). Rejected: a larger room subscription window, which only moves
+the limit.
+
 **Mentions turn read when seen, "read up to here".** Opening a mention's thread or room marks
 it read, without "Alle als gelesen": the timeline sends a read receipt for the newest message
 on screen (Element X), and every mention up to it counts as read, in rooms and in threads
@@ -172,6 +202,11 @@ the server refuses). Neither passes a message or thread reply not yet seen, and 
 one waits while a thread mention in the room is unread, because it would mark that mention read. The badge
 does not take the server's counts instead: they follow push rules, and the app turns
 `.m.rule.message` off for members who want no message pushes.
+
+**The timeline shows no one else's read receipts:** no avatars under the newest message and no
+"Gelesen von" (Philip, 2026-11-20; the website shows none). The app's own receipts go out as
+before, public: Element X ties both to `sharePresence`, so only the display is cut
+(`TimelineViewModel`, patch).
 
 **A thread opens only on its root.** A thread timeline built on a reply's ID sends receipts
 naming that reply as the thread, and Synapse refuses each with 400 (Alex's #bugs, 2026-11-17).
@@ -256,7 +291,7 @@ That code is AGPL-3.0, so this app is AGPL-3.0 too; the repository is public, as
 | Timeline | `Timeline`: pagination, local echo, send queue, edits, reactions, receipts | `Screens/Timeline` (cells, list, reactions, replies, thread summaries), `Services/Timeline` (SDK wrapper, view items) | adapters, our colours and type, cells we do not want removed |
 | Threads | thread focus, `ThreadListService`, thread subscriptions | `Screens/ThreadTimelineScreen`, `Screens/RoomThreadListScreen` | the article discussions and the threads in #one |
 | Composer | send queue, replies, edits, `Mentions`, markdown to HTML, media upload | the composer, its formatting toolbar (+ › Textformatierung) and mention suggestions from `Screens/RoomScreen`, `Other/Pills` | no polls, no voice messages |
-| Media | thumbnails, files, upload with progress | `Screens/FilePreviewScreen`, `Screens/MediaPickerScreen`, `Screens/MediaUploadPreviewScreen`; link previews through Apple's `LPMetadataProvider` (the phone fetches the page, not Synapse's preview_url) | the upload progress bar under a sending photo, video or file (`Shim/ChatUploadProgress.swift`); animated GIFs play from the original and go out unchanged (Element X), with Reduce Motion as their first frame (patch) |
+| Media | thumbnails, files, upload with progress | `Screens/FilePreviewScreen`, `Screens/MediaPickerScreen`, `Screens/MediaUploadPreviewScreen`; link previews through Apple's `LPMetadataProvider` (the phone fetches the page, not Synapse's preview_url) | the upload progress bar under a sending photo, video or file (`Shim/ChatUploadProgress.swift`); animated GIFs play from the original and go out unchanged (Element X), with Reduce Motion as their first frame (patch); with a caption, the picture alone gets the rounded corners, so the caption keeps its first letter (patch); Markieren in the upload preview draws on a photo, not a GIF, with PencilKit and sends the marked-up copy (`Shim/ChatMarkup.swift`) |
 | Design system | | `compound-ios` (needed by the views), recoloured through its override API | our tokens: teal, coral, greys; teal for all content, coral only for #one and sign-in (the colour rule in `App/Sources/Theme.swift`; it overrides the coral badges and mentions in `design/screens.html`) |
 | Push | `NotificationClient` | | extension text, pusher registration, tap routing |
 | Sign-in | OAuth 2.0, PKCE, dynamic registration | | one button, `ASWebAuthenticationSession` |
@@ -334,6 +369,11 @@ API change small, which costs less than a monthly jump over eight releases.
 - CI runs "Build and test" on Thorsten's Mac Studio when it is online and idle and the code is
   ours, on GitHub's hosted `xcode-27` image otherwise: forks, the weekly run, and every fallback
   (docs/mac-runner.md). TestFlight always runs on GitHub.
+- One run per branch at a time. A new push to a pull request's branch cancels its older run;
+  on `main` a new merge waits for the running build, and GitHub keeps only the newest waiting
+  run, so `main` still builds its newest commit next. Cancelling on `main` too stopped every
+  2.5-hour build when merges came hourly, and no build reached TestFlight for a day
+  (2026-11-20/21).
 - TestFlight: `fastlane/Fastfile`, switched on with the repository variable
   `TESTFLIGHT_ENABLED` once the App Store Connect key exists (README).
 

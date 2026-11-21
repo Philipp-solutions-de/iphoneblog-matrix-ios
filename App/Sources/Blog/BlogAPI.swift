@@ -36,6 +36,9 @@ enum GuestAPI {
         let replyCount: Int
         let latestReplyTs: Int64?
         let lastRepliers: [Replier]?
+        /// The article's video, played in the card (blog-card-video.md); nil without one. The
+        /// files carry the backfilled cards' videos too, so no Matrix edit needs reading here.
+        let video: CardVideo?
 
         /// Names only: the server shows no avatars (Synapse's media needs a token).
         struct Replier: Decodable {

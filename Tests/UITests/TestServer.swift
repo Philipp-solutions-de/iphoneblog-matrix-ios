@@ -223,6 +223,19 @@ struct TestServer {
         return Set((page["notifications"] as? [[String: Any]] ?? []).compactMap { ($0["event"] as? [String: Any])?["event_id"] as? String })
     }
 
+    /// This account's m.fully_read in a room (the Neu divider's place), if any.
+    func fullyRead(in room: String) throws -> String? {
+        let data = try Self.call(base, "/_matrix/client/v3/user/\(Self.encode(userID))/rooms/\(Self.encode(room))/account_data/m.fully_read",
+                                 method: "GET", token: token, body: nil)
+        return data["event_id"] as? String
+    }
+
+    /// Sets m.fully_read as another client would.
+    func setFullyRead(_ eventID: String, in room: String) throws {
+        _ = try Self.call(base, "/_matrix/client/v3/rooms/\(Self.encode(room))/read_markers", method: "POST", token: token,
+                          body: ["m.fully_read": eventID])
+    }
+
     /// Reacts to an event and returns the reaction's ID.
     func react(_ key: String, to event: String, in room: String) throws -> String {
         let path = "/_matrix/client/v3/rooms/\(Self.encode(room))/send/m.reaction/r\(UInt64(Date().timeIntervalSince1970 * 1000))\(Int.random(in: 0..<1000))"
@@ -261,6 +274,15 @@ struct TestServer {
     func createRoom(_ name: String) throws -> String {
         let result = try Self.call(base, "/_matrix/client/v3/createRoom", method: "POST", token: token,
                                    body: ["name": name, "preset": "public_chat"])
+        return try XCTUnwrap(result["room_id"] as? String, "createRoom failed")
+    }
+
+    /// A room where only its creator posts, as the server's read-only rooms (#releases): messages
+    /// need power level 50, reactions stay open to everyone (docs/matrix.md in infra, read_only).
+    func createReadOnlyRoom(_ name: String) throws -> String {
+        let result = try Self.call(base, "/_matrix/client/v3/createRoom", method: "POST", token: token,
+                                   body: ["name": name, "preset": "public_chat",
+                                          "power_level_content_override": ["events": ["m.room.message": 50, "m.reaction": 0]]])
         return try XCTUnwrap(result["room_id"] as? String, "createRoom failed")
     }
 

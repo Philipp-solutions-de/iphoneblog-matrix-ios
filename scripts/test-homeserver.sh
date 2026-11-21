@@ -45,6 +45,10 @@ rc_login:
   failed_attempts: {per_second: 1000, burst_count: 1000}
 rc_joins:
   local: {per_second: 1000, burst_count: 1000}
+# Room creation too: Synapse's default lets ten through, then about one a minute, and the UI
+# tests make three per run of the room-bar test. Back-to-back local runs hit 429
+# (rc_room_creation) where CI's fresh server did not (2026-11-21).
+rc_room_creation: {per_second: 1000, burst_count: 1000}
 # As on our server: no encryption for any room type.
 encryption_enabled_by_default_for_room_type: "off"
 EOF

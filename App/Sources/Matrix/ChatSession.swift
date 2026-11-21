@@ -78,6 +78,7 @@ final class ChatSession: ObservableObject, ChatHost {
 
     /// Starts sliding sync and the room list. Safe to call again after `stop()`.
     func start() async throws {
+        StartTrace.mark("session start")
         if syncService == nil {
             // The send queue reports how far an upload is; the message row shows it as a bar.
             client.enableSendQueueUploadProgress(enable: true)
@@ -90,16 +91,27 @@ final class ChatSession: ObservableObject, ChatHost {
                 Task { @MainActor in self?.syncStateChanged(state) }
             })
             try await rooms.attach(to: service.roomListService())
+            StartTrace.mark("sync service built")
         }
         await syncService?.start()
+        StartTrace.mark("sync started")
         await resolveRooms()
+        StartTrace.mark("rooms resolved")
         try await ChatScreens.provider.start(host: self)
+        StartTrace.mark("chat screens ready")
         mentions.attach(to: self)
         forYou.attach(to: self)
-        await loadBots()
         notificationPrefs.attach(to: self)
-        displayName = try? await client.displayName()
-        await loadAvatar()
+        // The #one rooms, the bots, the name and the picture load beside the screens, not before
+        // them: each is a round trip, and the app showed a spinner for all of them in a row,
+        // about a second on a phone before #one could open a room (2026-11-20, docs/performance.md).
+        Task { [weak self] in await self?.loadOneRooms() }
+        Task { [weak self] in
+            guard let self else { return }
+            await loadBots()
+            displayName = try? await client.displayName()
+            await loadAvatar()
+        }
         log.info("sync started")
     }
 
@@ -156,7 +168,11 @@ final class ChatSession: ObservableObject, ChatHost {
     /// whose presence among the joined rooms makes someone a member. A lapsed membership drops
     /// the room and locks #one-Chat on the next sync.
     private func resolveRooms() async {
-        if let blog = await resolve(Self.alias("IPHONEBLOG_BLOG_ALIAS", Brand.blogRoomAlias)) {
+        // The three addresses at once: one after another they cost three round trips.
+        async let blogAlias = resolve(Self.alias("IPHONEBLOG_BLOG_ALIAS", Brand.blogRoomAlias))
+        async let oneAlias = resolve(Self.alias("IPHONEBLOG_ONE_ALIAS", Brand.oneRoomAlias))
+        async let channelAlias = resolve(Self.alias("IPHONEBLOG_CHANNEL_ALIAS", Brand.oneChannelAlias))
+        if let blog = await blogAlias {
             blogRoomID = blog.roomId
             router.blogRoomID = blog.roomId
             rooms.hidden = [blog.roomId]
@@ -167,9 +183,11 @@ final class ChatSession: ObservableObject, ChatHost {
         } else {
             log.error("blog room alias does not resolve")
         }
-        oneRoomID = await resolve(Self.alias("IPHONEBLOG_ONE_ALIAS", Brand.oneRoomAlias))?.roomId
-        oneChannelID = await resolve(Self.alias("IPHONEBLOG_CHANNEL_ALIAS", Brand.oneChannelAlias))?.roomId
+        oneRoomID = await oneAlias?.roomId
+        oneChannelID = await channelAlias?.roomId
+        StartTrace.mark("aliases")
         await refreshMembership()
+        StartTrace.mark("membership")
         // The space may not have synced yet at this first look, and the room list may then go
         // quiet: look again a few times soon, rather than waiting for the 5-minute timer.
         membershipRetry = Task { [weak self] in
@@ -243,10 +261,25 @@ final class ChatSession: ObservableObject, ChatHost {
     /// Fetches the #one room list (names, order, locked for non-members); without the server's
     /// endpoint (the test server), the space's children as the joined rooms name them.
     func loadOneRooms() async {
+        // Start-up and the #one tab both ask; the second waits for the first.
+        if let running = oneRoomsLoad { return await running.value }
+        let load = Task { await fetchOneRooms() }
+        oneRoomsLoad = load
+        await load.value
+        oneRoomsLoad = nil
+    }
+
+    private var oneRoomsLoad: Task<Void, Never>?
+
+    private func fetchOneRooms() async {
+        StartTrace.mark("one rooms: load")
+        defer { StartTrace.mark("one rooms: loaded \(oneRooms.count)") }
         struct Response: Decodable {
             struct Room: Decodable {
                 let room_id: String // swiftlint:disable:this identifier_name
-                let name: String
+                // Rooms come from the space #one since 2026-11-20; one made in Element may have
+                // no name (the server sends "") and no alias (the app never reads alias).
+                let name: String?
                 let topic: String?
                 let locked: Bool?
             }
@@ -254,7 +287,12 @@ final class ChatSession: ObservableObject, ChatHost {
         }
         if let data = try? await api("GET", "/_iphoneblog/v1/rooms"),
            let response = try? JSONDecoder().decode(Response.self, from: data) {
-            let list = response.rooms.map { OneRoom(id: $0.room_id, name: $0.name, topic: $0.topic, locked: $0.locked ?? !isOneMember) }
+            let list = response.rooms.map { room in
+                let given = room.name.flatMap { $0.isEmpty ? nil : $0 }
+                let shown = given ?? (try? client.getRoom(roomId: room.room_id))?.displayName().flatMap { $0.isEmpty ? nil : $0 } ?? room.room_id
+                return OneRoom(id: room.room_id, name: shown, topic: room.topic.flatMap { $0.isEmpty ? nil : $0 },
+                               locked: room.locked ?? !isOneMember)
+            }
             if list != oneRooms { oneRooms = list }
             return
         }

@@ -2,14 +2,16 @@
   "_comment": "docs/performance.md. A CI smoke test, not a fluidity measure: each metric's best iteration after the warm-up, against a baseline (the median of those bests over ten CI runs of 2026-11-17 on the pinned iPhone 17 Pro simulator); it fails at twice the baseline (tolerance.relative 1.0) and the absolute slack.",
   "gated": [
     "Hitch time ratio",
-    "Clock Monotonic Time"
+    "Clock Monotonic Time",
+    "First messages"
   ],
   "budgets": {},
   "tolerance": {
     "relative": 1.0,
     "absolute": {
       "Hitch time ratio": 1.0,
-      "Clock Monotonic Time": 2.0
+      "Clock Monotonic Time": 2.0,
+      "First messages": 1.0
     }
   },
   "baselines": {

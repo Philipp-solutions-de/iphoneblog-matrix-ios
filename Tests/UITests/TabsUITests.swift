@@ -39,7 +39,7 @@ final class TabsUITests: XCTestCase {
     func testSignedOutSeesBlogAndASignIn() {
         let app = launch(["IPHONEBLOG_SIGNED_OUT": "1"])
         XCTAssertTrue(app.buttons["one.signIn"].waitForExistence(timeout: 30), "no sign-in in #one-Chat")
-        XCTAssertEqual(tabs(app), ["Blog", "#one"])
+        XCTAssertEqual(tabs(app), ["Blog", "one"])
         XCTAssertEqual(app.staticTexts["one.gate.text"].label, "Melde dich mit deinem iPhoneBlog-Konto an, um #one zu öffnen.")
         assertNoBuyWording(app)
         attach(app, "tabs-signed-out")
@@ -54,14 +54,14 @@ final class TabsUITests: XCTestCase {
         XCTAssertEqual(app.buttons["one.signOut"].label, "Mit anderem Konto anmelden")
         XCTAssertTrue(app.buttons["one.deleteAccount"].exists, "no Konto löschen")
         assertNoBuyWording(app)
-        XCTAssertEqual(tabs(app), ["Blog", "#one"])
+        XCTAssertEqual(tabs(app), ["Blog", "one"])
         attach(app, "tabs-non-member")
     }
 
     func testMemberSeesAllFour() throws {
         let app = try signIn(env["IPHONEBLOG_TEST_USER"], env["IPHONEBLOG_TEST_PASSWORD"])
         XCTAssertTrue(app.tabBars.buttons["Für dich"].waitForExistence(timeout: 120), "no member tabs")
-        XCTAssertEqual(tabs(app), ["Blog", "#one", "Für dich", "Ich"])
+        XCTAssertEqual(tabs(app), ["Blog", "one", "Für dich", "Ich"])
         attach(app, "tabs-member")
     }
 

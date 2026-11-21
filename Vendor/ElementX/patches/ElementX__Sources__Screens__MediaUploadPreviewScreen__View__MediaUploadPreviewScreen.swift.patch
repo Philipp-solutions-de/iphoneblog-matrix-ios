@@ -34,3 +34,36 @@
              }
              .navigationTitle(title)
              .navigationBarTitleDisplayMode(.inline)
+@@ -169,6 +184,20 @@
+         }
+         
+         if isCurrentMediaImage {
++            // iphoneblog: draw on a photo with PencilKit, not on a GIF (Thorsten, 2026-11-19).
++            if !isCurrentMediaGIF {
++                ToolbarItem(placement: .primaryAction) {
++                    Button {
++                        let index = currentIndex
++                        ChatMarkup.present(imageURL: context.viewState.mediaURLs[index]) { image in
++                            if let image { context.send(viewAction: .editedMedia(image: image, index: index)) }
++                        }
++                    } label: {
++                        Label("Markieren", systemImage: "pencil.tip.crop.circle")
++                    }
++                    .accessibilityIdentifier("upload.markup")
++                }
++            }
+             ToolbarItem(placement: .primaryAction) {
+                 Button { context.isPresentingMediaEditor = true } label: {
+                     CompoundIcon(\.crop)
+@@ -191,6 +220,11 @@
+         return type.conforms(to: .image)
+     }
+     
++    private var isCurrentMediaGIF: Bool {
++        guard context.viewState.mediaURLs.indices.contains(currentIndex) else { return false }
++        return UTType(filenameExtension: context.viewState.mediaURLs[currentIndex].pathExtension)?.conforms(to: .gif) ?? false
++    }
++    
+     private func handleKeyPress(_ key: UIKeyboardHIDUsage) {
+         switch key {
+         case .keyboardReturnOrEnter:

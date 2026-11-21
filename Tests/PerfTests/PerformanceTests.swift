@@ -69,6 +69,34 @@ final class PerformanceTests: XCTestCase {
 
     // MARK: #one-Chat
 
+    /// A launch with a stored session to the first message in #one, through a phone's round
+    /// trip (latency-proxy.py, 100 ms). Start-up steps that wait one after another cost a round
+    /// trip each: the room list, the bots, the name and the picture held the screens back by
+    /// about a second (2026-11-20, docs/performance.md).
+    func testOneChatAfterLaunch() throws {
+        let app = try app()
+        guard let slow = env["IPHONEBLOG_SLOW_HOMESERVER"] else { throw XCTSkip("no slow homeserver (scripts/perf.sh)") }
+        app.launchEnvironment["IPHONEBLOG_HOMESERVER"] = slow
+        app.launchEnvironment["IPHONEBLOG_START_TAB"] = "chat"
+        let startFile = (statsPath as NSString).deletingLastPathComponent + "/perf-start.json"
+        app.launchEnvironment["IPHONEBLOG_PERF_START"] = startFile
+        // Signed in once outside the measurement: each measured launch restores that session.
+        launchSignedIn(app)
+        let message = app.staticTexts["Felix H."].firstMatch
+        XCTAssertTrue(message.waitForExistence(timeout: 120), "#one shows no seeded messages")
+        app.terminate()
+        let measured = XCTMeasureOptions()
+        measured.iterationCount = 5
+        measured.invocationOptions = [.manuallyStop]
+        measure(metrics: [FirstMessagesMetric(path: startFile)], options: measured) {
+            app.launch()
+            XCTAssertTrue(message.waitForExistence(timeout: 60), "#one shows no seeded messages after a launch")
+            sleep(1) // the app writes its time a moment after the timeline fills
+            stopMeasuring()
+            app.terminate()
+        }
+    }
+
     /// The channel with 160 messages, 30 of them photos up to 4032x3024: fling up through the
     /// history and back down.
     func testScrollOneChat() throws {
@@ -129,7 +157,7 @@ final class PerformanceTests: XCTestCase {
         launchSignedIn(app)
         _ = try openOneChat(app)
         measure(metrics: [XCTClockMetric(), XCTOSSignpostMetric.navigationTransitionMetric], options: options) {
-            for name in ["Blog", "#one", "Für dich", "Ich", "Blog"] {
+            for name in ["Blog", "one", "Für dich", "Ich", "Blog"] {
                 let tab = tabButton(app, name)
                 tab.tap()
                 XCTAssertTrue(tab.isSelected, "\(name) not selected")
@@ -191,7 +219,7 @@ final class PerformanceTests: XCTestCase {
     /// Opens the #one tab and returns its timeline once the newest seeded messages show.
     private func openOneChat(_ app: XCUIApplication) throws -> XCUIElement {
         allowLocalNetwork()
-        let tab = tabButton(app, "#one")
+        let tab = tabButton(app, "one")
         XCTAssertTrue(tab.waitForExistence(timeout: 30), "no #one tab")
         // The sign-in runs in the background after launch; the tab shows the channel once the
         // session and the space are there.

@@ -1,4 +1,4 @@
-# TestFlight for the iphoneblog chat app. Everything runs with an App Store Connect API key
+# TestFlight for the iPhoneBlog chat app. Everything runs with an App Store Connect API key
 # from repository secrets; nobody's Apple ID password is used. Setup: docs/apple-setup.md.
 #
 #   bundle exec fastlane ios register   identifiers and capabilities (Apple setup workflow)
@@ -340,6 +340,28 @@ platform :ios do
     UI.message("invite to \"#{group.dig('attributes', 'name')}\": HTTP #{code}")
     (body["errors"] || []).each { |e| UI.message("  #{e['code']}: #{e['detail']}") }
     UI.user_error!("invite failed") unless code.start_with?("2")
+  end
+
+  # The App Store page: texts and review notes from fastlane/metadata, screenshots from
+  # fastlane/screenshots (scripts/store-screenshots.sh). No binary, and never a submission:
+  # a person picks the build and presses "Submit for Review" in App Store Connect. Privacy
+  # labels and the age rating are answered there by hand too (docs/app-store.md), because
+  # Apple's API does not take them with an API key.
+  desc "Upload the App Store texts and screenshots; no build, no submission"
+  lane :store_listing do
+    deliver(
+      api_key: api_key,
+      app_identifier: brand("BUNDLE_ID"),
+      metadata_path: File.join(ROOT, "fastlane/metadata"),
+      screenshots_path: File.join(ROOT, "fastlane/screenshots"),
+      skip_binary_upload: true,
+      skip_screenshots: Dir[File.join(ROOT, "fastlane/screenshots/*/*.png")].empty?,
+      overwrite_screenshots: true,
+      submit_for_review: false,
+      automatic_release: false,
+      run_precheck_before_submit: false,
+      force: true # no HTML preview to confirm; the files are reviewed in the pull request
+    )
   end
 
   desc "Build and sign for the App Store without uploading (proves signing works)"

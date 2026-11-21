@@ -8,7 +8,7 @@ are. Apple's texts quoted here were read on 2026-11-16.
 
 | Apple asks | Answer | Where |
 |---|---|---|
-| In-app purchase (3.1.1) | None. #one is sold on the website; the app shows no price, buy button or link to buy (`SHOW_PURCHASE` off). A free app beside a paid web service, 3.1.3(f) | `brand.env`, review notes |
+| In-app purchase (3.1.1) | None. #one is sold on the website; the app has no price, buy button or link to buy anywhere in its code, and the Blog tab's web view sells nothing (iphoneblog-wordpress `docs/app-view.md`, "No purchase in the app"). A free app beside a paid web service, 3.1.3(f) | review notes |
 | User content (1.2) | Report a message or a person (mailed to the moderation contact ao@iphoneblog.de), block a person; no word filter (Thorsten, 2026-11-16: added only if review refuses for its lack) | `App/Sources/Moderation/`, server module (infra) |
 | Account deletion (5.1.1(v)) | Ich → Konto löschen → the website's `/konto/loeschen/` | `AccountDeletionView.swift`, iphoneblog-wordpress |
 | Privacy manifest | `PrivacyInfo.xcprivacy` in the app, the notification extension and ChatKit | below |
@@ -30,7 +30,7 @@ Three files, one per bundle that runs code: `App/Resources/PrivacyInfo.xcprivacy
 - **Tracking**: none, no tracking domains. Element X's PostHog and Sentry are cut
   (`Vendor/ElementX/Shim/Analytics.swift`).
 - **Collected** (the app's file only), all linked to the person, for app functionality, none for
-  tracking: name, email address, user ID, messages, photos or videos, audio (voice messages),
+  tracking: email address, user ID, messages, photos or videos, audio (voice messages),
   other user content (reactions, reports).
 - Of the 21 packages only Kingfisher and Mantis ship their own manifest.
 
@@ -40,28 +40,42 @@ Enter the same as the manifest: **Data Linked to You**, purpose **App Functional
 
 | Category | Type | Why |
 |---|---|---|
-| Contact Info | Name, Email Address | the account, from iphoneblog.de's sign-in |
-| Identifiers | User ID | `@name:iphoneblog.de` |
-| User Content | Emails or Text Messages, Photos or Videos, Audio Data, Other User Content | messages, pictures, voice messages, reactions and reports |
+| Contact Info | Email Address | the account, from iphoneblog.de's sign-in |
+| Identifiers | User ID | `@name:iphoneblog.de` and the nickname shown with it; Apple counts a screen name or handle as a user ID |
+| User Content | Emails or Text Messages, Photos or Videos, Audio Data, Other User Content | messages, pictures, voice messages, reactions and reports, kept on the chat server |
 
-**When the app offers "Kontaktdaten teilen"** (the server's `POST /_iphoneblog/v1/contact-share`,
-infra `docs/matrix.md`, "Sharing contact details"; no screen in the app yet), the same build adds
-**Contact Info → Phone Number** to the labels (typed, mailed once through Mailjet, not stored by
-us; declared because the mail service and the recipient keep it), and this paragraph to
-`review_information/notes.txt` under "USER-GENERATED CONTENT":
+**The rule behind them** (Thorsten, 2026-11-19): we store no personal data beyond the email
+address and the nickname, plus what WordPress and Stripe already hold. What members write,
+send and react with is kept on the chat server so the conversation can be shown; Apple counts
+that as collected, so it is declared.
 
-> - "Kontaktdaten teilen": a #one member can send their own email address and/or a phone number they type, with a short note, to one other member. It goes as a single email from chat@iphoneblog.de to that member's address on file; nothing appears in the chat, there is no reply in the app, and the recipient's address is never shown. Limits: 5 an hour, 20 a day, 2 a day to the same person. Unwanted mails can be forwarded to ao@iphoneblog.de.
-
-**Data Used to Track You**: none. **Not collected**: purchases (Stripe on the website, not in the
-app), location, contacts, browsing history, diagnostics, usage data. Privacy policy URL
-`https://www.iphoneblog.de/datenschutz/`, once the chat's section is there.
+**Data Used to Track You**: none. **Not collected**: a name (members have a nickname, under User
+ID); the phone number of "Kontaktdaten teilen" (`ContactShare.swift`), which is typed for one
+share, passed to the recipient by mail and stored nowhere, and which Apple's optional-disclosure
+exception also covers (optional, rare, not the app's purpose, typed in a form that shows the
+sender's account); purchases (Stripe on the website, not in the
+app), location, contacts, browsing history, search history (the chat search sends the term to
+our server and keeps nothing), usage data, and diagnostics: `MetricsReporter` reports only from
+TestFlight and Xcode builds, and the labels describe the App Store build. The push token is not a
+label type. The blog loads no analytics; articles may embed YouTube, Vimeo or X players, which
+are web content, not code in the app. Privacy policy URL `https://www.iphoneblog.de/datenschutz/`.
 
 ## Age rating
 
-App Store Connect's questionnaire: **user-generated content and messaging: yes**; **unrestricted
-web access: no**, because `BlogURLPolicy` keeps the web view on iphoneblog.de; every content
-question (violence, sexual content, gambling, contests, medical) **none**; no location sharing
-(the SDK's live location is not offered in the composer). Expected rating 13+.
+App Store Connect → App Information → Age Rating. Apple's questionnaire (tiers 4+, 9+, 13+, 16+,
+18+) has a list of in-app controls and capabilities, then content questions by frequency.
+
+- **Capabilities**: User-Generated Content and Messaging and Chat: **yes** (both alone give 4+).
+  Unrestricted Web Access: **no**, because `BlogURLPolicy` keeps the web view on iphoneblog.de
+  (yes would give 16+). Social Media: **no**: Apple means "a social feed or similar discovery
+  method that visibly spreads content to many users"; #one's rooms are a group chat and "Für dich"
+  lists only one's own mentions and threads (yes would give 13+ and a Social Media label).
+  Advertising, Parental Controls, Age Assurance: **no**.
+- **Content** (mature themes, medical or wellness, sexuality or nudity, violence, chance-based
+  activities including contests and loot boxes): **none** everywhere; no location sharing (the
+  SDK's live location is not offered in the composer).
+- **Result**: 4+. Whether to raise it with "Override to Higher Age Rating" is Thorsten's call:
+  member conversations have no word filter, and no page of iphoneblog.de sets a minimum age.
 
 ## Export compliance
 
@@ -197,30 +211,50 @@ All within Apple's 30 characters (counted with spaces). Category: **primary News
 Social Networking would invite the reviewer to judge the app as a social network first, and
 the reader-app case rests on it being a publication.
 
-**Screenshots** (6.9" iPhone, German, the demo account, no prices, no "Chat" in captions):
+**Screenshots**: `scripts/store-screenshots.sh` takes seven on an iPhone 17 Pro Max (1320 × 2868,
+Apple's 6.9" size, which App Store Connect scales down for smaller iPhones), German, light, with
+Apple's status bar (9:41), into `fastlane/screenshots/de-DE`. Articles come from live www's app
+view; the signed-in shots from the store server (`scripts/store-homeserver.sh start`, port 8018,
+server name iphoneblog.de), which `scripts/store-seed.py` fills with an invented cast: the demo
+member Lena Hoffmann and four others, all fictional, so nobody's consent is needed. They talk in
+German about the news: a real public article's discussion, episode #532 in Allgemein, a thread
+about the Passwords app, and a mention of Lena.
 
-1. Blog: the article list. "Alle Artikel von iPhoneBlog.de"
-2. One article, open. "Lesen ohne Anmeldung"
-3. The discussion under that article. "Unter jedem Artikel: die Diskussion"
-4. A #one article, open for a member. "#one: die Inhalte für Mitglieder"
-5. The members' room with a thread about an article. "Mit anderen Mitgliedern über die News reden"
-6. Ich: notifications, blocked users, report. "Mitteilungen, Melden und Blockieren"
+1. `1_artikel`: the article list, signed out.
+2. `2_artikel-offen`: one public article, open.
+3. `3_diskussion`: the discussion under an article.
+4. `4_one`: #one, the members' room.
+5. `5_thread`: a thread in the members' room.
+6. `6_fuer-dich`: Für dich, the mention of Lena.
+7. `7_ich`: Ich, with notifications, the blocked list, the moderation contact and "Konto löschen".
 
-**The tab label shows in shot 5:** the app calls the tab "#one-Chat". To keep "Chat" out of the
-screenshots the tab becomes "#one" (or "#one-connect") in the app itself; the app session owns
-that label.
+No prices, no "Chat" in a caption; the tab is "#one". Take the shots from the build that is
+submitted: run the script on that commit.
+
+A #one article open for a member is not among them: the screenshot run has no signed-in session
+on www.
 
 ## Review notes and demo account
 
 `fastlane/metadata/review_information/notes.txt` (English). Before submitting, replace
-`CONTACT_NAME` and `CONTACT_PHONE`; add a line on the word filter if it is on by then. The demo account (`demo_user.txt`, `demo_password.txt`, never in git: CI writes
-them from the `apple` environment's secrets) must be a #one member **on live**: Apple reviews
+`CONTACT_NAME` and `CONTACT_PHONE`; add a line on the word filter if it is on by then. The demo
+account (entered by hand in App Store Connect, never in git) must be a #one member **on live**: Apple reviews
 against the App Store build, which signs in through live. That needs the chat on live (launch
 step, Thorsten's yes).
 
 ## Upload
 
-`fastlane ios beta` uploads to TestFlight only. The App Store needs a lane that runs `deliver`
-with `fastlane/metadata`, the store screenshots (6.9" iPhone at least) and `submit_for_review`
-off by default, on Alex's team, which publishes (2026-11-16), with his Admin API key in the
-`apple` environment.
+`fastlane ios beta` uploads a build to TestFlight. `fastlane ios store_listing` uploads the App
+Store page: `fastlane/metadata` (texts, categories, review notes) and `fastlane/screenshots`, no
+binary, and it **never submits**. A person picks the build and presses "Submit for Review" in App
+Store Connect. The workflow "App Store listing" runs the lane by hand on `main`, with the `apple`
+environment's key. The demo account goes in by hand in App Store Connect (App Review
+Information), so its password is in no file and no secret.
+
+Not through the lane, because Apple's API does not take them with an API key: the App Privacy
+labels and the age rating. Thorsten answers them as Admin in App Store Connect, from the sections
+above.
+
+The lane runs only against the team in the `apple` environment, today Thorsten's, which has no
+App Store record for this app. It is for Alex's team after the switch (the bundle-id plan,
+iphoneblog-wordpress `docs/TODO.md`).

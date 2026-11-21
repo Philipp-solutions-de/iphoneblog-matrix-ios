@@ -28,8 +28,9 @@ final class FourTabsUITests: XCTestCase {
         XCTAssertTrue(again.textViews["Nachricht an # Raum 2"].waitForExistence(timeout: 120), "the tab did not open the last room read")
     }
 
-    /// The open room has nothing new, another one has: "Weiter" leads there.
-    func testWeiterLeadsToTheNextRoomWithNews() throws {
+    /// The open room has nothing new, another one has: no "Weiter" bar over the room (Thorsten,
+    /// 2026-11-20); the room bar counts the news, and a tap on it opens that room.
+    func testRoomBarLeadsToTheNextRoomWithNews() throws {
         let other = try TestServer.signIn(2)
         defer { other.signOut() }
         let room2 = try XCTUnwrap(env["IPHONEBLOG_TEST_ROOM2"].flatMap { $0.isEmpty ? nil : $0 })
@@ -38,12 +39,34 @@ final class FourTabsUITests: XCTestCase {
         XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "the room did not open")
         sleep(3) // read up to here
         try other.send("Weitertest \(Int(Date().timeIntervalSince1970))", in: room2)
-        let next = app.buttons["one.next"]
-        XCTAssertTrue(next.waitForExistence(timeout: 30), "no Weiter")
-        XCTAssertTrue(next.label.contains("Raum 2"), next.label)
-        save(app, "weiter")
-        next.tap()
-        XCTAssertTrue(app.textViews["Nachricht an # Raum 2"].waitForExistence(timeout: 60), "Weiter did not open Raum 2")
+        let news = app.buttons.matching(NSPredicate(format: "identifier == 'one-room' AND label BEGINSWITH 'Raum 2,' AND label CONTAINS 'ungelesen'")).firstMatch
+        XCTAssertTrue(news.waitForExistence(timeout: 30), "the room bar shows no news for Raum 2")
+        XCTAssertFalse(app.buttons["one.next"].exists, "the Weiter bar is back")
+        save(app, "room-bar-news")
+        news.tap()
+        XCTAssertTrue(app.textViews["Nachricht an # Raum 2"].waitForExistence(timeout: 60), "the room bar did not open Raum 2")
+    }
+
+    /// A read-only room (#releases): only the team posts. No composer, one quiet line in its
+    /// place (Thorsten, 2026-11-20); the room still opens and shows its messages.
+    func testReadOnlyRoomShowsNoComposer() throws {
+        let me = try TestServer.signIn(1)
+        let team = try TestServer.signIn(2)
+        defer { me.signOut(); team.signOut() }
+        let stamp = Int(Date().timeIntervalSince1970)
+        let releases = try team.createReadOnlyRoom("Releases \(stamp)")
+        try team.send("Build \(stamp) ist live", in: releases)
+        try me.join(releases)
+        let space = try me.resolve(env["IPHONEBLOG_ONE_ALIAS"] ?? "#one:localhost")
+        try me.addChild(releases, toSpace: space, order: "x\(stamp)")
+        let app = launch(tab: "chat", room: releases)
+        let line = app.staticTexts["Nur das Team schreibt hier"]
+        XCTAssertTrue(line.waitForExistence(timeout: 120), "no line in place of the composer")
+        let message = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Build \(stamp) ist live")).firstMatch
+        XCTAssertTrue(message.waitForExistence(timeout: 30), "the room's message is not shown")
+        XCTAssertFalse(app.buttons["room-send_button"].exists, "a composer in a read-only room")
+        XCTAssertFalse(app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Nachricht an'")).firstMatch.exists, "a text field in a read-only room")
+        save(app, "read-only-room")
     }
 
     /// More rooms than fit: a room with news out of sight leaves a dot at the edge.
@@ -94,10 +117,11 @@ final class FourTabsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Keine Treffer"].waitForExistence(timeout: 20))
     }
 
-    /// Many new messages: the Neu divider above the first, and the pill that jumps to it. In a
+    /// Many new messages: the Neu divider above the first stays; the pill that jumped to it is
+    /// gone (Thorsten, 2026-11-19: Tweetbot's read position instead, ReadPositionUITests). In a
     /// room of its own: thirty messages in the channel would push the seeded GIF and files out of
     /// sight for the tests that come after (GifUITests, RichMessagesUITests).
-    func testNeuDividerAndJumpPill() throws {
+    func testNeuDividerWithoutJumpPill() throws {
         let me = try TestServer.signIn(1)
         let other = try TestServer.signIn(2)
         defer { me.signOut(); other.signOut() }
@@ -105,19 +129,28 @@ final class FourTabsUITests: XCTestCase {
         let space = try me.resolve(env["IPHONEBLOG_ONE_ALIAS"] ?? "#one:localhost")
         let busy = try me.createRoom("Neutest \(stamp)")
         try me.addChild(busy, toSpace: space, order: "y\(stamp)")
-        // The tester has written there, so what comes after counts as new.
-        try me.send("Hallo", in: busy)
+        // The tester has read up to here (m.fully_read, where the divider goes), so what comes
+        // after counts as new.
+        let hello = try me.send("Hallo", in: busy)
+        try me.setFullyRead(hello, in: busy)
         try other.join(busy)
+        // Thirty, more than the room's first sync brings: the SDK drew no divider then, and the
+        // app now places it itself (architecture.md, "The Neu divider"); 10 never showed the gap.
         for n in 1...30 { try other.send("Neu \(n) \(stamp)", in: busy) }
         let app = launch(tab: "chat", room: busy)
         XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "the room did not open")
-        let pill = app.buttons["room.jumpToUnread"]
-        if !pill.waitForExistence(timeout: 30) { save(app, "debug-jump-pill") }
-        XCTAssertTrue(pill.exists, "no pill for the first unread message out of sight")
-        XCTAssertTrue(pill.label.contains("neue"), pill.label)
-        save(app, "jump-pill")
-        pill.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["timeline.readMarker"].waitForExistence(timeout: 20), "no Neu divider")
+        sleep(3)
+        XCTAssertFalse(app.buttons["room.jumpToUnread"].exists, "the old jump pill is back")
+        // The room is new to the app: its messages and the read position (m.fully_read) arrive
+        // with sync, a moment after it opens. Wait for the messages, then give the divider time
+        // at each swipe; twelve swipes in a row ran out before it came (CI, main 9cb997c).
+        let newest = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Neu 30 \(stamp)")).firstMatch
+        XCTAssertTrue(newest.waitForExistence(timeout: 60), "the new messages did not arrive")
+        let marker = app.descendants(matching: .any)["timeline.readMarker"]
+        for _ in 0..<12 where !marker.waitForExistence(timeout: 2) {
+            app.swipeDown(velocity: .slow)
+        }
+        XCTAssertTrue(marker.waitForExistence(timeout: 10), "no Neu divider above the first new message")
         save(app, "neu-divider")
     }
 
@@ -138,6 +171,35 @@ final class FourTabsUITests: XCTestCase {
     }
 
     // MARK: Für dich
+
+    /// The mentions in a preview are the timeline's rounded pills, my name solid teal, another
+    /// name soft teal (Philip, #bugs 2026-11-21: "Highlighted usernames sind eckig"). The shape
+    /// is for the eye: the row's picture is kept with every run; MentionHighlightTests checks
+    /// that no square background is set.
+    func testFuerDichMentionsAreRoundPills() throws {
+        closeRunningApp()
+        let me = try TestServer.signIn(1)
+        let other = try TestServer.signIn(2)
+        defer { me.signOut(); other.signOut() }
+        let stamp = Int(Date().timeIntervalSince1970)
+        let myName = String(me.userID.dropFirst().split(separator: ":")[0])
+        let html = "Pille <a href=\"https://matrix.to/#/\(me.userID)\">@\(myName)</a> und "
+            + "<a href=\"https://matrix.to/#/\(other.userID)\">@Anna</a>, schau mal \(stamp)"
+        _ = try other.sendContent(["msgtype": "m.text",
+                                   "body": "Pille @\(myName) und @Anna, schau mal \(stamp)",
+                                   "format": "org.matrix.custom.html", "formatted_body": html,
+                                   "m.mentions": ["user_ids": [me.userID, other.userID]]], in: room)
+
+        let app = launch(tab: "foryou")
+        let mention = row(app, "schau mal \(stamp)")
+        XCTAssertTrue(mention.waitForExistence(timeout: 120), "the mention is not in Für dich")
+        sleep(1)
+        let shot = XCTAttachment(screenshot: mention.screenshot())
+        shot.name = "fuer-dich-mention-pills"
+        shot.lifetime = .keepAlways
+        add(shot)
+        save(app, "fuer-dich-mention-pills")
+    }
 
     /// Alles · Erwähnungen · Threads, the badge, and "Alle gelesen" for exactly the filter.
     func testFuerDichFiltersBadgeAndAlleGelesen() throws {

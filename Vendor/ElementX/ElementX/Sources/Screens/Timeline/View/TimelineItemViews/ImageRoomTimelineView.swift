@@ -31,7 +31,9 @@ struct ImageRoomTimelineView: View {
                         .accessibilityLabel(L10n.commonImage)
                         // This clip shape is distinct from the one in the styler as that one
                         // operates on the entire message so wouldn't round the bottom corners.
-                        .clipShape(RoundedRectangle(cornerRadius: hasMediaCaption ? 6 : 0))
+                        // iphoneblog: with a caption the row does not clip the whole item (the caption would lose
+                        // its first letter, Philip 2026-11-20); the picture is rounded here, as without one.
+                        .clipShape(RoundedRectangle(cornerRadius: hasMediaCaption ? ChatKitStyle.current.metrics.corner : 0, style: .continuous))
                         .onTapGesture {
                             context?.send(viewAction: .mediaTapped(itemID: timelineItem.id))
                         }

@@ -132,10 +132,12 @@ final class TimelineProxy: TimelineProxyProtocol {
     /// Paginate backwards using the subscription from Rust to drive the pagination state.
     private func paginateBackwardsOnLive(requestSize: UInt16) async -> Result<Void, TimelineProxyError> {
         MXLog.info("Paginating backwards")
+        ChatOpenTrace.mark("paginate \(requestSize) start") // iphoneblog: room-open timing
         
         do {
             let _ = try await timeline.paginateBackwards(numEvents: requestSize)
             MXLog.info("Finished paginating backwards")
+            ChatOpenTrace.mark("paginate end") // iphoneblog
             
             return .success(())
         } catch {

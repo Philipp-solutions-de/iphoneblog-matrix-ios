@@ -19,7 +19,10 @@ permissions:
 
 concurrency:
   group: perf-${{ github.ref }}
-  cancel-in-progress: true
+  # A new push to a branch cancels its older run; on main a merge waits instead, or merges
+  # an hour apart cancelled every 2.5-hour main build and nothing reached TestFlight
+  # (2026-11-20/21, architecture.md "Build and CI").
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   perf:

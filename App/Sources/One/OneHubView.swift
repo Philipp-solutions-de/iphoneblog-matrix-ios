@@ -49,26 +49,6 @@ struct OneHubView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Text("#one")
-                        .font(Theme.Font.screenTitle)
-                        .foregroundStyle(Theme.coralText)
-                        .accessibilityAddTraits(.isHeader)
-                    Spacer()
-                    Button { router.openSearch(in: session.oneRooms.map(\.id)) } label: {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Theme.ink)
-                            .frame(width: 36, height: 36)
-                            .background(Theme.surface, in: Circle())
-                    }
-                    .accessibilityLabel("In #one suchen")
-                    .accessibilityIdentifier("hub.search")
-                }
-                .padding(.horizontal, Theme.Space.page)
-                .padding(.top, 6)
-                .padding(.bottom, 4)
-
                 if let newest = episodes.episodes.first {
                     HubSection("Neu für dich")
                     Button { router.chatPath.append(.episode(newest)) } label: {
@@ -126,12 +106,56 @@ struct OneHubView: View {
                 }
             }
             .padding(.bottom, 24)
+            // With "#one" in the navigation bar the content began 8 pt lower than with the old
+            // header in the page; it starts where it did (measured 2026-11-20).
+            .padding(.top, -8)
         }
         .background(Theme.background)
         .navigationTitle("#one")
-        .toolbar(.hidden, for: .navigationBar)
+        .navigationBarTitleDisplayMode(.inline)
+        // The hub keeps a navigation bar, with "#one" and the search in it. Hidden here and shown
+        // in the room, the bar made the back button jump to the screen's edge when a back swipe
+        // was let go (Philip, 2026-11-20); with a bar on both screens it moves as the system's.
+        .toolbar {
+            // A title, not a button: no glass capsule behind it (iOS 26).
+            if #available(iOS 26.0, *) {
+                ToolbarItem(placement: .topBarLeading) { hubTitle }.sharedBackgroundVisibility(.hidden)
+            } else {
+                ToolbarItem(placement: .topBarLeading) { hubTitle }
+            }
+            ToolbarItem(placement: .principal) { Color.clear.frame(width: 1, height: 1).accessibilityHidden(true) }
+            // The search keeps the hub's own small circle, not the bar's glass button.
+            if #available(iOS 26.0, *) {
+                ToolbarItem(placement: .topBarTrailing) { hubSearch }.sharedBackgroundVisibility(.hidden)
+            } else {
+                ToolbarItem(placement: .topBarTrailing) { hubSearch }
+            }
+        }
         .task { await episodes.load() }
         .refreshable { await episodes.load() }
+    }
+}
+
+extension OneHubView {
+    fileprivate var hubSearch: some View {
+        Button { router.openSearch(in: session.oneRooms.map(\.id)) } label: {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+                .frame(width: 36, height: 36)
+                .background(Theme.surface, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("In #one suchen")
+        .accessibilityIdentifier("hub.search")
+    }
+
+    fileprivate var hubTitle: some View {
+        Text("#one")
+            .font(Theme.Font.screenTitle)
+            .foregroundStyle(Theme.coralText)
+            .accessibilityAddTraits(.isHeader)
+            .fixedSize()
     }
 }
 
@@ -298,12 +322,8 @@ private struct ActiveRow: View {
     let summary: RoomSummary
 
     var body: some View {
+        // No "#" tile on the left: the name says "# bugs" already (Philip, 2026-11-20).
         HStack(spacing: 12) {
-            Text("#")
-                .font(Theme.Font.rowHash)
-                .foregroundStyle(Theme.ink3)
-                .frame(width: 34, height: 34)
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 9))
             VStack(alignment: .leading, spacing: 2) {
                 Text("# \(name)" + (summary.unreadMessages > 0 ? " · \(summary.unreadMessages > 99 ? "99+" : "\(summary.unreadMessages)") neu" : ""))
                     .font(.system(size: 15, weight: .semibold))

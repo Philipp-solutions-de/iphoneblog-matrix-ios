@@ -1,0 +1,82 @@
+--- a/ElementX/Sources/Screens/Timeline/TimelineTableViewController.swift
++++ b/ElementX/Sources/Screens/Timeline/TimelineTableViewController.swift
+@@ -262,6 +262,11 @@
+         tableView.contentOffset.y = -1
+         hasAppearedOnce = true
+         paginatePublisher.send()
++    }
++    
++    override func viewWillDisappear(_ animated: Bool) {
++        super.viewWillDisappear(animated)
++        recordReadPosition() // iPhoneBlog
+     }
+     
+     override func viewWillLayoutSubviews() {
+@@ -399,6 +404,8 @@
+         }
+         tableView.scrollToRow(at: IndexPath(item: 0, section: 0), at: .top, animated: animated)
+         scrollDirectionPublisher.send(.bottom)
++        // iPhoneBlog: back at the newest (an animated scroll records when it ends).
++        if !animated { DispatchQueue.main.async { [weak self] in self?.recordReadPosition() } }
+     }
+     
+     /// Scrolls to the oldest item in the timeline.
+@@ -432,7 +439,9 @@
+                 // Scrolling to the middle created a small bump in the timeline
+                 // Using top, which is bottom in the reversed timeline helps with rendering
+                 // in full long messages and images
+-                tableView.scrollToRow(at: indexPath, at: .top, animated: animated)
++                // iPhoneBlog: a restored read position goes to the visual top (ChatReadPositions).
++                let position: UITableView.ScrollPosition = ChatReadPositions.shared.didRestore(eventID) ? .bottom : .top
++                tableView.scrollToRow(at: indexPath, at: position, animated: animated)
+                 coordinator.send(viewAction: .scrolledToFocussedItem)
+                 // Ensure VoiceOver focus happens after the scroll animation (if any)
+                 DispatchQueue.main.asyncAfter(deadline: .now() + (animated ? 0.5 : 0.0)) {
+@@ -555,17 +564,47 @@
+         isDraggingScrollView = false
+         if !decelerate {
+             scrollViewIsScrolling = false
++            recordReadPosition() // iPhoneBlog
+         }
+     }
+     
+     func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+         sendLastVisibleItemReadReceipt()
+         scrollViewIsScrolling = false
++        recordReadPosition() // iPhoneBlog
+     }
+     
+     func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
+         sendLastVisibleItemReadReceipt()
++        recordReadPosition() // iPhoneBlog
+     }
++    
++    /// iPhoneBlog: where the reader is, for ChatReadPositions: the event at the top of the screen,
++    /// or nil at the newest message. Rooms and threads only.
++    private func recordReadPosition() {
++        let state = coordinator.context.viewState
++        let thread: String?
++        switch state.timelineKind {
++        case .live, .detached: thread = nil
++        case .thread(let rootEventID): thread = rootEventID
++        default: return
++        }
++        guard !timelineItemsIDs.isEmpty else { return }
++        ChatReadPositions.shared.record(topmostVisibleEventID(), user: state.ownUserID, room: state.roomID, thread: thread)
++    }
++    
++    /// The topmost fully visible item with an event; the table is flipped, so the highest row.
++    private func topmostVisibleEventID() -> String? {
++        let atNewest = tableView.contentOffset.y <= 1 && (isLive || paginationState.forward == .endReached)
++        guard !atNewest, let paths = tableView.indexPathsForVisibleRows?.sorted(by: >) else { return nil }
++        var partlyVisible: String?
++        for path in paths {
++            guard let id = dataSource?.itemIdentifier(for: path), let eventID = timelineItemsDictionary[id]?.identifier.eventID else { continue }
++            if tableView.bounds.contains(tableView.rectForRow(at: path)) { return eventID }
++            if partlyVisible == nil { partlyVisible = eventID }
++        }
++        return partlyVisible
++    }
+ }
+ 
+ // MARK: - Floating Date Badge

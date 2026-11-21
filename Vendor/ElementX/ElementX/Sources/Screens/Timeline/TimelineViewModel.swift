@@ -17,6 +17,10 @@ typealias TimelineViewModelType = StateStoreViewModel<TimelineViewState, Timelin
 class TimelineViewModel: TimelineViewModelType, TimelineViewModelProtocol {
     private enum Constants {
         static let paginationEventLimit: UInt16 = 20
+        // iphoneblog: 50 back: reactions, edits and state events take up most of a page of 20,
+        // and a room filled its first screen only after four round trips one after another
+        // (2026-11-20, docs/performance.md, testOneChatAfterLaunch).
+        static let backPaginationEventLimit: UInt16 = 50
         static let detachedTimelineSize: UInt16 = 100
         static let focusTimelineToastIndicatorID = "RoomScreenFocusTimelineToastIndicator"
         static let toastErrorID = "RoomScreenToastError"
@@ -118,7 +122,9 @@ class TimelineViewModel: TimelineViewModelType, TimelineViewModelProtocol {
                    mediaProvider: userSession.mediaProvider,
                    contentScannerService: userSession.contentScannerService)
         
-        if focussedEventID != nil {
+        // iPhoneBlog: no "Lädt" toast for a restored read position, which opens quietly and falls
+        // back to the newest message if its event is gone (ChatReadPositions).
+        if let focussedEventID, !ChatReadPositions.shared.isRestoring(focussedEventID) {
             // The timeline controller will start loading a detached timeline.
             showFocusLoadingIndicator()
         }
@@ -590,9 +596,9 @@ class TimelineViewModel: TimelineViewModelType, TimelineViewModelProtocol {
     }
     
     private func setupUserSettingsSubscriptions() {
-        userSettings.account.sharePresencePublisher
-            .weakAssign(to: \.state.showReadReceipts, on: self)
-            .store(in: &cancellables)
+        // iphoneblog: no read-receipt avatars and no "Gelesen von" in the timeline (Philip,
+        // 2026-11-20; the website shows none). showReadReceipts stays false. Our own receipts go
+        // out as before: sharePresence, which picks public receipts, is untouched.
         
         userSettings.app.viewSourceEnabledPublisher
             .weakAssign(to: \.state.isViewSourceEnabled, on: self)
@@ -659,7 +665,7 @@ class TimelineViewModel: TimelineViewModelType, TimelineViewModelProtocol {
                 return
             }
             
-            switch await timelineController.paginateBackwards(requestSize: Constants.paginationEventLimit) {
+            switch await timelineController.paginateBackwards(requestSize: Constants.backPaginationEventLimit) {
             case .failure:
                 displayErrorToast(L10n.errorFailedLoadingMessages)
             default:
@@ -910,6 +916,7 @@ class TimelineViewModel: TimelineViewModelType, TimelineViewModelProtocol {
     // MARK: - Timeline Item Building
     
     private func buildTimelineViews(timelineItems: [RoomTimelineItemProtocol], isSwitchingTimelines: Bool = false) {
+        defer { ChatOpenTrace.items(timelineItems.count) } // iphoneblog: room-open timing
         var timelineItemsDictionary = OrderedDictionary<TimelineItemIdentifier.UniqueID, RoomTimelineItemViewState>()
         
         timelineItems.filter { $0 is RedactedRoomTimelineItem }.forEach { timelineItem in

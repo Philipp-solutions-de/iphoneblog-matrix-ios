@@ -67,6 +67,12 @@ struct TimelineItemRowStylerView<Content: View>: View {
         timelineItem is ImageRoomTimelineItem || timelineItem is VideoRoomTimelineItem || timelineItem is StickerRoomTimelineItem
     }
 
+    /// A picture or video with a caption: the media view rounds the picture alone, so the
+    /// caption below keeps its first letter (Philip, 2026-11-20).
+    private var hasMediaCaption: Bool {
+        (timelineItem as? ImageRoomTimelineItem)?.content.caption != nil || (timelineItem as? VideoRoomTimelineItem)?.content.caption != nil
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: style.metrics.avatarGap) {
@@ -81,7 +87,9 @@ struct TimelineItemRowStylerView<Content: View>: View {
             .padding(.horizontal, style.metrics.page)
             .padding(.top, showsSender ? style.metrics.groupSpacing : style.metrics.messageSpacing)
             .padding(.bottom, 2)
-            .highlightedTimelineItem(isFocussed)
+            // A message shown on request (a search hit) fades in and out once; a restored read
+            // position not at all. Element X's lasting green band read as a status (Thorsten).
+            .modifier(ChatFocusFlash(isOn: isFocussed && !(focussedEventID.map(ChatReadPositions.shared.isQuiet) ?? false)))
 
             if isThreadRoot { threadRootFooter }
         }
@@ -161,7 +169,7 @@ struct TimelineItemRowStylerView<Content: View>: View {
             if isMedia {
                 content()
                     .frame(maxWidth: style.metrics.mediaWidth, alignment: .leading)
-                    .clipShape(RoundedRectangle(cornerRadius: style.metrics.corner, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: hasMediaCaption ? 0 : style.metrics.corner, style: .continuous))
             } else {
                 content()
             }
@@ -429,5 +437,23 @@ enum ChatTimeLabel {
         let label = formatter.string(from: date)
         cache[key] = label
         return label
+    }
+}
+
+/// A brief tint on a message the reader was sent to, gone after a second and a half.
+struct ChatFocusFlash: ViewModifier {
+    let isOn: Bool
+    @State private var visible = false
+
+    func body(content: Content) -> some View {
+        content
+            .background(Color.compound.gradientSubtleStop1.opacity(visible ? 1 : 0))
+            .onAppear { if isOn { flash() } }
+            .onChange(of: isOn) { _, on in if on { flash() } }
+    }
+
+    private func flash() {
+        visible = true
+        withAnimation(.easeOut(duration: 1.5).delay(0.3)) { visible = false }
     }
 }

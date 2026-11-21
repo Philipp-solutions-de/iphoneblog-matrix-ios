@@ -23,20 +23,22 @@ final class MentionHighlightTests: XCTestCase {
 
         let philip = try! XCTUnwrap(text.range(of: "@Philip Braeunlich"))
         XCTAssertEqual(text[philip].foregroundColor, .white)
-        XCTAssertEqual(text[philip].backgroundColor, Theme.badge)
+        XCTAssertEqual(text[philip][MentionPill.Key.self], true, "my name: the solid pill")
 
         let kyrios = try! XCTUnwrap(text.range(of: "@Kyrios"))
         XCTAssertEqual(text[kyrios].foregroundColor, Theme.teal)
-        XCTAssertEqual(text[kyrios].backgroundColor, Theme.tealSoft)
+        XCTAssertEqual(text[kyrios][MentionPill.Key.self], false, "another name: the soft pill")
 
         let rest = try! XCTUnwrap(text.range(of: "Ein GIF"))
         XCTAssertNil(text[rest].foregroundColor, "only the mentions are marked")
+        XCTAssertNil(text[rest][MentionPill.Key.self])
+        XCTAssertNil(text[philip].backgroundColor, "a square box again (Philip: \"eckig\")")
     }
 
     /// A client that typed "@Name" without a link: my own name is still marked.
     func testPlainTextMentionOfMeStillMarked() {
         let text = MentionRow.highlight("@Philip schau mal", mentioned: [], me: ["Philip"])
         let range = try! XCTUnwrap(text.range(of: "@Philip"))
-        XCTAssertEqual(text[range].backgroundColor, Theme.badge)
+        XCTAssertEqual(text[range][MentionPill.Key.self], true)
     }
 }
