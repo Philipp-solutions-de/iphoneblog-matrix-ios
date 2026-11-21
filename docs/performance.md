@@ -168,6 +168,7 @@ launch and polling hiding the difference. Synapse was not the cause: its `/messa
 | start-up waits in parallel | 2.68 s (2.59–2.94) |
 | and 50 events per back-pagination | 2.57 s (2.44–2.70) |
 | and a warm launch from the last run's rooms (first fresh: 1.96 s) | 2.00 s (1.96–2.07) |
+| measured to the first message, not five items; tabs built on first use (fresh: 2.01 s) | 1.96 s (1.90–2.13) |
 
 | change | where |
 |---|---|
@@ -180,6 +181,12 @@ launch and polling hiding the difference. Synapse was not the cause: its `/messa
 What is left on a warm launch is local: about 1 s from the process to the app's model, about
 0.4 s of building the tab bar and screens before the room opens, and about 0.25 s between the
 room's screen and Element X's first page from the store, which then takes milliseconds.
+
+**Ich shows the last launch's time** ("Ladezeit beim letzten Start: 1,9 s, aktuell nach
+2,0 s"); a tap copies build, device and every start-up step, for testers to send. The next
+measurement is a real phone with a TestFlight build, not the simulator (the master, 2026-11-21).
+A prefetch of the room's first page as soon as start-up knew the room was tried and dropped: it
+raced the screen's own first page and could leave the timeline empty, for no measurable gain.
 
 The log keeps every step with its time (subsystem `de.iphoneblog.chat`, categories `start` and
 `open`), so a slow phone can be read with Console.
