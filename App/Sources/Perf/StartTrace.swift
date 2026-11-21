@@ -17,9 +17,26 @@ enum StartTrace {
         guard let started = processStart() else { return }
         let seconds = Date().timeIntervalSince(started)
         log.notice("start: first messages at \(String(format: "%.0f", seconds * 1000), privacy: .public) ms after launch")
-        guard let path = ProcessInfo.processInfo.environment["IPHONEBLOG_PERF_START"],
-              let data = try? JSONSerialization.data(withJSONObject: ["first_messages_s": seconds]) else { return }
-        try? data.write(to: URL(fileURLWithPath: path), options: .atomic)
+        write("first_messages_s", seconds)
+    }
+
+    /// The server's rooms, membership and #one list have replaced what a warm launch showed:
+    /// seconds since the process started, in the log and in the IPHONEBLOG_PERF_START file
+    /// ("fresh_s", FirstMessagesMetric).
+    static func fresh() {
+        guard let started = processStart() else { return }
+        let seconds = Date().timeIntervalSince(started)
+        log.notice("start: fresh at \(String(format: "%.0f", seconds * 1000), privacy: .public) ms after launch")
+        write("fresh_s", seconds)
+    }
+
+    /// Adds one number to the perf file without dropping the others.
+    private static func write(_ key: String, _ seconds: Double) {
+        guard let path = ProcessInfo.processInfo.environment["IPHONEBLOG_PERF_START"] else { return }
+        let url = URL(fileURLWithPath: path)
+        var object = (try? JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Double]) ?? [:]
+        object[key] = seconds
+        if let data = try? JSONSerialization.data(withJSONObject: object) { try? data.write(to: url, options: .atomic) }
     }
 
     /// When the kernel started this process: before main, so the launch itself counts.

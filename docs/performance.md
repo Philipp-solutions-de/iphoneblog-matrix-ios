@@ -34,7 +34,7 @@ slower than it was, on every pull request; the budget is checked on a device.
 
 ## The tests
 
-`Tests/PerfTests/PerformanceTests.swift`, seven tests, five measured iterations each after one
+`Tests/PerfTests/PerformanceTests.swift`, eight tests, five measured iterations each after one
 warm-up:
 
 | test | what | metrics |
@@ -46,6 +46,7 @@ warm-up:
 | `testScrollThread` | the long thread, 90 replies, 12 photos | hitch ratio, late frames |
 | `testSwitchTabs` | Blog, #one-Chat, @Mentions, Ich, Blog | clock time |
 | `testScrollBlog` | the Blog tab's web view on the blog fixture | hitch ratio, late frames |
+| `testScrollSearch` | the search's list, 60 mixed hits with highlights from the fixture's search API | hitch ratio, late frames |
 
 **The data.** `scripts/perf.sh` starts its own Synapse (a copy of `scripts/test-homeserver.sh`
 on port 8048, `build/perf-synapse`), seeds it with `scripts/seed-perf-data.py`, and starts the
@@ -166,13 +167,19 @@ launch and polling hiding the difference. Synapse was not the cause: its `/messa
 | main (b3bcd84) | 3.08 s (2.91–3.52) |
 | start-up waits in parallel | 2.68 s (2.59–2.94) |
 | and 50 events per back-pagination | 2.57 s (2.44–2.70) |
+| and a warm launch from the last run's rooms (first fresh: 1.96 s) | 2.00 s (1.96–2.07) |
 
 | change | where |
 |---|---|
 | Bots, display name and picture load beside the screens; the app showed a spinner until all three round trips were done | `ChatSession.start()` |
 | The three room aliases resolve at once, not one after another | `ChatSession.resolveRooms()` |
 | The #one room list loads during start-up, once, not when the tab first appears | `ChatSession.loadOneRooms()` |
+| A warm launch shows the last run's rooms, #one membership and list at once (`WarmStart`, per account, room IDs and names only), the timelines from the SDK's event cache; the server's answers replace them in the background ("First fresh"). A first launch waits as before | `ChatSession.start()` |
 | 50 events per back-pagination, not 20: reactions, edits and state filled a page, and a room needed four round trips for its first screen | `TimelineViewModel` (patch) |
+
+What is left on a warm launch is local: about 1 s from the process to the app's model, about
+0.4 s of building the tab bar and screens before the room opens, and about 0.25 s between the
+room's screen and Element X's first page from the store, which then takes milliseconds.
 
 The log keeps every step with its time (subsystem `de.iphoneblog.chat`, categories `start` and
 `open`), so a slow phone can be read with Console.

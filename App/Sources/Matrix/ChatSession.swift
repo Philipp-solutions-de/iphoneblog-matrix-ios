@@ -31,7 +31,7 @@ final class ChatSession: ObservableObject, ChatHost {
     /// 2026-11-14_interfaces.md "The #one rooms"), else from the space #one's children.
     /// A non-member gets them locked: listed, not opened.
     @Published private(set) var oneRooms: [OneRoom] = []
-    struct OneRoom: Identifiable, Equatable {
+    struct OneRoom: Identifiable, Equatable, Codable {
         let id: String
         var name: String
         var topic: String?
@@ -95,8 +95,19 @@ final class ChatSession: ObservableObject, ChatHost {
         }
         await syncService?.start()
         StartTrace.mark("sync started")
-        await resolveRooms()
-        StartTrace.mark("rooms resolved")
+        // **A warm launch** shows what the phone knows at once: the rooms, membership and the
+        // #one list from the last run (WarmStart), the timelines from the SDK's event cache.
+        // The server's answers replace them in the background; no spinner waits for a round
+        // trip (2026-11-20, docs/performance.md). A first launch, or a new account, waits.
+        let warm = startedOnce ? nil : WarmStart.load(for: userID)
+        startedOnce = true
+        if let warm {
+            apply(warm)
+            StartTrace.mark("warm start applied")
+        } else {
+            await resolveRooms()
+            StartTrace.mark("rooms resolved")
+        }
         try await ChatScreens.provider.start(host: self)
         StartTrace.mark("chat screens ready")
         mentions.attach(to: self)
@@ -105,7 +116,13 @@ final class ChatSession: ObservableObject, ChatHost {
         // The #one rooms, the bots, the name and the picture load beside the screens, not before
         // them: each is a round trip, and the app showed a spinner for all of them in a row,
         // about a second on a phone before #one could open a room (2026-11-20, docs/performance.md).
-        Task { [weak self] in await self?.loadOneRooms() }
+        Task { [weak self] in
+            guard let self else { return }
+            if warm != nil { await resolveRooms() }
+            await loadOneRooms()
+            saveWarmStart()
+            StartTrace.fresh()
+        }
         Task { [weak self] in
             guard let self else { return }
             await loadBots()
@@ -312,6 +329,28 @@ final class ChatSession: ObservableObject, ChatHost {
         if member != isOneMember { isOneMember = member }
         if router.isMember != member { router.isMember = member }
         if rooms.channelIDs != channels { rooms.channelIDs = channels }
+    }
+
+    /// The last run's rooms and membership, for a warm launch (WarmStart).
+    private var startedOnce = false
+
+    private func apply(_ warm: WarmStart) {
+        if let blog = warm.blogRoomID {
+            blogRoomID = blog
+            router.blogRoomID = blog
+            rooms.hidden = [blog]
+        }
+        oneRoomID = warm.oneRoomID
+        oneChannelID = warm.oneChannelID
+        spaceOrder = warm.spaceOrder
+        setMembership(warm.isMember, channels: Set(warm.channels))
+        if warm.oneRooms != oneRooms { oneRooms = warm.oneRooms }
+    }
+
+    /// Kept after every fresh look at the server, so the next launch starts from it.
+    private func saveWarmStart() {
+        WarmStart(blogRoomID: blogRoomID, oneRoomID: oneRoomID, oneChannelID: oneChannelID, isMember: isOneMember,
+                  channels: rooms.channelIDs.sorted(), spaceOrder: spaceOrder, oneRooms: oneRooms).save(for: userID)
     }
 
     /// Resolves an alias of this account's own server. Another server's alias would send the
@@ -676,3 +715,31 @@ private final class UploadProgress: NSObject, URLSessionTaskDelegate, Sendable {
         Task { @MainActor in report(min(0.99, share)) }
     }
 }
+
+/// What a warm launch shows before the server answers: the last run's room IDs, #one
+/// membership and the #one list, per account in UserDefaults. Room IDs and names only, nothing
+/// personal (the privacy rule: no personal data kept beyond email, nickname and pictures).
+struct WarmStart: Codable, Equatable {
+    var blogRoomID: String?
+    var oneRoomID: String?
+    var oneChannelID: String?
+    var isMember: Bool
+    var channels: [String]
+    var spaceOrder: [String]
+    var oneRooms: [ChatSession.OneRoom]
+
+    private static func key(_ userID: String) -> String { "warmStart." + userID }
+
+    static func load(for userID: String) -> WarmStart? {
+        guard let data = UserDefaults.standard.data(forKey: key(userID)) else { return nil }
+        return try? JSONDecoder().decode(WarmStart.self, from: data)
+    }
+
+    func save(for userID: String) {
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        UserDefaults.standard.set(data, forKey: Self.key(userID))
+    }
+
+    static func forget(for userID: String) { UserDefaults.standard.removeObject(forKey: key(userID)) }
+}
+

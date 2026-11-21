@@ -33,6 +33,9 @@ final class Router: ObservableObject {
         /// Search in these rooms: one room from its header, all from the list's.
         /// Search in these rooms; `current` is the open room, for the "this room" chip.
         case search([String], current: String?)
+        /// A video passage from the search: the episode's page, playing from `seconds`.
+        /// `page` is the article with `?t=`, for an episode the list does not hold.
+        case video(postID: Int, seconds: Int, page: URL?)
     }
 
     @Published var tab: Tab = Router.startTab
@@ -56,6 +59,11 @@ final class Router: ObservableObject {
     var blogRoomID: String?
 
     @Published var presentedURL: URL?
+    /// The search over blog and #one (SiteSearchView), a sheet over either tab.
+    @Published var showSiteSearch = false
+    /// A blog page for the Blog tab's web view to load (a search hit); BlogTab loads it and
+    /// clears it.
+    @Published var blogPageRequest: URL?
     /// A person's profile sheet; `shareNow` opens "Kontaktdaten teilen" in it at once.
     struct Person: Identifiable, Hashable {
         let userID: String
@@ -209,8 +217,69 @@ final class Router: ObservableObject {
         chatPath = [.chat, thread]
     }
 
+    /// Where a search hit opens (ADR-0010): a post in the Blog tab's web view, a video in its
+    /// episode page at the passage, a chat message in its room or thread, a discussion reply in
+    /// the article's discussion, a link in Safari. Pure, so it is tested without screens.
+    enum SearchTarget: Equatable {
+        case blogPage(URL)
+        case video(postID: Int, seconds: Int, page: URL?)
+        case message(roomID: String, eventID: String)
+        case thread(roomID: String, rootEventID: String)
+        case discussion(rootEventID: String)
+        case outside(URL)
+        case nothing
+    }
+
+    /// `chat`: the reader is a #one member with a session, so the #one tab can show rooms and
+    /// episodes.
+    static func target(for hit: SiteSearchHit, chat: Bool) -> SearchTarget {
+        switch hit.kind {
+        case .post, .one:
+            return hit.url.map(SearchTarget.blogPage) ?? .nothing
+        case .video:
+            let page = hit.deepLink ?? hit.url
+            if chat, let postID = hit.postID { return .video(postID: postID, seconds: hit.seconds ?? 0, page: page) }
+            return page.map(SearchTarget.blogPage) ?? .nothing
+        case .chat:
+            guard chat, let roomID = hit.roomID, let eventID = hit.eventID else {
+                return hit.deepLink.map(SearchTarget.outside) ?? .nothing
+            }
+            if let root = hit.threadRoot, root != eventID { return .thread(roomID: roomID, rootEventID: root) }
+            return .message(roomID: roomID, eventID: eventID)
+        case .discussion:
+            // The reply's thread is the article's discussion, readable signed out too.
+            if let root = hit.threadRoot ?? hit.eventID { return .discussion(rootEventID: root) }
+            return hit.url.map(SearchTarget.blogPage) ?? .nothing
+        case .link:
+            return (hit.deepLink ?? hit.url).map(SearchTarget.outside) ?? .nothing
+        }
+    }
+
+    /// Opens a search hit's target; `.outside` is the caller's (Safari).
+    func open(_ target: SearchTarget) {
+        switch target {
+        case .blogPage(let url):
+            tab = .blog
+            blogPath = []
+            blogPageRequest = url
+        case .video(let postID, let seconds, let page):
+            tab = .chat
+            chatPath = [.video(postID: postID, seconds: seconds, page: page)]
+        case .message(let roomID, let eventID):
+            openMessage(roomID: roomID, eventID: eventID)
+        case .thread(let roomID, let root):
+            openThread(roomID: roomID, rootEventID: root)
+        case .discussion(let root):
+            tab = .blog
+            blogPath = [.thread(rootEventID: root)]
+        case .outside, .nothing:
+            break
+        }
+    }
+
     /// Back to a clean state after signing out; the Blog tab stays readable.
     func reset() {
+        showSiteSearch = false
         currentRoomID = nil
         tab = .blog
         chatPath = []

@@ -22,6 +22,9 @@ final class AppModel: ObservableObject {
     /// loaded the blog again, several at once during a restore, which raced at beta's staff
     /// gate (Philip's 500, build 220, 2026-11-20).
     lazy var blogWeb = BlogWebModel(start: BlogTab.startURL)
+    /// The search over blog and #one, one for the app's life: opened again after a hit, it
+    /// shows what it showed (SiteSearchView).
+    lazy var siteSearch = SiteSearchModel()
     @Published var errorMessage: String?
     /// True when the server offers only username and password (a test server).
     /// Our own server signs in through the blog only.
@@ -187,6 +190,7 @@ final class AppModel: ObservableObject {
         try? await session.client.logout()
         if let stored = store.load() { MatrixClientFactory.deleteStore(storeID: stored.storeID) }
         store.delete()
+        WarmStart.forget(for: session.userID)
         pendingClient = nil
         router.reset()
         AvatarStore.shared.reset()
@@ -205,6 +209,7 @@ final class AppModel: ObservableObject {
         // no longer accepts the token and may take their time doing so.
         let stored = store.load()
         store.delete()
+        WarmStart.forget(for: session.userID)
         pendingClient = nil
         router.reset()
         AvatarStore.shared.reset()

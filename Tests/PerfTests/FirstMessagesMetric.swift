@@ -8,6 +8,7 @@ import XCTest
 final class FirstMessagesMetric: NSObject, XCTMetric {
     let path: String
     private var seconds: Double?
+    private var fresh: Double?
 
     init(path: String) { self.path = path }
 
@@ -16,19 +17,28 @@ final class FirstMessagesMetric: NSObject, XCTMetric {
     func willBeginMeasuring() {
         try? FileManager.default.removeItem(atPath: path)
         seconds = nil
+        fresh = nil
     }
 
     func didStopMeasuring() {
         guard let data = FileManager.default.contents(atPath: path),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Double] else { return }
         seconds = object["first_messages_s"]
+        fresh = object["fresh_s"]
     }
 
     func reportMeasurements(from startTime: XCTPerformanceMeasurementTimestamp,
                             to endTime: XCTPerformanceMeasurementTimestamp) throws -> [XCTPerformanceMeasurement] {
         guard let seconds else { throw FirstMessagesMetricError.notWritten }
-        return [XCTPerformanceMeasurement(identifier: "de.iphoneblog.first-messages", displayName: "First messages",
-                                          doubleValue: seconds, unitSymbol: "s")]
+        var measured = [XCTPerformanceMeasurement(identifier: "de.iphoneblog.first-messages", displayName: "First messages",
+                                                  doubleValue: seconds, unitSymbol: "s")]
+        // A warm launch shows the cached messages first; "fresh" is when the server's rooms,
+        // membership and #one list have replaced them (StartTrace.fresh).
+        if let fresh {
+            measured.append(XCTPerformanceMeasurement(identifier: "de.iphoneblog.first-fresh", displayName: "First fresh",
+                                                      doubleValue: fresh, unitSymbol: "s"))
+        }
+        return measured
     }
 }
 

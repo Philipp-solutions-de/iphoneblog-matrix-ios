@@ -16,7 +16,7 @@ struct BlogTab: View {
 
     var body: some View {
         NavigationStack(path: $router.blogPath) {
-            BlogHome(web: web)
+            BlogHome(web: web) { router.showSiteSearch = true }
                 // The logo sits in the navigation bar: a bar on both the blog and the discussion
                 // keeps the system back button where it belongs during a back swipe (Philip,
                 // 2026-11-20). The title is what that button says; the button keeps the edge swipe.
@@ -28,7 +28,11 @@ struct BlogTab: View {
         }
         .onAppear {
             web.openDiscussion = { [weak router] article in router?.blogPath.append(.article(article)) }
+            openRequestedPage()
         }
+        // A post from the search: shown here, on the blog the tab shows (www's address on beta
+        // becomes beta's).
+        .onChange(of: router.blogPageRequest) { _, _ in openRequestedPage() }
         // Signed in: the web view gets the member's WordPress session (#one articles open);
         // signed out: WordPress's cookies go too.
         .task(id: session?.userID) {
@@ -38,6 +42,12 @@ struct BlogTab: View {
                                     refresh: { _ = try? await session.client.displayName() })
             })
         }
+    }
+
+    private func openRequestedPage() {
+        guard let page = router.blogPageRequest else { return }
+        router.blogPageRequest = nil
+        web.open(BlogLinks.onBlog(page, start: web.start))
     }
 
     /// beta.iphoneblog.de while the app view is tested, www once it is live (brand.env).
@@ -55,6 +65,7 @@ struct BlogTab: View {
 /// or when it cannot.
 private struct BlogHome: View {
     @ObservedObject var web: BlogWebModel
+    let search: () -> Void
 
     var body: some View {
         BlogWebView(model: web)
@@ -89,6 +100,13 @@ private struct BlogHome: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("iPhoneBlog.de, zum Anfang")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: search) {
+                        Image(systemName: "magnifyingglass")
+                    }
+                    .accessibilityLabel("Suchen")
+                    .accessibilityIdentifier("blog.search")
                 }
             }
             .toolbarBackground(Theme.background, for: .navigationBar)
@@ -380,6 +398,18 @@ enum BlogLinks {
     }
 
     static let blogHosts: Set<String> = ["www.iphoneblog.de", "iphoneblog.de", "beta.iphoneblog.de"]
+
+    /// A blog address on the blog the tab shows: the search knows www's addresses, the tab may
+    /// show beta (or a test fixture). Other sites stay as they are.
+    static func onBlog(_ url: URL, start: URL) -> URL {
+        guard let host = url.host()?.lowercased(), blogHosts.contains(host),
+              let startHost = start.host(), startHost.lowercased() != host,
+              var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+        components.scheme = start.scheme
+        components.host = startHost
+        components.port = start.port
+        return components.url ?? url
+    }
 
     /// The same address with `app=1`, once.
     static func withAppView(_ url: URL) -> URL {

@@ -22,6 +22,9 @@ struct MainView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.scenePhase) private var scenePhase
     @State private var confirmReadAll = false
+    /// A search hit's place, opened once the search sheet has gone: a navigation push while the
+    /// sheet was still closing was dropped.
+    @State private var searchTarget: Router.SearchTarget?
     @ObservedObject var router: Router
     /// Nil while signed out.
     let session: ChatSession?
@@ -99,6 +102,23 @@ struct MainView: View {
         .sheet(item: $router.moderation) { request in
             if let session { ModerationSheet(request: request, session: session) }
         }
+        // The search over blog and #one, from the Blog tab and the #one hub. A hit closes it and
+        // opens where it lives; a link goes to Safari, as links from the blog do.
+        .sheet(isPresented: $router.showSiteSearch, onDismiss: openSearchTarget) {
+            SiteSearchView(model: model.siteSearch) { hit in
+                searchTarget = Router.target(for: hit, chat: session != nil && router.isMember)
+                router.showSiteSearch = false
+            }
+        }
+        // The search sends the reader's token: the server decides what they may see.
+        .task(id: session?.userID) {
+            if let session {
+                model.siteSearch.setAccount(token: { [weak session] in await MainActor.run { try? session?.client.session().accessToken } },
+                                            refresh: { [weak session] in _ = try? await session?.client.displayName() })
+            } else {
+                model.siteSearch.setAccount(token: nil, refresh: { })
+            }
+        }
         .sheet(isPresented: $router.showSignIn) {
             SignInView()
                 .environmentObject(model)
@@ -130,6 +150,16 @@ struct MainView: View {
             }
         }
         #endif
+    }
+
+    private func openSearchTarget() {
+        guard let target = searchTarget else { return }
+        searchTarget = nil
+        if case .outside(let url) = target {
+            if !model.open(url) { UIApplication.shared.open(url) }
+        } else {
+            router.open(target)
+        }
     }
 
     /// #one-Chat counts unread messages in the channel, for members.
