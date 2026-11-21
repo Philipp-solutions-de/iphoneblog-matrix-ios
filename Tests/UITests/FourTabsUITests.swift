@@ -134,11 +134,9 @@ final class FourTabsUITests: XCTestCase {
         let hello = try me.send("Hallo", in: busy)
         try me.setFullyRead(hello, in: busy)
         try other.join(busy)
-        // Ten, not thirty: the SDK places the divider only when m.fully_read is among the events
-        // the room's first sync brings (about 20). With 30 new messages "Hallo" came later by
-        // back-pagination and no divider was drawn, 6 of 8 attempts (2026-11-21). That gap is a
-        // bug of its own (architecture.md, Open points); this test covers the divider and the missing pill.
-        for n in 1...10 { try other.send("Neu \(n) \(stamp)", in: busy) }
+        // Thirty, more than the room's first sync brings: the SDK drew no divider then, and the
+        // app now places it itself (architecture.md, "The Neu divider"); 10 never showed the gap.
+        for n in 1...30 { try other.send("Neu \(n) \(stamp)", in: busy) }
         let app = launch(tab: "chat", room: busy)
         XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "the room did not open")
         sleep(3)
@@ -146,7 +144,7 @@ final class FourTabsUITests: XCTestCase {
         // The room is new to the app: its messages and the read position (m.fully_read) arrive
         // with sync, a moment after it opens. Wait for the messages, then give the divider time
         // at each swipe; twelve swipes in a row ran out before it came (CI, main 9cb997c).
-        let newest = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Neu 10 \(stamp)")).firstMatch
+        let newest = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Neu 30 \(stamp)")).firstMatch
         XCTAssertTrue(newest.waitForExistence(timeout: 60), "the new messages did not arrive")
         let marker = app.descendants(matching: .any)["timeline.readMarker"]
         for _ in 0..<12 where !marker.waitForExistence(timeout: 2) {
