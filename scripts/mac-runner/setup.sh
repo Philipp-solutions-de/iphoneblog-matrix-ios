@@ -219,7 +219,13 @@ for slot in $(seq 1 "$runner_count"); do
   </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>ProcessType</key><string>Interactive</string>
+  <!-- The lowest priority, inherited by every process the runner starts (xcodebuild, simctl,
+       the test homeserver): Thorsten's work on this Mac comes first (docs/mac-runner.md,
+       "Priority"). lower-priority.sh covers what launchd starts outside this tree. -->
+  <key>ProcessType</key><string>Background</string>
+  <key>Nice</key><integer>20</integer>
+  <key>LowPriorityIO</key><true/>
+  <key>LowPriorityBackgroundIO</key><true/>
   <key>StandardOutPath</key><string>/Users/$user/Library/Logs/$label.log</string>
   <key>StandardErrorPath</key><string>/Users/$user/Library/Logs/$label.log</string>
 </dict></plist>"
