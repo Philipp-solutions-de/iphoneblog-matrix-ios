@@ -371,6 +371,14 @@ API change small, which costs less than a monthly jump over eight releases.
      strangers' code on it, so it needs runs from forks switched off or kept on GitHub's
      runners.
 
+- **No Neu divider after about 20 unread messages.** The SDK places the read marker only when
+  the reader's `m.fully_read` event is among the events the room's first sync brings (about
+  20). With more unread, that event arrives later by back-pagination and the room shows no
+  divider; the room still opens at the newest message. Measured 2026-11-21 in
+  `testNeuDividerWithoutJumpPill`: 30 new messages, no divider in 6 of 8 attempts; 10 new
+  messages, a divider every time. Fix not chosen yet: draw the divider in the app after the
+  `fullyReadEventID` item when the SDK sent none, or raise the room subscription's timeline
+  limit.
 - Fonts: the blog uses Foro and Foro Sans, licensed for the web. Using them in the app needs
   an app licence from the foundry; until then the app uses the system font (SF Pro).
 - Licence: AGPL-3.0, because of the transplanted Element X views (above). App Store question before launch.
