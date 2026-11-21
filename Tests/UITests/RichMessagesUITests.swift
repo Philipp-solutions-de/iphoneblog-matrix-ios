@@ -63,11 +63,11 @@ final class RichMessagesUITests: XCTestCase {
         // the hub's and the long-press tests had written), and a swipe can carry past the row
         // while the list still moves, so the search also comes back down.
         if !fileRow(app).waitForExistence(timeout: 30) {
-            for _ in 0..<25 where !fileRow(app).isHittable {
+            for _ in 0..<25 where !onScreen(fileRow(app), app) {
                 app.swipeDown(velocity: .slow)
                 _ = fileRow(app).waitForExistence(timeout: 2)
             }
-            for _ in 0..<25 where !fileRow(app).isHittable {
+            for _ in 0..<25 where !onScreen(fileRow(app), app) {
                 app.swipeUp(velocity: .slow)
                 _ = fileRow(app).waitForExistence(timeout: 2)
             }
@@ -405,6 +405,15 @@ final class RichMessagesUITests: XCTestCase {
     // MARK: Helpers
 
     /// The PDF's row; Element X labels a file "Datei" for VoiceOver.
+    /// Inside the window, by its frame. Not isHittable: for a row the list has laid out off
+    /// screen, XCTest fails the test with "Failed to determine hittability" instead of answering
+    /// false (CI, #54 and #56, 2026-11-21).
+    private func onScreen(_ element: XCUIElement, _ app: XCUIApplication) -> Bool {
+        guard element.exists else { return false }
+        let frame = element.frame
+        return !frame.isEmpty && app.windows.firstMatch.frame.contains(CGPoint(x: frame.midX, y: frame.midY))
+    }
+
     private func fileRow(_ app: XCUIApplication) -> XCUIElement {
         app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Datei' OR label CONTAINS 'dokument.pdf'")).firstMatch
     }
