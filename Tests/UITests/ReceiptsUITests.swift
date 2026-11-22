@@ -89,13 +89,14 @@ final class ReceiptsUITests: XCTestCase {
         let offset = (try? FileManager.default.attributesOfItem(atPath: log)[.size] as? Int) ?? 0
         let stamp = Int(Date().timeIntervalSince1970)
         let root = try other.send("Quittung Wurzel \(stamp)", in: room)
-        _ = try other.send("Quittung Antwort 1 \(stamp)", in: room, thread: root)
+        let first = try other.send("Quittung Antwort 1 \(stamp)", in: room, thread: root)
         let reply = try other.send("Quittung Antwort 2 \(stamp)", in: room, thread: root)
 
         let app = launch(["IPHONEBLOG_START_TAB": "chat", "IPHONEBLOG_START_THREAD": "\(room)|\(root)"])
         XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "thread did not open")
-        XCTAssertTrue(waitFor(60) { (try? me.receiptsCover(reply, in: room, thread: root)) == true }, // 60: a slow CI runner
-                      "the thread's receipt does not cover its newest reply")
+        // Read from the server's database: a sync's receipts can leave out the thread's one.
+        XCTAssertTrue(waitFor(60) { (try? self.storedReceipt(me.userID, in: room, thread: root)) == reply }, // 60: a slow CI runner
+                      "the thread's receipt is not on its newest reply \(reply): thread \((try? self.storedReceipt(me.userID, in: room, thread: root)) ?? "none"), main \((try? self.storedReceipt(me.userID, in: room, thread: "main")) ?? "none"), unthreaded \((try? self.storedReceipt(me.userID, in: room, thread: nil)) ?? "none"); root \(root), first reply \(first)")
         sleep(3)
         let refused = try refusedReceipts(log, from: offset)
         XCTAssertTrue(refused.isEmpty, "the server refused receipts:\n" + refused.joined(separator: "\n"))
