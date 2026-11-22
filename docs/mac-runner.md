@@ -78,7 +78,8 @@ which every 5 seconds gives each process of the user `ci` nice 20 and the backgr
 (`taskpolicy -b`): on Apple silicon such a process runs only on the efficiency cores and yields
 the disk. A loop over the user rather than a wrapper around the job, because the simulators,
 `XCBBuildService`, `SWBBuildService` and the compilers they start come from launchd and XPC,
-outside the job's process tree. The runner ends the loop with the job. The step "The job's
+outside the job's process tree. The runner ends the loop with the job, and each test shard shuts down its own simulator at
+the end (`scripts/mac-runner/shutdown-simulator.sh`), so none idles between jobs. The step "The job's
 processes and their priority" lists them with nice and priority at the end of each job. The
 repository variable `MAC_RUNNER_PRIORITY=normal` turns the loop off; the services' own setting
 needs `setup.sh` to change.

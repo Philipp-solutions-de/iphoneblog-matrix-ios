@@ -228,6 +228,10 @@ jobs:
         if: always() && runner.environment == 'self-hosted'
         run: scripts/mac-runner/lower-priority.sh report
 
+      - name: Shut down this shard's simulator (Mac Studio)
+        if: always() && runner.environment == 'self-hosted'
+        run: scripts/mac-runner/shutdown-simulator.sh
+
       - name: Keep the logs
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
