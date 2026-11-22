@@ -26,6 +26,8 @@ final class PlaybackProgress: ObservableObject {
         if ProcessInfo.processInfo.environment["IPHONEBLOG_PLAYBACK_RESET"] == "1" {
             entries = [:]
             save()
+            // And the card videos' captions back to their default, off.
+            defaults.removeObject(forKey: EpisodePlayer.cardCaptionsKey)
         }
         // UI tests: IPHONEBLOG_PLAYBACK_SEED="video_id=position/duration;…" sets progress before launch.
         if let seed = ProcessInfo.processInfo.environment["IPHONEBLOG_PLAYBACK_SEED"], !seed.isEmpty {

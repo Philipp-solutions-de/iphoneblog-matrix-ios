@@ -11,13 +11,13 @@ final class DiscussionUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    private func launch(member: Bool) throws -> XCUIApplication {
+    private func launch(member: Bool, extra: [String: String] = [:]) throws -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment = [
             "IPHONEBLOG_BLOG_WEB": "\(fixture)/blog/?app=1",
             "IPHONEBLOG_BLOG_API": "\(fixture)/api",
             "IPHONEBLOG_NO_PUSH_PROMPT": "1",
-        ]
+        ].merging(extra) { _, new in new }
         if member {
             guard let server = env["IPHONEBLOG_TEST_HOMESERVER"], let user = env["IPHONEBLOG_TEST_USER"],
                   let password = env["IPHONEBLOG_TEST_PASSWORD"] else {
@@ -42,10 +42,36 @@ final class DiscussionUITests: XCTestCase {
     }
 
     /// An article's video plays right in its card (Thorsten, 2026-11-20, blog-card-video.md):
-    /// the poster with play, then the player with the drawn captions, on by default; a tap on
-    /// the title, outside the player, still opens the article in the Blog tab.
+    /// the poster with play, then the player. Captions are off until "CC" turns them on, and
+    /// stay on for the next launch (Thorsten, 2026-11-21: "CC sollen default off sein und
+    /// brauchen einen toggle"). A tap on the title, outside the player, still opens the
+    /// article in the Blog tab.
     func testCardVideoPlaysInTheCard() throws {
-        let app = try launch(member: false)
+        var app = try launch(member: false, extra: ["IPHONEBLOG_PLAYBACK_RESET": "1"])
+        try playCardVideo(app)
+        let caption = app.staticTexts["player.caption"]
+        let toggle = app.buttons["player.captions"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10), "no UT switch under the card's video")
+        XCTAssertEqual(toggle.label, "Untertitel an", "captions are on by default")
+        XCTAssertFalse(caption.waitForExistence(timeout: 4), "captions over the video although off")
+        attach(app, "card-video-captions-off")
+        toggle.tap()
+        XCTAssertTrue(caption.waitForExistence(timeout: 20), "UT did not turn the captions on")
+        attach(app, "card-video-captions-on")
+
+        // The choice is kept: the next launch plays with captions.
+        app.terminate()
+        app = try launch(member: false)
+        try playCardVideo(app)
+        XCTAssertEqual(app.buttons["player.captions"].label, "Untertitel aus", "the captions choice was not kept")
+        XCTAssertTrue(app.staticTexts["player.caption"].waitForExistence(timeout: 20), "no captions after turning them on before")
+
+        app.buttons["discussion.title"].tap()
+        XCTAssertTrue(app.staticTexts["DISKUSSION"].waitForNonExistence(timeout: 10), "the title does not open the article")
+        XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 10), "not back in the Blog tab")
+    }
+
+    private func playCardVideo(_ app: XCUIApplication) throws {
         let web = app.webViews.firstMatch
         XCTAssertTrue(web.staticTexts["Artikel 1"].waitForExistence(timeout: 30), "blog page not loaded")
         let link = web.links["Diskussion 2"]
@@ -56,13 +82,6 @@ final class DiscussionUITests: XCTestCase {
         attach(app, "card-video-poster")
         play.tap()
         XCTAssertTrue(app.descendants(matching: .any)["card.video.player"].waitForExistence(timeout: 10), "no player in the card")
-        let caption = app.staticTexts["player.caption"]
-        XCTAssertTrue(caption.waitForExistence(timeout: 20), "no captions over the card's video")
-        attach(app, "card-video-playing")
-
-        app.buttons["discussion.title"].tap()
-        XCTAssertTrue(app.staticTexts["DISKUSSION"].waitForNonExistence(timeout: 10), "the title does not open the article")
-        XCTAssertTrue(web.waitForExistence(timeout: 10), "not back in the Blog tab")
     }
 
     /// Signed out: the discussion of an article that has a thread opens read-only, without

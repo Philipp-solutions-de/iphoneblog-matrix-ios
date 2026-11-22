@@ -3,7 +3,7 @@ import Combine
 import SwiftUI
 
 /// Plays one episode (spec-ios.md "Player"): the system controls for play, scrubbing, speed,
-/// picture-in-picture, AirPlay and full screen; the app's own row for ±10 s, speed and "UT";
+/// picture-in-picture, AirPlay and full screen; the app's own row for ±10 s, speed and "CC";
 /// captions from captions.de.vtt, drawn by the app over the picture, inline and full screen.
 @MainActor
 final class EpisodePlayer: ObservableObject {
@@ -17,7 +17,18 @@ final class EpisodePlayer: ObservableObject {
     /// Not published: it moves four times a second; what the page shows (caption, labels) is.
     private(set) var position: Double = 0
     @Published private(set) var duration: Double = 0
-    @Published var captionsOn = true { didSet { updateCaption() } }
+    @Published var captionsOn = true {
+        didSet {
+            updateCaption()
+            // A card video's choice is kept for the next one (property observers do not run in
+            // init, so only a tap saves it).
+            if episode == nil { UserDefaults.standard.set(captionsOn, forKey: Self.cardCaptionsKey) }
+        }
+    }
+    /// Captions in an article card's video: off until the reader turns them on, then on for
+    /// every card video on this device until turned off (Thorsten, 2026-11-21: "CC sollen
+    /// default off sein und brauchen einen toggle").
+    static let cardCaptionsKey = "cardCaptionsOn"
     @Published private(set) var speed: Float = 1
     @Published private(set) var caption: String?
     @Published private(set) var hasCaptions = false
@@ -54,6 +65,7 @@ final class EpisodePlayer: ObservableObject {
         duration = durationS ?? 0
         if let entry = progress.entry(videoID), entry.started { position = entry.position }
         hasCaptions = captions != nil
+        captionsOn = UserDefaults.standard.bool(forKey: Self.cardCaptionsKey)
     }
 
     /// Loads the chosen file, seeks to "Weiter ab", fetches the captions. Once.
