@@ -266,7 +266,11 @@ the sheet and opens the hit where it lives (`Router.target(for:chat:)`): a post 
 the Blog tab's web view (www's address moved to the blog the tab shows), a video passage on the
 episode's page playing from `t` (for #one members; others get the article at `?t=`), a chat
 message in its room scrolled to it or its thread, a discussion reply in the article's discussion,
-a link in Safari. The sheet keeps its query and hits for the next time it opens.
+a link in Safari. The sheet keeps its query and hits for the next time it opens. Under a hit,
+"und 3 weitere Antworten" (chat, discussion) or "und 1 weitere Stelle" (video) counts the other
+matches in its group (`more`). In Alle a post merged with its own video and discussion carries
+two teal lines, "Im Video ab 12:34" and "3 Antworten in der Diskussion"; each opens like a video
+or discussion hit, the discussion by the article's root (`discussion.thread_root`).
 
 **Search in a room is Matrix's own.** The magnifier in the open room sends `POST /_matrix/client/v3/search`
 (room_events, in every #one room or, with the chip, only the open one; newest first,
