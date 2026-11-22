@@ -92,6 +92,8 @@ build() {
     lowprio xcodebuild "${common[@]}" build-for-testing 2>&1 | tee build/perf-build.log \
         | grep -E 'error:|\*\* (BUILD|TEST) ' || true
     lower_stop
+    # The simulator may have been lowered during the build; it is measured at normal priority.
+    raise_simulator "$device"
     grep -q '\*\* TEST BUILD SUCCEEDED \*\*' build/perf-build.log
 }
 

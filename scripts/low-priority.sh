@@ -8,6 +8,10 @@
 #                               process tree
 #   lower_start [udid]          keeps lowering them every 20 s, so the app and the test runner
 #   lower_stop                  the simulator starts later are lowered too; lower_stop ends it
+#   raise_simulator udid        moves that simulator's process tree back to normal priority:
+#                               ending the loop leaves lowered processes lowered, and perf.sh
+#                               measured a simulator it had lowered while building (858 ms/s
+#                               hitches against 14, 2026-11-22)
 #
 # GitHub's hosted runners keep normal priority: nobody works on them, and CI time counts.
 # IPHONEBLOG_PRIORITY=normal turns it off anywhere; perf.sh measures at normal priority.
@@ -41,6 +45,15 @@ lower_simulator() {
     for pid in $(pgrep -x XCBBuildService 2>/dev/null) $(pgrep -x SWBBuildService 2>/dev/null); do
         taskpolicy -b -p "$pid" 2>/dev/null || true
     done
+}
+
+raise_simulator() {
+    local udid="${1:-}" pid p
+    [[ -n "$udid" ]] || return 0
+    for pid in $(pgrep -f "launchd_sim.*${udid}" 2>/dev/null); do
+        for p in "$pid" $(lowprio_tree "$pid"); do taskpolicy -B -p "$p" 2>/dev/null || true; done
+    done
+    return 0
 }
 
 lower_start() {
