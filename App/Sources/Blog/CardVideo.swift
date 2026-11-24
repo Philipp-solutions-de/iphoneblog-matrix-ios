@@ -50,7 +50,8 @@ struct CardVideo: Decodable, Equatable, Hashable {
 }
 
 /// The card's video: the poster with a play button; a tap plays it right there, with the
-/// episode player's controls, picture-in-picture and drawn captions (on by default).
+/// episode player's controls and picture-in-picture, and "CC" under it for the drawn captions
+/// (off until the reader turns them on; the choice is kept).
 struct CardVideoView: View {
     let video: CardVideo
     /// The card's image, when the video has no poster of its own.
@@ -58,6 +59,21 @@ struct CardVideoView: View {
     @State private var player: EpisodePlayer?
 
     var body: some View {
+        VStack(spacing: 0) {
+            videoArea
+            // "CC" under the playing video, when it has captions: off by default, remembered.
+            if let player, player.hasCaptions {
+                HStack {
+                    Spacer()
+                    CaptionsButton(player: player)
+                }
+                .foregroundStyle(Theme.ink)
+            }
+        }
+        .onDisappear { player?.stop() }
+    }
+
+    private var videoArea: some View {
         ZStack {
             if let player {
                 EpisodePlayerView(model: player)
@@ -94,7 +110,6 @@ struct CardVideoView: View {
         }
         .aspectRatio(video.aspectRatio, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: Theme.Size.corner))
-        .onDisappear { player?.stop() }
     }
 
     private func start() {

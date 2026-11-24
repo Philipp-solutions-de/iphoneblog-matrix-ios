@@ -102,7 +102,9 @@ back swipe was let go (Philip, 2026-11-20).
 **An article's video plays in its card** (Thorsten, 2026-11-20; the field in the WordPress repo's
 blog-card-video.md). The discussion's header shows the poster (the card's image without one)
 with play; a tap plays it right there with the episode player (`EpisodePlayer`, PiP, captions
-drawn and on), the rendition picked from the manifest when playing starts: the smallest listed
+drawn). The captions start off and "CC" under the video turns them on; the choice is kept on the
+device for the next card video (Thorsten, 2026-11-21: "CC sollen default off sein und brauchen
+einen toggle"). The rendition is picked from the manifest when playing starts: the smallest listed
 file at least as wide as the screen, `h264.mp4` without a manifest. The title opens the article.
 The video comes from the thread file, which carries the backfilled cards' too, so no Matrix edit
 is read (`CardVideo.swift`).
