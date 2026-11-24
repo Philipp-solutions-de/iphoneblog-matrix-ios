@@ -9,7 +9,7 @@
      
      @State private var captionWarningFrame: CGRect = .zero
      @State private var currentIndex = 0
-@@ -38,10 +40,23 @@
+@@ -38,10 +40,27 @@
              .ignoresSafeArea(edges: [.horizontal])
              .overlay(alignment: .top) { galleryBadge }
              .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -23,6 +23,10 @@
 +                    }
 +                    .padding(.horizontal, 12)
 +                }
++                // iphoneblog: tags for a GIF new to the library (ChatGIFTags).
++                ChatGIFTagField(model: context.viewState.gifTags) { context.send(viewAction: .send) }
++                    .padding(.horizontal, 12)
++                    .padding(.top, 12)
                  composer
                      .padding(.horizontal, 12)
                      .padding(.vertical, 16)
@@ -34,7 +38,7 @@
              }
              .navigationTitle(title)
              .navigationBarTitleDisplayMode(.inline)
-@@ -169,6 +184,20 @@
+@@ -169,6 +188,20 @@
          }
          
          if isCurrentMediaImage {
@@ -55,7 +59,7 @@
              ToolbarItem(placement: .primaryAction) {
                  Button { context.isPresentingMediaEditor = true } label: {
                      CompoundIcon(\.crop)
-@@ -191,6 +220,11 @@
+@@ -191,6 +224,11 @@
          return type.conforms(to: .image)
      }
      

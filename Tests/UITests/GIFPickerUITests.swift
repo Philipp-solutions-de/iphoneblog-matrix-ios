@@ -79,6 +79,61 @@ final class GIFPickerUITests: XCTestCase {
         attach(app, "gif-picker-after-report")
     }
 
+    /// A GIF of one's own that is new to the library asks for tags above the caption; a tag the
+    /// server would refuse is said before anything leaves, a good one reaches the library after
+    /// the GIF went out.
+    func testANewGIFAsksForTagsAndSendsThem() throws {
+        let me = try TestServer.signIn(1)
+        defer { me.signOut() }
+        let room = try XCTUnwrap(env["IPHONEBLOG_TEST_CHANNEL_ROOM"])
+        try post("/gifs-fixture", ["gifs": [[String: Any]]()]) // an empty library: every GIF is new
+        let before = try fixtureCalls()
+
+        let app = launch(["IPHONEBLOG_START_ROOM": room])
+        app.buttons["composer_toolbar-open_compose_options"].tap()
+        app.buttons["room-attachment_picker_photo_library"].tap()
+        // build.sh adds the fixture GIF today; the picker labels pictures with their date (GifUITests).
+        func today(_ locale: String, _ format: String) -> String {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: locale)
+            formatter.dateFormat = format
+            return formatter.string(from: .now)
+        }
+        let added = app.images.matching(NSPredicate(format: "label CONTAINS %@ OR label CONTAINS %@",
+                                                    today("de_DE", "dd. MMMM,"), today("en_US", "MMMM d,")))
+        guard added.firstMatch.waitForExistence(timeout: 45) else {
+            throw XCTSkip("no picture from today in the photo picker (CI's simulator, GifUITests)")
+        }
+        let gif = added.allElementsBoundByIndex.first { $0.isHittable } ?? added.firstMatch
+        sleep(1)
+        gif.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        app.buttons["Add"].tap()
+
+        let field = app.textFields["gif-tags.field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 30), "no tag field for a GIF new to the library")
+        XCTAssertTrue(app.staticTexts["Ohne Schlagwort geht das GIF raus, aber nicht in die Auswahl."].exists)
+        attach(app, "gif-tags-field")
+
+        field.tap()
+        field.typeText("ab")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS '3 bis 24 Zeichen'")).firstMatch.waitForExistence(timeout: 5),
+                      "a too short tag is not said")
+        let sendButton = app.buttons.matching(NSPredicate(format: "label == 'Senden' AND identifier != 'room-send_button'")).firstMatch
+        sendButton.tap()
+        sleep(2)
+        XCTAssertTrue(field.exists, "the GIF went out with a tag the server refuses")
+        if app.alerts.firstMatch.exists { app.alerts.buttons.firstMatch.tap() }
+
+        field.tap()
+        field.typeText(XCUIKeyboardKey.delete.rawValue + XCUIKeyboardKey.delete.rawValue + "jubeln")
+        sendButton.tap()
+        XCTAssertTrue(field.waitForNonExistence(timeout: 60), "the GIF did not go out")
+        let tagged = NSPredicate { _, _ in ((try? self.fixtureCalls()["gif_tag_changes"]) ?? 0) > (before["gif_tag_changes"] ?? 0) }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: tagged, object: nil)], timeout: 20), .completed,
+                       "the tags did not reach the library")
+        XCTAssertEqual(try fixtureState()["last_tags"] as? [String], ["jubeln"])
+    }
+
     // MARK: Helpers
 
     /// Uploads a GIF as the tester and lists it in the fixture's library: once tagged, and, when

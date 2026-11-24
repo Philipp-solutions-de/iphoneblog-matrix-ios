@@ -476,6 +476,23 @@ final class ChatSession: ObservableObject, ChatHost {
         router.gifPick = GIFPickRequest(roomID: roomID) { gif in send(gif.mxc, gif.width, gif.height, gif.size) }
     }
 
+    func gifNeedsTags(sha256: String) async -> Bool {
+        guard isOneMember else { return false }
+        return (try? await GIFLibraryAPI(session: self).lookup(sha256: sha256).needsTag) ?? false
+    }
+
+    func tagGIF(sha256: String, tags: [String]) async {
+        _ = try? await GIFLibraryAPI(session: self).addTags(tags, to: sha256)
+    }
+
+    func parseGIFTags(_ text: String) -> (tags: [String], problem: String?) {
+        switch GIFTags.parse(text) {
+        case .success(let tags): (tags, nil)
+        case .failure(.badTag(let why)): ([], why)
+        case .failure: ([], "Die Schlagworte stimmen nicht.")
+        }
+    }
+
     func showMessage(_ text: String) {
         router.notice = text
     }

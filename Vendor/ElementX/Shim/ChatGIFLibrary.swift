@@ -10,6 +10,13 @@ public enum ChatGIFLibrary {
     /// threads, never the Blog room).
     public static var isOffered: (String) -> Bool = { _ in false }
 
+    /// Set by the app: whether a GIF (by the SHA-256 of its file) needs tags for the library.
+    public static var needsTags: (String) async -> Bool = { _ in false }
+    /// Set by the app: adds tags to a GIF after it was sent.
+    public static var addTags: (String, [String]) async -> Void = { _, _ in }
+    /// Set by the app: "jubeln, facepalm" as tags, or why not (the server's rules).
+    public static var parseTags: (String) -> (tags: [String], problem: String?) = { _ in ([], nil) }
+
     static let menuTitle = "GIFs aus dem Chat"
 
     /// The message for a picked GIF: an m.image with the library's mxc, its size and

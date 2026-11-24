@@ -38,6 +38,9 @@ final class ElementXChatScreens: ChatScreenProviding {
             host?.didSee(roomID: roomID, threadRootEventID: threadRoot, eventID: eventID, isPrivate: isPrivate)
         }
         ChatGIFLibrary.isOffered = { [weak host] roomID in host?.offersGIFs(roomID: roomID) ?? false }
+        ChatGIFLibrary.needsTags = { [weak host] sha256 in await host?.gifNeedsTags(sha256: sha256) ?? false }
+        ChatGIFLibrary.addTags = { [weak host] sha256, tags in await host?.tagGIF(sha256: sha256, tags: tags) }
+        ChatGIFLibrary.parseTags = { [weak host] text in host?.parseGIFTags(text) ?? ([], nil) }
     }
 
     func roomScreen(roomID: String, host: ChatHost) -> AnyView {

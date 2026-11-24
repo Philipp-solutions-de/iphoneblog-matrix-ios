@@ -50,6 +50,10 @@ struct MediaUploadPreviewScreen: View {
                     }
                     .padding(.horizontal, 12)
                 }
+                // iphoneblog: tags for a GIF new to the library (ChatGIFTags).
+                ChatGIFTagField(model: context.viewState.gifTags) { context.send(viewAction: .send) }
+                    .padding(.horizontal, 12)
+                    .padding(.top, 12)
                 composer
                     .padding(.horizontal, 12)
                     .padding(.vertical, 16)
