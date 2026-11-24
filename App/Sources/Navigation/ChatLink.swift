@@ -68,6 +68,18 @@ struct ChatLink: Equatable {
         return nil
     }
 
+    /// The person a link names: matrix.to/#/@user:server, also with "?via=…" or a trailing
+    /// slash. A tap on such a link in a message opens the person's profile in the app, never the
+    /// browser (Philip, #bugs 2026-11-21: a tap on "Dominic" in a thread landed on matrix.to).
+    static func userID(_ url: URL) -> String? {
+        guard url.scheme == "https", url.host?.lowercased() == "matrix.to" else { return nil }
+        let parts = segments(of: url.fragment(percentEncoded: true) ?? "")
+        guard parts.count == 1, let user = parts.first, user.hasPrefix("@"),
+              let colon = user.firstIndex(of: ":"), colon > user.index(after: user.startIndex),
+              user.index(after: colon) < user.endIndex else { return nil }
+        return user
+    }
+
     private static func segments(of fragment: String) -> [String] {
         // "?via=…" belongs to matrix.to; our links carry none, but a pasted one may.
         let path = fragment.split(separator: "?", maxSplits: 1).first.map(String.init) ?? ""
