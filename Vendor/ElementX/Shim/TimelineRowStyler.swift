@@ -127,7 +127,7 @@ struct TimelineItemRowStylerView<Content: View>: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(timelineItem.sender.displayName ?? timelineItem.sender.id)
                 .font(style.fonts.senderName)
-                .foregroundStyle(isBot ? style.colors.accent : style.colors.ink)
+                .foregroundStyle(isBot ? style.colors.bot : style.colors.ink)
                 .lineLimit(1)
                 .accessibilityHidden(true) // read by the accessibility modifier below
                 #if DEBUG

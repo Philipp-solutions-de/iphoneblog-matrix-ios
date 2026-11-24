@@ -64,7 +64,9 @@ final class SiteSearchUITests: XCTestCase {
 
         // The end of the list asks for page 2.
         // The keyboard covers the lower half: "Suchen" closes it, then the finger drags the list.
-        app.searchFields.firstMatch.typeText("\n")
+        // Without focus (a hardware keyboard, a list update) there is no return to type.
+        let field = app.searchFields.firstMatch
+        if (field.value(forKey: "hasKeyboardFocus") as? Bool) == true { field.typeText("\n") }
         XCTAssertTrue(waitFor(5) { !app.keyboards.firstMatch.exists }, "the keyboard stayed")
         for _ in 0..<10 { drag(app, from: 0.8, to: 0.3) }
         XCTAssertTrue(waitFor(10) { (try? self.searches().contains { $0["page"] as? Int == 2 }) ?? false }, "no second page")
@@ -76,8 +78,12 @@ final class SiteSearchUITests: XCTestCase {
         XCTAssertTrue(video.waitForExistence(timeout: 10))
         attach(app, "site-search-videos")
 
+        // The filter's list starts at the top: the hit sits below the chips, where a finger
+        // reaches it. XCUITest's own scroll-to-visible ignores the chips' inset and taps them.
+        let chips = app.buttons["site-search.filter.videos"]
+        XCTAssertTrue(waitFor(10) { video.isHittable && video.frame.minY >= chips.frame.maxY }, "the video hit is under the chips: \(video.frame), chips \(chips.frame)")
         let loads = try articleLoads().count
-        video.tap()
+        video.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertTrue(waitFor(15) { ((try? self.articleLoads()) ?? []).count > loads }, "the article did not open")
         let opened = try XCTUnwrap(articleLoads().last)
         XCTAssertTrue(opened.contains("/video-") && opened.contains("t=") && opened.contains("app=1"), opened)

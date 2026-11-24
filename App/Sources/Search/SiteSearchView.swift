@@ -23,6 +23,8 @@ struct SiteSearchView: View {
                     ProgressView().frame(maxWidth: .infinity).listRowSeparator(.hidden)
                 }
             }
+            // A new filter starts its list at the top, not where the last one was scrolled to.
+            .id(model.filter)
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(Theme.background)

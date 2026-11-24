@@ -94,8 +94,8 @@ The hub's episode request (`LiveEpisodesSource`) carries that web view's cookies
 host, so the gate session on beta, and never follows a redirect: without a session the gate's
 302 means no episodes, not a sign-in started outside the web view. The discussion uses the system back
 button, so a swipe from the left edge returns to the blog where the reader was; a custom back
-button would switch that swipe off (Thorsten's test of build 70). The Blog home and the #one
-hub keep a navigation bar too, with their own header in it (the logo; "#one" and the search):
+button would switch that swipe off (Thorsten's test of build 70). The Blog home and #one's
+start screen keep a navigation bar too, with their own header in it (the logo; "#one" and the search):
 with the bar hidden on one side of a push, the back button rode with the page and jumped when a
 back swipe was let go (Philip, 2026-11-20).
 
@@ -125,6 +125,13 @@ the server sanitizes with the website's allowlist (`ReplyHTML`, no WebKit), or e
 their body text ("in der App zu sehen"); reply quotes and link previews are not in the files. `scripts/build.sh ui` drives this path in the simulator
 against `scripts/blog-fixture-server.py`, and `RichMessagesUITests` checks formatting, links,
 replies, pictures, video, files and the composer against the test homeserver.
+
+**#one opens on draft B** (Thorsten, 2026-11-20, replacing the hub of 2026-11-18): "Videos"
+with "Alle" and the newest episodes as a cover flow (the centred one full size, its neighbours
+smaller and turned; flat with Reduce Motion), then "Räume": a Threads row with the latest
+thread and the unread ones counted, and every #one room with its last sender, line, time and
+unread count (`OneHubView.swift`). An episode opens its page, Threads the list, a room the Chat
+screen below on that room. Without episodes from the route the rooms show alone.
 
 **#one: a room bar, variant A.** Under the title "#one" (with the open room's topic) a bar of
 chips holds every #one room from the server, each with its unread count, "@" for a mention and
@@ -309,7 +316,7 @@ That code is AGPL-3.0, so this app is AGPL-3.0 too; the repository is public, as
 | Threads | thread focus, `ThreadListService`, thread subscriptions | `Screens/ThreadTimelineScreen`, `Screens/RoomThreadListScreen` | the article discussions and the threads in #one |
 | Composer | send queue, replies, edits, `Mentions`, markdown to HTML, media upload | the composer, its formatting toolbar (+ › Textformatierung) and mention suggestions from `Screens/RoomScreen`, `Other/Pills` | no polls, no voice messages |
 | Media | thumbnails, files, upload with progress | `Screens/FilePreviewScreen`, `Screens/MediaPickerScreen`, `Screens/MediaUploadPreviewScreen`; link previews through Apple's `LPMetadataProvider` (the phone fetches the page, not Synapse's preview_url) | the upload progress bar under a sending photo, video or file (`Shim/ChatUploadProgress.swift`); animated GIFs play from the original and go out unchanged (Element X), with Reduce Motion as their first frame (patch); with a caption, the picture alone gets the rounded corners, so the caption keeps its first letter (patch); Markieren in the upload preview draws on a photo, not a GIF, with PencilKit and sends the marked-up copy (`Shim/ChatMarkup.swift`) |
-| Design system | | `compound-ios` (needed by the views), recoloured through its override API | our tokens: teal, coral, greys; teal for all content, coral only for #one and sign-in (the colour rule in `App/Sources/Theme.swift`; it overrides the coral badges and mentions in `design/screens.html`) |
+| Design system | | `compound-ios` (needed by the views), recoloured through its override API | our tokens: teal, coral, greys; teal for content outside #one, and inside the #one tab the #one red (#EB686E family) for everything, chat views included, with no teal but the bot marks (Thorsten, 2026-11-20). A bridged trait, `OneTintTrait`, set on the #one tab, turns every teal token red there (the colour rule in `App/Sources/Theme.swift`; it overrides the coral badges and mentions in `design/screens.html`) |
 | Push | `NotificationClient` | | extension text, pusher registration, tap routing |
 | Sign-in | OAuth 2.0, PKCE, dynamic registration | | one button, `ASWebAuthenticationSession` |
 
@@ -383,6 +390,11 @@ API change small, which costs less than a monthly jump over eight releases.
   with xcodegen; neither is committed.
 - `scripts/build.sh build|test|integration` builds for the arm64 simulator (the SDK ships no
   x86_64 simulator slice), ad-hoc signed.
+- **Lowest CPU priority on Thorsten's Mac** (Thorsten, 2026-11-21): `scripts/build.sh` and
+  `scripts/perf.sh` start xcodebuild with `taskpolicy -b` and, every 20 s while it runs, lower
+  the test simulator's process tree and the build services (`scripts/low-priority.sh`). The
+  performance tests measure at normal priority and say so. GitHub's hosted runners keep normal
+  priority; `IPHONEBLOG_PRIORITY=normal` turns it off anywhere.
 - CI builds once, then runs the unit, sign-in and UI tests in four shards side by side, balanced
   by measured test time (`scripts/ui-shards.py`). It runs on Thorsten's Mac Studio, four runner
   instances under their own user, when it is online and idle and the code is ours; on GitHub's

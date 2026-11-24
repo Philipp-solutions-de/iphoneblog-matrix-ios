@@ -18,6 +18,8 @@ set -euo pipefail
 
 here="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$here"
+# The build at the lowest CPU priority on Thorsten's Mac; the measuring at normal (run, below).
+. scripts/low-priority.sh
 mkdir -p build
 action="${1:-all}"
 port="${PERF_HOMESERVER_PORT:-8048}"
@@ -86,8 +88,12 @@ common=(
 )
 
 build() {
-    xcodebuild "${common[@]}" build-for-testing 2>&1 | tee build/perf-build.log \
+    lower_start "$device"
+    lowprio xcodebuild "${common[@]}" build-for-testing 2>&1 | tee build/perf-build.log \
         | grep -E 'error:|\*\* (BUILD|TEST) ' || true
+    lower_stop
+    # The simulator may have been lowered during the build; it is measured at normal priority.
+    raise_simulator "$device"
     grep -q '\*\* TEST BUILD SUCCEEDED \*\*' build/perf-build.log
 }
 
@@ -162,6 +168,10 @@ run() {
     set +e
     # One retry for a failed test: a loaded CI runner's XCUITest times out reading the screen now
     # and then. perf-gate.py takes the last numbers a test printed, which are the retry's.
+    # Measured at normal priority: a background-priority simulator would measure the policy,
+    # not the app (scripts/low-priority.sh). Said, so nobody wonders why the Mac is busy.
+    lower_stop
+    echo "perf.sh: measuring at normal CPU priority" >&2
     xcodebuild "${common[@]}" -resultBundlePath "$result" ${only[@]+"${only[@]}"} \
         -retry-tests-on-failure -test-iterations 2 test-without-building 2>&1 \
         | tee build/perf.log | grep -E 'error:|Test Case .*(passed|failed|skipped)|measured \[|\*\* TEST '
