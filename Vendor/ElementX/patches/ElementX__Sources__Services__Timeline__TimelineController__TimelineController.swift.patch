@@ -16,21 +16,36 @@
      }
      
      func processItemAppearance(_ itemID: TimelineItemIdentifier) async {
-@@ -516,6 +523,13 @@
-             }
-             
-             return (activeTimelineProvider.itemProxies, activeTimelineProvider.paginationState)
-+        }, roomProxy.infoPublisher.map(\.fullyReadEventID).removeDuplicates().dropFirst().compactMap { [weak self] _ in
-+            // iphoneblog: the read position can arrive after the items; place the Neu divider then.
+@@ -340,6 +347,14 @@
+     
+     // MARK: - Sending
+     
++    /// iphoneblog: sends content made elsewhere (a GIF from the library, by its mxc) on the
++    /// timeline in front, so a thread's message goes into the thread.
++    func sendMessageEventContent(_ content: RoomMessageEventContentWithoutRelation) async -> Result<Void, TimelineProxyError> {
++        // The posting notice first, as for every other message (TimelineProxy).
++        guard await ChatPostingNotice.shared.ensureAcknowledged() else { return .failure(.sdkError(CancellationError())) }
++        return await activeTimeline.sendMessageEventContent(content)
++    }
++    
+     func sendMessage(_ message: String,
+                      html: String?,
+                      inReplyToEventID: String?,
+@@ -511,6 +526,13 @@
+         
+         let contentSizeChangePublisher = NotificationCenter.default.publisher(for: UIContentSizeCategory.didChangeNotification)
+         let timelineUpdates = activeTimelineItemProvider.updatePublisher.merge(with: contentSizeChangePublisher.compactMap { [weak self] _ in
 +            guard let activeTimelineProvider = self?.activeTimelineItemProvider else {
 +                return nil
 +            }
 +            
 +            return (activeTimelineProvider.itemProxies, activeTimelineProvider.paginationState)
-         })
-         
-         updateTimelineItemsCancellable = Task { [weak self] in
-@@ -523,6 +537,26 @@
++        }, roomProxy.infoPublisher.map(\.fullyReadEventID).removeDuplicates().dropFirst().compactMap { [weak self] _ in
++            // iphoneblog: the read position can arrive after the items; place the Neu divider then.
+             guard let activeTimelineProvider = self?.activeTimelineItemProvider else {
+                 return nil
+             }
+@@ -523,6 +545,26 @@
                  await self?.updateTimelineItems(itemProxies: items, paginationState: paginationState)
              }
          }.asCancellable()
@@ -57,7 +72,7 @@
      }
      
      private func updateTimelineItems(itemProxies: [TimelineItemProxy], paginationState: TimelinePaginationState) async {
-@@ -570,6 +604,8 @@
+@@ -570,6 +612,8 @@
              return newTimelineItems
          }.value
          

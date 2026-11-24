@@ -28,10 +28,13 @@
          
          // Start processing the media whilst the user is reviewing it/adding a caption.
          processingTask = Self.processMedia(at: mediaURLs, preprocessor: mediaUploadingPreprocessor, clientProxy: clientProxy)
-@@ -53,11 +59,18 @@
+@@ -53,14 +59,29 @@
                                                                         title: title,
                                                                         shouldShowCaptionWarning: shouldShowCaptionWarning,
                                                                         bindings: .init(caption: caption ?? NSAttributedString())))
++        
++        // iphoneblog: a GIF new to the library asks for tags (ChatGIFTags).
++        state.gifTags.prepare(mediaURLs)
 +        
 +        completionSuggestionService?.setSuggestionTrigger(nil)
 +        suggestionsCancellable = completionSuggestionService?.suggestionsPublisher
@@ -48,7 +51,23 @@
          
          switch viewAction {
          case .send:
-@@ -101,6 +114,10 @@
++            // iphoneblog: tags the server would refuse are said before anything leaves.
++            if let problem = state.gifTags.problem {
++                showError(label: problem)
++                return
++            }
+             startLoading()
+             
+             Task { [processingTask] in
+@@ -84,6 +105,7 @@
+                             switch await sendAttachment(mediaInfo: mediaInfo, caption: perItemCaption) {
+                             case .success:
+                                 perItemCaption = nil // Set the caption only on the first uploaded file.
++                                state.gifTags.submit() // iphoneblog: the GIF's tags, once it went out
+                             case .failure(let error):
+                                 MXLog.error("Failed sending media with error: \(error)")
+                                 showError(label: L10n.screenMediaUploadPreviewErrorFailedSending)
+@@ -101,6 +123,10 @@
                      showError(label: L10n.screenMediaUploadPreviewErrorFailedProcessing)
                  }
              }
@@ -59,7 +78,7 @@
          case .cancel:
              requestHandle?.cancel()
              actionsSubject.send(.dismiss)
-@@ -156,6 +173,17 @@
+@@ -156,6 +182,17 @@
                                                      inReplyToEventID: nil)
      }
      

@@ -1,15 +1,17 @@
 --- a/ElementX/Sources/Screens/MediaUploadPreviewScreen/MediaUploadPreviewScreenModels.swift
 +++ b/ElementX/Sources/Screens/MediaUploadPreviewScreen/MediaUploadPreviewScreenModels.swift
-@@ -20,6 +20,8 @@
+@@ -20,6 +20,10 @@
      var shouldDisableInteraction = false
      
      var mediaEditVersion = 0
 +    /// iphoneblog: @ suggestions for the caption, as the message composer offers them.
 +    var suggestions: [SuggestionItem] = []
++    /// iphoneblog: tags for a GIF new to the library (ChatGIFTags).
++    let gifTags = ChatGIFTagModel()
      
      var bindings: MediaUploadPreviewScreenBindings
  }
-@@ -43,4 +45,7 @@
+@@ -43,4 +47,7 @@
      case send
      case cancel
      case editedMedia(image: UIImage, index: Int)

@@ -37,6 +37,10 @@ final class ElementXChatScreens: ChatScreenProviding {
         ChatKitReads.seen = { [weak host] roomID, threadRoot, eventID, isPrivate in
             host?.didSee(roomID: roomID, threadRootEventID: threadRoot, eventID: eventID, isPrivate: isPrivate)
         }
+        ChatGIFLibrary.isOffered = { [weak host] roomID in host?.offersGIFs(roomID: roomID) ?? false }
+        ChatGIFLibrary.needsTags = { [weak host] sha256 in await host?.gifNeedsTags(sha256: sha256) ?? false }
+        ChatGIFLibrary.addTags = { [weak host] sha256, tags in await host?.tagGIF(sha256: sha256, tags: tags) }
+        ChatGIFLibrary.parseTags = { [weak host] text in host?.parseGIFTags(text) ?? ([], nil) }
     }
 
     func roomScreen(roomID: String, host: ChatHost) -> AnyView {
@@ -116,4 +120,9 @@ private final class HostAdapter: ChatKitHost {
     func openURL(_ url: URL) { host?.openURL(url) }
     func showMessage(_ text: String) { host?.showMessage(text) }
     func reportMessage(roomID: String, eventID: String) { host?.reportMessage(roomID: roomID, eventID: eventID) }
+    func pickGIF(roomID: String, send: @escaping @MainActor (ChatGIF) -> Void) {
+        host?.pickGIF(roomID: roomID) { mxc, width, height, size in
+            send(ChatGIF(mxc: mxc, width: width, height: height, size: size))
+        }
+    }
 }

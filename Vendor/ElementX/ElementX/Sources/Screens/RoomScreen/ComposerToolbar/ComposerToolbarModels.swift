@@ -65,6 +65,8 @@ enum ComposerAttachmentType {
     case file
     case location
     case poll
+    /// iphoneblog: "GIFs aus dem Chat", the library of GIFs posted in #one (ChatGIFLibrary).
+    case gifLibrary
 }
 
 struct ComposerToolbarViewState: BindableState {
@@ -76,6 +78,8 @@ struct ComposerToolbarViewState: BindableState {
     var composerEmpty = true
     /// Could be false if sending is disabled in the room
     var canSend = true
+    /// iphoneblog: the + menu offers "GIFs aus dem Chat" (#one rooms and their threads only).
+    var gifLibraryEnabled = false
     var suggestions: [SuggestionItem] = []
     
     var isRoomEncrypted: Bool

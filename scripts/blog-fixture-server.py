@@ -34,7 +34,9 @@ ARTICLES = [(i, f"https://www.iphoneblog.de/2026/11/{16 - i:02d}/artikel-{i}/", 
 ARTICLES[0] = (1, "https://www.iphoneblog.de/2023/02/28/tipp-in-der-reader-darstellung-verschickt-apple-mail-einen-kompletten-web-artikel/", "Artikel 1")
 EXISTING = {ARTICLES[1][1]: "$existing", ARTICLES[5][1]: "$existing6"}
 made = {}
-calls = {"created": 0, "found": 0, "blog_loads": 0, "gate_starts": 0, "episodes_ok": 0, "episodes_gated": 0}
+# The GIF library's stand-in (gif-library.md): a test sets the list with POST /gifs-fixture.
+gif_library = {"gifs": [], "last_tags": [], "last_query": ""}
+calls = {"gif_lists": 0, "gif_reports": 0, "gif_tag_changes": 0, "gif_lookups": 0, "created": 0, "found": 0, "blog_loads": 0, "gate_starts": 0, "episodes_ok": 0, "episodes_gated": 0}
 gate = {"token": secrets.token_hex(16)}
 FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "App", "Resources", "Fixtures")
 EPISODES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "App", "Resources", "Fixtures", "episodes-fixture.json")
@@ -168,6 +170,21 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/video/fx1/h264.mp4":
             calls["card_video_plays"] = calls.get("card_video_plays", 0) + 1
             return self.send_file(os.path.join(FIXTURES, "sample-video.mp4"), "video/mp4")
+        if path == "/gifs":
+            calls["gif_lists"] += 1
+            query = urllib.parse.parse_qs(parsed.query)
+            q = (query.get("q") or [""])[0].lower()
+            gif_library["last_query"] = q
+            gifs = [g for g in gif_library["gifs"] if all(w in " ".join(g["tags"]) for w in q.split())]
+            return self.send(200, {"gifs": gifs, "total": len(gifs), "next": None})
+        if path == "/gifs/lookup":
+            calls["gif_lookups"] += 1
+            sha = (urllib.parse.parse_qs(parsed.query).get("sha256") or [""])[0]
+            known = next((g for g in gif_library["gifs"] if g["id"] == sha), None)
+            return self.send(200, {"id": sha, "known": known is not None, "listed": known is not None, "reported": False,
+                                   "tags": known["tags"] if known else [], "needs_tag": not (known and known["tags"])})
+        if path == "/gifs-state":
+            return self.send(200, gif_library)
         if path == "/calls":
             return self.send(200, calls)
         self.send(404, {})
@@ -192,7 +209,36 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(chunk)
 
+    def gif_tags(self, replace):
+        gid = urllib.parse.urlparse(self.path).path.split("/")[2]
+        body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+        tags = [t.lower() for t in body.get("tags", [])]
+        calls["gif_tag_changes"] += 1
+        gif_library["last_tags"] = tags
+        for g in gif_library["gifs"]:
+            if g["id"] == gid:
+                g["tags"] = tags if replace else g["tags"] + [t for t in tags if t not in g["tags"]]
+        return self.send(200, {"id": gid, "tags": tags})
+
+    def do_PATCH(self):
+        if urllib.parse.urlparse(self.path).path.endswith("/tags"):
+            return self.gif_tags(replace=True)
+        return self.send(404, {})
+
     def do_POST(self):
+        path = urllib.parse.urlparse(self.path).path
+        if path == "/gifs-fixture":
+            body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+            gif_library["gifs"] = body.get("gifs", [])
+            gif_library["last_tags"] = []
+            return self.send(200, {})
+        if path.startswith("/gifs/") and path.endswith("/tags"):
+            return self.gif_tags(replace=False)
+        if path.startswith("/gifs/") and path.endswith("/report"):
+            gid = path.split("/")[2]
+            calls["gif_reports"] += 1
+            gif_library["gifs"] = [g for g in gif_library["gifs"] if g["id"] != gid]
+            return self.send(200, {"id": gid, "removed": True})
         if urllib.parse.urlparse(self.path).path == "/gate/reset":
             gate["token"] = secrets.token_hex(16)
             return self.send(200, {})

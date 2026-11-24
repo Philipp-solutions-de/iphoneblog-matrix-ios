@@ -62,6 +62,16 @@ struct RoomAttachmentPicker: View {
             }
             .accessibilityIdentifier(A11yIdentifiers.roomScreen.attachmentPickerPhotoLibrary)
             
+            // iphoneblog: GIFs already posted in #one, beside Fotos and Kamera (gif-library.md).
+            if context.viewState.gifLibraryEnabled {
+                Button {
+                    context.send(viewAction: .attach(.gifLibrary))
+                } label: {
+                    Label(ChatGIFLibrary.menuTitle, systemImage: "sparkles.rectangle.stack")
+                }
+                .accessibilityIdentifier("room-attachment_picker_gif_library")
+            }
+            
             Button {
                 context.send(viewAction: .attach(.camera))
             } label: {
