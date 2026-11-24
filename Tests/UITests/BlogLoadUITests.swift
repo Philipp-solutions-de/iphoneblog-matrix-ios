@@ -39,10 +39,10 @@ final class BlogLoadUITests: XCTestCase {
         try post("/gate/reset")
         let gateBefore = try count("gate_starts"), gatedBefore = try count("episodes_gated")
         var app = try launch(tab: "chat", blog: "/blog/?app=1", hub: true)
-        XCTAssertTrue(app.buttons["hub.tile.chat"].waitForExistence(timeout: 120), "no hub")
+        XCTAssertTrue(app.descendants(matching: .any)["hub.search"].waitForExistence(timeout: 120), "no hub")
         XCTAssertTrue(waitFor(30) { (try? self.count("episodes_gated")) ?? 0 > gatedBefore }, "the hub did not ask for episodes")
         sleep(2)
-        XCTAssertFalse(app.buttons["hub.hero"].exists, "episodes without a gate session")
+        XCTAssertFalse(app.buttons.matching(identifier: "one.episode").firstMatch.exists, "episodes without a gate session")
         XCTAssertEqual(try count("gate_starts"), gateBefore, "the episodes request followed the gate's redirect")
         app.terminate()
 
@@ -51,7 +51,7 @@ final class BlogLoadUITests: XCTestCase {
         app = try launch(tab: "blog", blog: "/gate/start?rd=%2Fblog%2F%3Fapp%3D1", hub: true)
         XCTAssertTrue(app.webViews.firstMatch.staticTexts["Artikel 1"].waitForExistence(timeout: 120), "the gate did not lead to the blog")
         oneTab(app).tap()
-        XCTAssertTrue(app.buttons["hub.hero"].waitForExistence(timeout: 60), "no episodes with the gate session")
+        XCTAssertTrue(app.buttons.matching(identifier: "one.episode").firstMatch.waitForExistence(timeout: 60), "no episodes with the gate session")
         XCTAssertGreaterThan(try count("episodes_ok"), okBefore)
     }
 

@@ -54,6 +54,9 @@ struct MainView: View {
                     .tag(Router.Tab.me)
             }
         }
+        // The selected tab in teal, the selected "one" in the #one red (Philip's point, approved;
+        // Thorsten's #one tint, 2026-11-20). Only the selected item takes the tint.
+        .tint(router.tab == .chat ? Theme.coral : Theme.teal)
         // A long press on "Für dich": everything read, while there is something (haptic).
         .background {
             if let session, router.isMember {

@@ -8,13 +8,17 @@ struct OneChatGate: View {
     let session: ChatSession?
 
     var body: some View {
-        if let session, router.isMember {
-            OneChatTab(router: router, session: session)
-        } else if let session {
-            OneMembersOnly(session: session, router: router)
-        } else {
-            OneSignIn(router: router)
+        Group {
+            if let session, router.isMember {
+                OneChatTab(router: router, session: session)
+            } else if let session {
+                OneMembersOnly(session: session, router: router)
+            } else {
+                OneSignIn(router: router)
+            }
         }
+        // Everything in #one in the #one red, nothing in teal (Thorsten, 2026-11-20; Theme).
+        .environment(\.oneTint, true)
     }
 }
 
