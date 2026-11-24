@@ -383,6 +383,11 @@ API change small, which costs less than a monthly jump over eight releases.
   with xcodegen; neither is committed.
 - `scripts/build.sh build|test|integration` builds for the arm64 simulator (the SDK ships no
   x86_64 simulator slice), ad-hoc signed.
+- **Lowest CPU priority on Thorsten's Mac** (Thorsten, 2026-11-21): `scripts/build.sh` and
+  `scripts/perf.sh` start xcodebuild with `taskpolicy -b` and, every 20 s while it runs, lower
+  the test simulator's process tree and the build services (`scripts/low-priority.sh`). The
+  performance tests measure at normal priority and say so. GitHub's hosted runners keep normal
+  priority; `IPHONEBLOG_PRIORITY=normal` turns it off anywhere.
 - CI runs on GitHub's hosted `xcode-27` image (public preview; free for public repositories).
 - One run per branch at a time. A new push to a pull request's branch cancels its older run;
   on `main` a new merge waits for the running build, and GitHub keeps only the newest waiting

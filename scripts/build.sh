@@ -12,6 +12,8 @@ set -euo pipefail
 
 here="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$here"
+# Lowest CPU priority on Thorsten's Mac (scripts/low-priority.sh).
+. scripts/low-priority.sh
 mkdir -p build
 action="${1:-build}"
 
@@ -49,8 +51,10 @@ common=(
 run() {
     local log="build/$1.log"; shift
     set +e
-    xcodebuild "$@" 2>&1 | tee "$log" | grep -E 'error:|Test Case .*(passed|failed|skipped)|\*\* (BUILD|TEST) '
+    lower_start "$device"
+    lowprio xcodebuild "$@" 2>&1 | tee "$log" | grep -E 'error:|Test Case .*(passed|failed|skipped)|\*\* (BUILD|TEST) '
     local status=${PIPESTATUS[0]}
+    lower_stop
     set -e
     return "$status"
 }
