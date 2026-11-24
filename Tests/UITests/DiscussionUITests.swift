@@ -187,6 +187,54 @@ final class DiscussionUITests: XCTestCase {
         attach(app, "member-reply-reopened")
     }
 
+    /// A thread with replies shows them on the first open, not only on the second (Brain's item
+    /// d, 2026-11-21: "Blog-Thread zeigt beim ersten Öffnen nichts").
+    func testMemberSeesTheRepliesOnTheFirstOpen() throws {
+        let other = try TestServer.signIn(2)
+        defer { other.signOut() }
+        let room = try XCTUnwrap(env["IPHONEBLOG_TEST_BLOG_ROOM"]), root = try XCTUnwrap(env["IPHONEBLOG_TEST_ARTICLE_ROOT"])
+        try other.join(room) // the Blog room is public; the second person is not in it yet
+        let marker = "erst\(Int.random(in: 1000...9999))"
+        try other.send("Schon da \(marker)", in: room, thread: root)
+
+        let app = try launch(member: true)
+        let web = app.webViews.firstMatch
+        XCTAssertTrue(web.links["Diskussion 1"].waitForExistence(timeout: 30))
+        sleep(8) // the sign-in runs in the background; the thread needs the session
+        web.links["Diskussion 1"].tap()
+        XCTAssertTrue(app.staticTexts["DISKUSSION"].waitForExistence(timeout: 45))
+        let reply = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", marker)).firstMatch
+        XCTAssertTrue(reply.waitForExistence(timeout: 30), "the thread's reply does not show on the first open")
+        attach(app, "member-thread-first-open")
+    }
+
+    /// The reply count under the thread's first message follows a new reply while the thread is
+    /// open (Brain's item d: "der Zähler vorne aktualisiert sich nicht").
+    func testMemberSeesTheReplyCountGrow() throws {
+        let other = try TestServer.signIn(2)
+        defer { other.signOut() }
+        let room = try XCTUnwrap(env["IPHONEBLOG_TEST_BLOG_ROOM"]), root = try XCTUnwrap(env["IPHONEBLOG_TEST_ARTICLE_ROOT"])
+        try other.join(room) // the Blog room is public; the second person is not in it yet
+        try other.send("Vorher \(Int.random(in: 1000...9999))", in: room, thread: root)
+
+        let app = try launch(member: true)
+        let web = app.webViews.firstMatch
+        XCTAssertTrue(web.links["Diskussion 1"].waitForExistence(timeout: 30))
+        sleep(8)
+        web.links["Diskussion 1"].tap()
+        let count = app.staticTexts.matching(NSPredicate(format: "label MATCHES '[0-9]+ Antworten|1 Antwort'")).firstMatch
+        for _ in 0..<8 where !count.isHittable { app.swipeDown(velocity: .fast) }
+        XCTAssertTrue(count.waitForExistence(timeout: 30), "no reply count under the root")
+        let before = Int(count.label.prefix { $0.isNumber }) ?? 0
+        XCTAssertGreaterThan(before, 0, "the count shows no replies: \(count.label)")
+
+        try other.send("Neu \(Int.random(in: 1000...9999))", in: room, thread: root)
+        let grown = NSPredicate { _, _ in (Int(count.label.prefix { $0.isNumber }) ?? 0) > before }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: grown, object: nil)], timeout: 30), .completed,
+                       "the count stayed at \(count.label) after a new reply")
+        attach(app, "member-thread-count-grown")
+    }
+
     // MARK: Helpers
 
     private func swipeBackFromLeftEdge(_ app: XCUIApplication) {
