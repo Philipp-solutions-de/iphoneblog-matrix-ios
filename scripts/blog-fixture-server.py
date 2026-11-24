@@ -242,6 +242,11 @@ class Handler(BaseHTTPRequestHandler):
         if urllib.parse.urlparse(self.path).path == "/gate/reset":
             gate["token"] = secrets.token_hex(16)
             return self.send(200, {})
+        if urllib.parse.urlparse(self.path).path == "/article-root":
+            # A test's own thread for an article: {"article": 4, "root": "$…"} (DiscussionUITests).
+            body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+            EXISTING[ARTICLES[int(body["article"]) - 1][1]] = body["root"]
+            return self.send(200, {})
         if urllib.parse.urlparse(self.path).path != "/article-thread":
             return self.send(404, {})
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
