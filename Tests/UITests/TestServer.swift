@@ -151,6 +151,20 @@ struct TestServer {
         return nil
     }
 
+    /// The newest event in the room whose content's `url` is this mxc (a GIF sent from the
+    /// library), with its content; nil after 30 tries.
+    func image(in room: String, mxc: String) throws -> [String: Any]? {
+        for _ in 0..<30 {
+            let page = try Self.call(base, "/_matrix/client/v3/rooms/\(Self.encode(room))/messages?dir=b&limit=30",
+                                     method: "GET", token: token, body: nil)
+            for event in page["chunk"] as? [[String: Any]] ?? [] {
+                if let content = event["content"] as? [String: Any], content["url"] as? String == mxc { return content }
+            }
+            sleep(1)
+        }
+        return nil
+    }
+
     /// One of this user's account data entries, or nil.
     func accountData(_ type: String) throws -> [String: Any]? {
         let result = try Self.call(base, "/_matrix/client/v3/user/\(Self.encode(userID))/account_data/\(type)", method: "GET",

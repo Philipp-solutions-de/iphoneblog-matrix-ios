@@ -73,6 +73,8 @@ final class Router: ObservableObject {
     @Published var profile: Person?
     /// A report from the conversation views (App/Sources/Moderation).
     @Published var moderation: ModerationRequest?
+    /// "GIFs aus dem Chat" from a composer's + menu (App/Sources/GIFs).
+    @Published var gifPick: GIFPickRequest?
     @Published var notice: String?
     /// The sign-in sheet, offered where reading ends and writing would start.
     @Published var showSignIn = false

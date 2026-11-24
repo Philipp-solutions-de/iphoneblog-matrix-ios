@@ -86,6 +86,9 @@ final class ComposerToolbarViewModel: ComposerToolbarViewModelType, ComposerTool
                                                               bindings: .init()),
                    mediaProvider: mediaProvider)
         
+        // iphoneblog: the app decides where its GIF library is offered (ChatGIFLibrary).
+        state.gifLibraryEnabled = ChatGIFLibrary.isOffered(roomProxy.id)
+        
         state.keyCommands = [
             .enter { [weak self] in
                 self?.process(viewAction: .sendMessage)

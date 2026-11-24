@@ -35,7 +35,16 @@
          let memberDetails: ManageRoomMemberDetails = if let memberProxy = roomProxy.membersPublisher.value.first(where: { $0.userID == sender.id }) {
              .memberDetails(roomMember: .init(withProxy: memberProxy))
          } else {
-@@ -584,9 +596,9 @@
+@@ -391,6 +403,8 @@
+             actionsSubject.send(.displayLocationPicker)
+         case .poll:
+             actionsSubject.send(.displayNewPollForm)
++        case .gifLibrary:
++            actionsSubject.send(.displayGIFLibrary)
+         }
+     }
+     
+@@ -584,9 +598,9 @@
      }
      
      private func setupUserSettingsSubscriptions() {
@@ -48,7 +57,7 @@
          
          userSettings.app.viewSourceEnabledPublisher
              .weakAssign(to: \.state.isViewSourceEnabled, on: self)
-@@ -653,7 +665,7 @@
+@@ -653,7 +667,7 @@
                  return
              }
              
@@ -57,7 +66,7 @@
              case .failure:
                  displayErrorToast(L10n.errorFailedLoadingMessages)
              default:
-@@ -719,6 +731,11 @@
+@@ -719,6 +733,11 @@
      
      private func sendReadReceiptIfNeeded(for lastVisibleItemID: TimelineItemIdentifier) async {
          guard appMediator.appState == .active else { return }
@@ -69,7 +78,7 @@
          
          await timelineController.sendReadReceipt(for: lastVisibleItemID)
      }
-@@ -899,6 +916,7 @@
+@@ -899,6 +918,7 @@
      // MARK: - Timeline Item Building
      
      private func buildTimelineViews(timelineItems: [RoomTimelineItemProtocol], isSwitchingTimelines: Bool = false) {

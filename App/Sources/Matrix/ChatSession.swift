@@ -465,6 +465,17 @@ final class ChatSession: ObservableObject, ChatHost {
         }
     }
 
+    // MARK: GIFs aus dem Chat
+
+    /// #one rooms and their threads, for #one members; never the Blog room (gif-library.md).
+    func offersGIFs(roomID: String) -> Bool {
+        isOneMember && roomID != blogRoomID && oneRooms.contains { $0.id == roomID }
+    }
+
+    func pickGIF(roomID: String, send: @escaping @MainActor (_ mxc: String, _ width: Int?, _ height: Int?, _ size: Int?) -> Void) {
+        router.gifPick = GIFPickRequest(roomID: roomID) { gif in send(gif.mxc, gif.width, gif.height, gif.size) }
+    }
+
     func showMessage(_ text: String) {
         router.notice = text
     }
@@ -551,6 +562,8 @@ final class ChatSession: ObservableObject, ChatHost {
     }
 
     private var lastStatus = 0
+    /// The HTTP status of the last `api` call, so a caller can tell 403 from 429 (GIFLibraryAPI).
+    var lastAPIStatus: Int { lastStatus }
 
     /// What pauses our calls (the backoff): the server or the network failing, not a request
     /// the app itself cancelled (search cancels one per keystroke: "Comics" typed letter by

@@ -17,6 +17,8 @@ enum TimelineViewModelAction {
     case displayCameraPicker
     case displayMediaPicker
     case displayDocumentPicker
+    /// iphoneblog: the GIF library picker.
+    case displayGIFLibrary
     case displayLocationPicker
     case displayNewPollForm
     case displayEditPollForm(eventID: String, poll: Poll)
