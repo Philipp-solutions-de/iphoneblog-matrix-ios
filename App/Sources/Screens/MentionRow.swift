@@ -133,16 +133,24 @@ enum MentionPill {
         let isMe: Bool
     }
 
-    /// The highlighted message as one Text, each mention a run of its own with a hair space on
-    /// either side, so the capsule has room around the name.
+    /// The room pill's padding (Element X's `PillView`): 4 pt before the name, 6 after. Philip,
+    /// build 275: "Sie sind rund, aber nicht identisch mit denen im Raum. Da fehlt etwas padding
+    /// links und rechts" (a hair space either side was about 1.5 pt).
+    static let leading: CGFloat = 4
+    static let trailing: CGFloat = 6
+
+    /// The highlighted message as one Text, each mention a run of its own between two fixed-width
+    /// spaces about as wide as the padding (U+2005, a quarter em, before; U+2004, a third, after).
+    /// The renderer draws the capsule over them: the name sits in the room's padding, and the
+    /// words beside it keep their distance. Padding inside the run moved the name but not the
+    /// capsule, which follows the glyphs, and SwiftUI drops kerning on a lone zero-width
+    /// character (2026-11-22).
     static func text(_ string: AttributedString) -> Text {
         var result = Text(verbatim: "")
         for run in string.runs {
             let part = AttributedString(string[run.range])
             if let isMe = run[Key.self] {
-                let space = AttributedString("\u{200A}", attributes: run.attributes)
-                let padded = space + part + space
-                result = Text("\(result)\(Text(padded).customAttribute(Attribute(isMe: isMe)))")
+                result = Text("\(result)\u{2005}\(Text(part).customAttribute(Attribute(isMe: isMe)))\u{2004}")
             } else {
                 result = Text("\(result)\(Text(part))")
             }
@@ -155,7 +163,10 @@ enum MentionPill {
             for line in layout {
                 for run in line {
                     if let pill = run[Attribute.self] {
-                        let box = run.typographicBounds.rect.insetBy(dx: 0, dy: -1)
+                        let glyphs = run.typographicBounds.rect
+                        let box = CGRect(x: glyphs.minX - MentionPill.leading, y: glyphs.minY - 1,
+                                         width: glyphs.width + MentionPill.leading + MentionPill.trailing,
+                                         height: glyphs.height + 2)
                         context.fill(Capsule().path(in: box), with: .color(pill.isMe ? Theme.badge : Theme.tealSoft))
                     }
                     context.draw(run)
