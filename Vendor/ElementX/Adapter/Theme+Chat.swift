@@ -27,8 +27,10 @@ extension Theme {
         static let summaryAvatar: CGFloat = 20
         /// Gap between avatar and message; space above a new sender, between one sender's messages.
         static let avatarGap: CGFloat = 12
-        static let groupSpacing: CGFloat = 14
-        static let messageSpacing: CGFloat = 4
+        // Between two messages of a group and above a new sender: 16 pt each, four paragraph gaps
+        // (ChatParagraphs, agreed with the web, chat-web PR #23; Thorsten 2026-11-24).
+        static let groupSpacing: CGFloat = 16
+        static let messageSpacing: CGFloat = 16
         /// Widest a picture or video in the timeline may be.
         static let mediaWidth: CGFloat = 280
     }

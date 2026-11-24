@@ -69,6 +69,9 @@ nonisolated struct AttributedStringBuilder: AttributedStringBuilderProtocol {
         let mutableAttributedString = NSMutableAttributedString(string: string)
         addLinksAndMentions(mutableAttributedString)
         addMatrixEntityPermalinkAttributesTo(mutableAttributedString)
+        // iphoneblog: the timeline's paragraphs and line breaks (ChatParagraphs); the composer's
+        // builder keeps the text as typed.
+        if cacheKey == Self.defaultKey { ChatParagraphs.normalise(mutableAttributedString, plain: true) }
         
         let result = try? AttributedString(mutableAttributedString, including: \.elementX)
         Self.cacheValue(result, forKey: string, cacheKey: cacheKey)
@@ -102,6 +105,9 @@ nonisolated struct AttributedStringBuilder: AttributedStringBuilderProtocol {
         addLinksAndMentions(mutableAttributedString)
         addMatrixEntityPermalinkAttributesTo(mutableAttributedString)
         removeParsingArtefacts(mutableAttributedString)
+        // iphoneblog: "</p>\n<p>" arrives as "</p><br><p>" (replacingHtmlBreaksOccurrences), a
+        // paragraph's end plus a break, a full empty line; one paragraph break here (ChatParagraphs).
+        if cacheKey == Self.defaultKey { ChatParagraphs.normalise(mutableAttributedString, plain: false) }
         
         let result = try? AttributedString(mutableAttributedString, including: \.elementX)
         Self.cacheValue(result, forKey: originalHTMLString, cacheKey: cacheKey)
@@ -179,7 +185,8 @@ nonisolated struct AttributedStringBuilder: AttributedStringBuilderProtocol {
                 content.append(NSAttributedString(string: "\n"))
                 
             case "br":
-                content = NSMutableAttributedString(string: "\n")
+                // iphoneblog: in the timeline a line break, not a paragraph's end (ChatParagraphs).
+                content = NSMutableAttributedString(string: cacheKey == Self.defaultKey ? ChatParagraphs.lineBreak : "\n")
                 
             case "b", "strong":
                 content = attributedString(element: childElement, documentBody: documentBody, preserveFormatting: preserveFormatting, listTag: listTag, listIndex: &childIndex, indentLevel: indentLevel)
