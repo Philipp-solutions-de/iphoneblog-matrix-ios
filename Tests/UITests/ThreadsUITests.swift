@@ -65,6 +65,62 @@ final class ThreadsUITests: XCTestCase {
     /// A thread with six replies from three people, the tester among them: the row under the
     /// root reads "6 Antworten" and opens the thread, with the count under the root. Its own
     /// thread, written just before, so the messages other tests add never bury it.
+    /// Five quick replies from one person, three of them with an HTML body, all show in the
+    /// thread (#allgemein, 2026-11-23: "5 Antworten" over a thread that showed two, the two
+    /// without formatted_body).
+    func testFormattedRepliesAllShowInTheThread() throws {
+        let other = try TestServer.signIn(2)
+        defer { other.signOut() }
+        let room = try XCTUnwrap(env["IPHONEBLOG_TEST_CHANNEL_ROOM"])
+        let stamp = Int.random(in: 1000...9999)
+        let root = try other.send("Fünf Antworten \(stamp)", in: room)
+        // As on the server: m.mentions {}, no fallback in the body, and each reply's in_reply_to
+        // the one before (1 → root, 2 → 1, …). The HTML ones are <p> paragraphs with "\n" between
+        // and after them, the plain ones one line.
+        let line = String(repeating: "Ein längerer Satz mit ein paar Wörtern. ", count: 4)
+        func html(_ parts: [String]) -> String { parts.map { "<p>\($0)</p>\n" }.joined() }
+        let replies: [(String, String?)] = [
+            ("Eins \(stamp) \(line)\n\n\(line)", html(["Eins \(stamp) \(line)", line])),
+            ("Zwei \(stamp) \(line)\(line)", nil),
+            ("Drei \(stamp) \(line)\n\n\(line)", html(["Drei \(stamp) \(line)", line])),
+            ("Vier \(stamp) \(line)\n\n\(line)\n\n\(line)", html(["Vier \(stamp) \(line)", line, line])),
+            ("Fünf \(stamp) Nur ein Test", nil),
+        ]
+        var previous = root
+        for (body, formatted) in replies {
+            var content: [String: Any] = ["msgtype": "m.text", "body": body, "m.mentions": [String: Any](),
+                                          "m.relates_to": ["rel_type": "m.thread", "event_id": root, "is_falling_back": true,
+                                                           "m.in_reply_to": ["event_id": previous]]]
+            if let formatted { content["format"] = "org.matrix.custom.html"; content["formatted_body"] = formatted }
+            previous = try other.sendContent(content, in: room)
+        }
+
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "IPHONEBLOG_NO_PUSH_PROMPT": "1", "IPHONEBLOG_START_TAB": "chat",
+            "IPHONEBLOG_START_THREAD": "\(room)|\(root)",
+            "IPHONEBLOG_HOMESERVER": env["IPHONEBLOG_TEST_HOMESERVER"] ?? "",
+            "IPHONEBLOG_DEV_USER": env["IPHONEBLOG_TEST_USER"] ?? "", "IPHONEBLOG_DEV_PASSWORD": env["IPHONEBLOG_TEST_PASSWORD"] ?? "",
+            "IPHONEBLOG_ONE_ALIAS": env["IPHONEBLOG_ONE_ALIAS"] ?? "", "IPHONEBLOG_BLOG_ALIAS": env["IPHONEBLOG_BLOG_ALIAS"] ?? "",
+            "IPHONEBLOG_CHANNEL_ALIAS": env["IPHONEBLOG_CHANNEL_ALIAS"] ?? "",
+        ]
+        app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE"]
+        app.launch()
+        XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "the thread did not open")
+        sleep(3)
+        var missing: [String] = []
+        for word in ["Eins", "Zwei", "Drei", "Vier", "Fünf"] {
+            let reply = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", "\(word) \(stamp)")).firstMatch
+            if !reply.exists { scrollTo(reply, in: app) }
+            if !reply.waitForExistence(timeout: 5) { missing.append(word) }
+        }
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "thread-formatted-replies"
+        shot.lifetime = .keepAlways
+        add(shot)
+        XCTAssertEqual(missing, [], "replies missing from the thread")
+    }
+
     func testThreadRowShowsCountAndOpensTheThread() throws {
         let (root, stamp) = try makeBusyThread()
         _ = root
