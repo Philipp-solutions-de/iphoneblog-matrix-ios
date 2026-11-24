@@ -401,6 +401,10 @@ final class ChatSession: ObservableObject, ChatHost {
     }
 
     func openURL(_ url: URL) {
+        if let user = ChatLink.userID(url) {
+            openUser(userID: user)
+            return
+        }
         if let link = ChatLink.parse(url) {
             Task { await open(link) }
             return

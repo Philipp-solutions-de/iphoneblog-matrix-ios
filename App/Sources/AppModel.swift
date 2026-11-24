@@ -54,6 +54,21 @@ final class AppModel: ObservableObject {
     /// shows what it may. False for any other address, which the caller opens as before.
     @discardableResult
     func open(_ url: URL) -> Bool {
+        // A person's link: their profile, signed in; signed out the browser as before, since a
+        // profile needs a session.
+        if let user = ChatLink.userID(url) {
+            switch state {
+            case .signedIn(let session):
+                session.openUser(userID: user)
+                return true
+            case .starting:
+                // Opened once the session is back, like a chat link.
+                pendingLinkURL = url
+                return true
+            default:
+                return false
+            }
+        }
         guard let link = ChatLink.parse(url) else { return false }
         switch state {
         case .starting:

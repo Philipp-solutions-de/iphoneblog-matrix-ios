@@ -236,8 +236,10 @@ installed, iOS hands it over as a universal link (`applinks:chat.iphoneblog.de`;
 server's apple-app-site-association names the app for `/` with a fragment). The link names no
 thread: the opener reads the event and opens its thread if it replies in one, else the room
 scrolled to the message, so a link stays right when a message moves into a thread. Signed out,
-the web chat opens in a sheet. matrix.to links to rooms and messages open the same way. The
-thread screen does not yet scroll to the reply.
+the web chat opens in a sheet. matrix.to links to rooms and messages open the same way. A
+matrix.to link to a person (`matrix.to/#/@user:server`) opens their profile in the app, in a room
+or a thread, never the browser (`ChatLink.userID`, `AppModel.open`); signed out it opens the
+browser, since a profile needs a session. The thread screen does not yet scroll to the reply.
 
 **Pushes for mentions, not for every message.** At an account's first sign-in the app turns the
 default underride `.m.rule.message` off, once, marked in account data
