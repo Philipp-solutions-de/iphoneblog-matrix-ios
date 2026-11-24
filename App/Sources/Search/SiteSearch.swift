@@ -33,6 +33,59 @@ struct SiteSearchHit: Identifiable, Equatable, Sendable {
     let postID: Int?
     /// A #one post found by someone outside #one: title and teaser only.
     let locked: Bool
+    /// "und 3 weitere Antworten" under a thread's hit, "und 1 weitere Stelle" under a video's;
+    /// empty when the group has no other match (ADR-0010, "Distinct results").
+    var more: String = ""
+    /// A post merged with its own video (ADR-0010, "one thing"): the best passage's second and
+    /// address. nil for anything else.
+    var videoSeconds: Int?
+    var videoLink: URL?
+    /// The same post's matching discussion replies and the link to one of them; 0 when none.
+    var discussionCount: Int = 0
+    var discussionLink: URL?
+    var discussionRoot: String?
+
+    /// "Im Video ab 12:34" under a merged post; empty without a video.
+    var videoLine: String {
+        guard let videoSeconds else { return "" }
+        return "Im Video ab \(Self.clock(videoSeconds))"
+    }
+
+    /// "3 Antworten in der Diskussion" under a merged post; empty without replies.
+    var discussionLine: String {
+        switch discussionCount {
+        case ...0: return ""
+        case 1: return "1 Antwort in der Diskussion"
+        default: return "\(discussionCount) Antworten in der Diskussion"
+        }
+    }
+
+    /// The merged video as a hit of its own, so a tap opens it the way a video hit opens.
+    var videoHit: SiteSearchHit? {
+        guard let videoSeconds else { return nil }
+        return SiteSearchHit(id: id + "#video", kind: .video, label: "Video", title: title, snippet: AttributedString(),
+                             meta: "", url: url, deepLink: videoLink ?? url, seconds: videoSeconds, roomID: nil,
+                             eventID: nil, threadRoot: nil, postID: postID, locked: locked)
+    }
+
+    /// The merged discussion as a hit of its own. Its link names the room and a reply:
+    /// `https://chat.iphoneblog.de/#/room/<room_id>/<event_id>` (ADR-0010).
+    var discussionHit: SiteSearchHit? {
+        guard discussionCount > 0, let link = discussionLink else { return nil }
+        let parts = (link.fragment ?? "").split(separator: "/").map(String.init)
+        guard parts.count >= 3, parts[0] == "room" else { return nil }
+        return SiteSearchHit(id: id + "#discussion", kind: .discussion, label: "Diskussion", title: title,
+                             snippet: AttributedString(), meta: "", url: url, deepLink: link, seconds: nil,
+                             roomID: parts[1].removingPercentEncoding ?? parts[1],
+                             eventID: parts[2].removingPercentEncoding ?? parts[2], threadRoot: discussionRoot,
+                             postID: postID, locked: locked)
+    }
+
+    /// 754 → "12:34", 3_725 → "1:02:05".
+    static func clock(_ seconds: Int) -> String {
+        let hours = seconds / 3600, minutes = seconds / 60 % 60, rest = seconds % 60
+        return hours > 0 ? String(format: "%d:%02d:%02d", hours, minutes, rest) : String(format: "%d:%02d", minutes, rest)
+    }
 }
 
 /// The filter chips over the list. Each names the server's types it shows.
@@ -107,6 +160,25 @@ struct SiteSearchResponse: Decodable {
         let post_id: Int?
         let published: String?
         let locked: Bool?
+        /// Other matching documents in this hit's group: replies, video passages (ADR-0010,
+        /// "Distinct results"); 0 or missing for posts and links.
+        let more: Int?
+        /// A post merged with its own video and discussion (ADR-0010, "one thing"); null otherwise.
+        let video: MergedVideo?
+        let discussion: MergedDiscussion?
+    } // swiftlint:enable identifier_name
+
+    struct MergedVideo: Decodable { // swiftlint:disable identifier_name
+        let t: Int?
+        let deep_link: String?
+        let more: Int?
+    }
+
+    struct MergedDiscussion: Decodable {
+        let count: Int?
+        let deep_link: String?
+        /// The article's root event, when the server names it; the link names a reply.
+        let thread_root: String?
     } // swiftlint:enable identifier_name
 
     let total: Int
@@ -190,9 +262,29 @@ extension SiteSearchPage {
                 eventID: hit.event_id,
                 threadRoot: hit.thread_root,
                 postID: hit.post_id,
-                locked: hit.locked ?? false)
+                locked: hit.locked ?? false,
+                more: moreLine(hit.more ?? 0, kind: kind),
+                videoSeconds: hit.video?.t,
+                videoLink: hit.video?.deep_link.flatMap(URL.init(string:)),
+                discussionCount: hit.discussion?.count ?? 0,
+                discussionLink: hit.discussion?.deep_link.flatMap(URL.init(string:)),
+                discussionRoot: hit.discussion?.thread_root)
         }
         return SiteSearchPage(total: response.total, counts: response.counts ?? [:], hits: hits)
+    }
+
+    /// The group's other matches under the hit: replies for chat and discussions, passages for
+    /// a video; nothing at 0 or for other kinds (the search session, 2026-11-21).
+    static func moreLine(_ count: Int, kind: SiteSearchHit.Kind) -> String {
+        guard count > 0 else { return "" }
+        switch kind {
+        case .chat, .discussion:
+            return count == 1 ? "und 1 weitere Antwort" : "und \(count) weitere Antworten"
+        case .video:
+            return count == 1 ? "und 1 weitere Stelle" : "und \(count) weitere Stellen"
+        case .post, .one, .link:
+            return ""
+        }
     }
 
     private static let dateStyle = Date.FormatStyle(date: .abbreviated, time: .omitted, locale: Locale(identifier: "de_DE"))
