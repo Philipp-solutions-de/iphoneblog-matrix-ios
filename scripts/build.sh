@@ -66,6 +66,28 @@ clear_app_settings() {
     rm -f "${data:?}/Library/Preferences/de.iphoneblog.matrix.preview.plist"
 }
 
+# A picture in the simulator's photo library, imported until the library shows it. addmedia
+# right after a boot, or on a freshly erased simulator, can return before the library is ready
+# and the import is lost without a word: the picker then shows no pictures (2026-11-21, CI).
+add_photo() {
+    local file="$1" library before tries
+    library="$HOME/Library/Developer/CoreSimulator/Devices/$device/data/Media/PhotoData/Photos.sqlite"
+    photo_count() { sqlite3 -readonly "$library" "SELECT count(*) FROM ZASSET WHERE ZTRASHEDSTATE = 0" 2>/dev/null || echo 0; }
+    before="$(photo_count)"
+    for tries in 1 2 3; do
+        xcrun simctl addmedia "$device" "$file"
+        for _ in $(seq 1 30); do
+            [[ "$(photo_count)" -gt "$before" ]] && return 0
+            sleep 1
+        done
+        echo "build.sh: $file is not in the photo library after 30 s (import $tries of 3)" >&2
+    done
+    # No library where CoreSimulator keeps it: nothing to check, the tests will tell.
+    [[ -f "$library" ]] || { echo "build.sh: no photo library at $library, import unchecked" >&2; return 0; }
+    echo "build.sh: $file never reached the photo library" >&2
+    return 1
+}
+
 case "$action" in
     build)
         run build "${common[@]}" -scheme iphoneblog -destination 'generic/platform=iOS Simulator' build
@@ -102,10 +124,10 @@ case "$action" in
         # one every import failed without a word (2026-11-20).
         xcrun simctl bootstatus "$device" -b >/dev/null
         # An animated GIF in the photo library, for the test that sends one (GifUITests).
-        xcrun simctl addmedia "$device" scripts/fixtures/animation.gif
+        add_photo scripts/fixtures/animation.gif
         # A photo dated 2001-01-01, so the picker labels it with "2001" and the Markup test finds
         # it among the GIFs other tests add (RichMessagesUITests.testPhotoMarkupIsSent).
-        xcrun simctl addmedia "$device" scripts/fixtures/markup-photo.jpg
+        add_photo scripts/fixtures/markup-photo.jpg
         clear_app_settings
         if curl -s -o /dev/null http://127.0.0.1:8793/calls; then
             echo "build.sh: port 8793 is taken; stop the old fixture server first" >&2; exit 1
