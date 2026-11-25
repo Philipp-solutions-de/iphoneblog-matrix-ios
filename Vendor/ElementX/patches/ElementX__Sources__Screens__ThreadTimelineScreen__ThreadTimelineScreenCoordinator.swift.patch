@@ -1,6 +1,13 @@
 --- a/ElementX/Sources/Screens/ThreadTimelineScreen/ThreadTimelineScreenCoordinator.swift
 +++ b/ElementX/Sources/Screens/ThreadTimelineScreen/ThreadTimelineScreenCoordinator.swift
-@@ -44,6 +44,8 @@
+@@ -39,11 +39,15 @@
+     case presentRoomMemberDetails(userID: String)
+     case presentMessageForwarding(forwardingPayload: MessageForwardingPayload)
+     case presentResolveSendFailure(failure: TimelineItemSendFailure.VerifiedUser, sendHandle: SendHandleProxy)
++    /// iphoneblog: the GIF library picker, sending into this thread.
++    case presentGIFLibrary
+ }
+ 
  final class ThreadTimelineScreenCoordinator: CoordinatorProtocol {
      private let viewModel: ThreadTimelineScreenViewModelProtocol
      private let timelineViewModel: TimelineViewModelProtocol
@@ -9,3 +16,12 @@
      private var composerViewModel: ComposerToolbarViewModelProtocol
      private let userSettings: UserSettings
      
+@@ -120,6 +124,8 @@
+                     viewModel.displayMediaPreview(mediaPreviewViewModel)
+                 case .displayLocationPicker:
+                     actionsSubject.send(.presentLocationPicker)
++                case .displayGIFLibrary:
++                    actionsSubject.send(.presentGIFLibrary)
+                 case .displayLocation(let location):
+                     actionsSubject.send(.presentLocationViewer(location))
+                 case .displayLiveLocation(let sender, let initialLiveLocationShare):

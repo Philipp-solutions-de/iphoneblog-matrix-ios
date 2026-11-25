@@ -102,7 +102,9 @@ back swipe was let go (Philip, 2026-11-20).
 **An article's video plays in its card** (Thorsten, 2026-11-20; the field in the WordPress repo's
 blog-card-video.md). The discussion's header shows the poster (the card's image without one)
 with play; a tap plays it right there with the episode player (`EpisodePlayer`, PiP, captions
-drawn and on), the rendition picked from the manifest when playing starts: the smallest listed
+drawn). The captions start off and "CC" under the video turns them on; the choice is kept on the
+device for the next card video (Thorsten, 2026-11-21: "CC sollen default off sein und brauchen
+einen toggle"). The rendition is picked from the manifest when playing starts: the smallest listed
 file at least as wide as the screen, `h264.mp4` without a manifest. The title opens the article.
 The video comes from the thread file, which carries the backfilled cards' too, so no Matrix edit
 is read (`CardVideo.swift`).
@@ -236,8 +238,10 @@ installed, iOS hands it over as a universal link (`applinks:chat.iphoneblog.de`;
 server's apple-app-site-association names the app for `/` with a fragment). The link names no
 thread: the opener reads the event and opens its thread if it replies in one, else the room
 scrolled to the message, so a link stays right when a message moves into a thread. Signed out,
-the web chat opens in a sheet. matrix.to links to rooms and messages open the same way. The
-thread screen does not yet scroll to the reply.
+the web chat opens in a sheet. matrix.to links to rooms and messages open the same way. A
+matrix.to link to a person (`matrix.to/#/@user:server`) opens their profile in the app, in a room
+or a thread, never the browser (`ChatLink.userID`, `AppModel.open`); signed out it opens the
+browser, since a profile needs a session. The thread screen does not yet scroll to the reply.
 
 **Pushes for mentions, not for every message.** At an account's first sign-in the app turns the
 default underride `.m.rule.message` off, once, marked in account data
@@ -266,7 +270,11 @@ the sheet and opens the hit where it lives (`Router.target(for:chat:)`): a post 
 the Blog tab's web view (www's address moved to the blog the tab shows), a video passage on the
 episode's page playing from `t` (for #one members; others get the article at `?t=`), a chat
 message in its room scrolled to it or its thread, a discussion reply in the article's discussion,
-a link in Safari. The sheet keeps its query and hits for the next time it opens.
+a link in Safari. The sheet keeps its query and hits for the next time it opens. Under a hit,
+"und 3 weitere Antworten" (chat, discussion) or "und 1 weitere Stelle" (video) counts the other
+matches in its group (`more`). In Alle a post merged with its own video and discussion carries
+two teal lines, "Im Video ab 12:34" and "3 Antworten in der Diskussion"; each opens like a video
+or discussion hit, the discussion by the article's root (`discussion.thread_root`).
 
 **Search in a room is Matrix's own.** The magnifier in the open room sends `POST /_matrix/client/v3/search`
 (room_events, in every #one room or, with the chip, only the open one; newest first,
@@ -312,10 +320,10 @@ That code is AGPL-3.0, so this app is AGPL-3.0 too; the repository is public, as
 |---|---|---|---|
 | Sync | `SyncService` | | start and stop with the app's life cycle |
 | Room list | `RoomListService`, filters, diffs, unread and mention counts | | `RoomListModel`, the channel list view (our design) |
-| Timeline | `Timeline`: pagination, local echo, send queue, edits, reactions, receipts | `Screens/Timeline` (cells, list, reactions, replies, thread summaries), `Services/Timeline` (SDK wrapper, view items) | adapters, our colours and type, cells we do not want removed |
+| Timeline | `Timeline`: pagination, local echo, send queue, edits, reactions, receipts | `Screens/Timeline` (cells, list, reactions, replies, thread summaries), `Services/Timeline` (SDK wrapper, view items) | adapters, our colours and type, cells we do not want removed; 16 pt between two messages of a group and above a new sender, 4 pt after a paragraph inside a message, a run of blank lines one paragraph, a `<br>` a line break without space (`Shim/ChatParagraphs.swift`, values shared with the web, chat-web PR #23); swipes on a message (`Shim/MessageSwipe.swift`): right opens the thread, left the menu with its reactions, across the whole row width (beside a short message too), never within 30 pt of the left edge, where swipe-back lives |
 | Threads | thread focus, `ThreadListService`, thread subscriptions | `Screens/ThreadTimelineScreen`, `Screens/RoomThreadListScreen` | the article discussions and the threads in #one |
 | Composer | send queue, replies, edits, `Mentions`, markdown to HTML, media upload | the composer, its formatting toolbar (+ › Textformatierung) and mention suggestions from `Screens/RoomScreen`, `Other/Pills` | no polls, no voice messages |
-| Media | thumbnails, files, upload with progress | `Screens/FilePreviewScreen`, `Screens/MediaPickerScreen`, `Screens/MediaUploadPreviewScreen`; link previews through Apple's `LPMetadataProvider` (the phone fetches the page, not Synapse's preview_url) | the upload progress bar under a sending photo, video or file (`Shim/ChatUploadProgress.swift`); animated GIFs play from the original and go out unchanged (Element X), with Reduce Motion as their first frame (patch); with a caption, the picture alone gets the rounded corners, so the caption keeps its first letter (patch); Markieren in the upload preview draws on a photo, not a GIF, with PencilKit and sends the marked-up copy (`Shim/ChatMarkup.swift`) |
+| Media | thumbnails, files, upload with progress | `Screens/FilePreviewScreen`, `Screens/MediaPickerScreen`, `Screens/MediaUploadPreviewScreen`; link previews through Apple's `LPMetadataProvider` (the phone fetches the page, not Synapse's preview_url) | the upload progress bar under a sending photo, video or file (`Shim/ChatUploadProgress.swift`); animated GIFs play from the original and go out unchanged (Element X), with Reduce Motion as their first frame (patch); with a caption, the picture alone gets the rounded corners, so the caption keeps its first letter (patch); Markieren in the upload preview draws on a photo, not a GIF, with PencilKit and sends the marked-up copy (`Shim/ChatMarkup.swift`); "GIFs aus dem Chat" in the + menu of #one rooms and threads, for members, never the Blog room: Beliebt, Neu and a search over the server's library of GIFs posted in #one (gif-library.md, `App/Sources/GIFs`); a tap sends an m.image with the library's mxc, no upload (`Shim/ChatGIFLibrary.swift`, `TimelineController.sendMessageEventContent` patch, behind the posting notice); a long press edits tags or reports; a GIF of one's own that is new to the library asks for tags above the caption, with on-device Vision suggestions, and sends them after the GIF (`Shim/ChatGIFTags.swift`) |
 | Design system | | `compound-ios` (needed by the views), recoloured through its override API | our tokens: teal, coral, greys; teal for content outside #one, and inside the #one tab the #one red (#EB686E family) for everything, chat views included, with no teal but the bot marks (Thorsten, 2026-11-20). A bridged trait, `OneTintTrait`, set on the #one tab, turns every teal token red there (the colour rule in `App/Sources/Theme.swift`; it overrides the coral badges and mentions in `design/screens.html`) |
 | Push | `NotificationClient` | | extension text, pusher registration, tap routing |
 | Sign-in | OAuth 2.0, PKCE, dynamic registration | | one button, `ASWebAuthenticationSession` |

@@ -347,6 +347,14 @@ class TimelineController: TimelineControllerProtocol {
     
     // MARK: - Sending
     
+    /// iphoneblog: sends content made elsewhere (a GIF from the library, by its mxc) on the
+    /// timeline in front, so a thread's message goes into the thread.
+    func sendMessageEventContent(_ content: RoomMessageEventContentWithoutRelation) async -> Result<Void, TimelineProxyError> {
+        // The posting notice first, as for every other message (TimelineProxy).
+        guard await ChatPostingNotice.shared.ensureAcknowledged() else { return .failure(.sdkError(CancellationError())) }
+        return await activeTimeline.sendMessageEventContent(content)
+    }
+    
     func sendMessage(_ message: String,
                      html: String?,
                      inReplyToEventID: String?,

@@ -9,6 +9,40 @@ final class ProfileUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    /// A link to a person (matrix.to/#/@user) opens their profile in the app, never the browser
+    /// (Philip, #bugs 2026-11-21: a tap on "Dominic" in a thread landed on matrix.to). A tapped
+    /// link reaches AppModel.open through MainView's openURL; the test hands the link to the same
+    /// function at launch (IPHONEBLOG_OPEN_URL), in a room and in a thread. XCUITest's taps never
+    /// reach the text view of a message row (the row's gestures take them), so the tap itself is
+    /// checked on a device.
+    func testPersonLinkOpensTheProfile() throws {
+        let other = try TestServer.signIn(2)
+        defer { other.signOut() }
+        let room = try XCTUnwrap(env["IPHONEBLOG_TEST_CHANNEL_ROOM"])
+        let thread = try XCTUnwrap(env["IPHONEBLOG_TEST_CHANNEL_THREAD"])
+        let link = "https://matrix.to/#/\(other.userID)"
+
+        for (place, start) in [("room", ["IPHONEBLOG_START_ROOM": room]),
+                               ("thread", ["IPHONEBLOG_START_THREAD": "\(room)|\(thread)"])] {
+            let app = XCUIApplication()
+            app.launchEnvironment = [
+                "IPHONEBLOG_NO_PUSH_PROMPT": "1", "IPHONEBLOG_START_TAB": "chat",
+                "IPHONEBLOG_HOMESERVER": env["IPHONEBLOG_TEST_HOMESERVER"] ?? "",
+                "IPHONEBLOG_DEV_USER": env["IPHONEBLOG_TEST_USER"] ?? "", "IPHONEBLOG_DEV_PASSWORD": env["IPHONEBLOG_TEST_PASSWORD"] ?? "",
+                "IPHONEBLOG_ONE_ALIAS": env["IPHONEBLOG_ONE_ALIAS"] ?? "", "IPHONEBLOG_BLOG_ALIAS": env["IPHONEBLOG_BLOG_ALIAS"] ?? "",
+                "IPHONEBLOG_CHANNEL_ALIAS": env["IPHONEBLOG_CHANNEL_ALIAS"] ?? "",
+                "IPHONEBLOG_OPEN_URL": link,
+            ].merging(start) { _, new in new }
+            app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE"]
+            app.launch()
+            XCTAssertTrue(app.buttons["profile.block"].waitForExistence(timeout: 120),
+                          "the person's link opened no profile from the \(place)")
+            XCTAssertFalse(app.webViews.firstMatch.exists, "the link opened a web page from the \(place)")
+            save(app, "person-link-\(place)")
+            app.terminate()
+        }
+    }
+
     func testTappingASenderOpensTheProfile() throws {
         let me = try TestServer.signIn(1)
         let other = try TestServer.signIn(2)

@@ -60,6 +60,9 @@ class MediaUploadPreviewScreenViewModel: MediaUploadPreviewScreenViewModelType, 
                                                                        shouldShowCaptionWarning: shouldShowCaptionWarning,
                                                                        bindings: .init(caption: caption ?? NSAttributedString())))
         
+        // iphoneblog: a GIF new to the library asks for tags (ChatGIFTags).
+        state.gifTags.prepare(mediaURLs)
+        
         completionSuggestionService?.setSuggestionTrigger(nil)
         suggestionsCancellable = completionSuggestionService?.suggestionsPublisher
             .receive(on: DispatchQueue.main)
@@ -74,6 +77,11 @@ class MediaUploadPreviewScreenViewModel: MediaUploadPreviewScreenViewModelType, 
         
         switch viewAction {
         case .send:
+            // iphoneblog: tags the server would refuse are said before anything leaves.
+            if let problem = state.gifTags.problem {
+                showError(label: problem)
+                return
+            }
             startLoading()
             
             Task { [processingTask] in
@@ -97,6 +105,7 @@ class MediaUploadPreviewScreenViewModel: MediaUploadPreviewScreenViewModelType, 
                             switch await sendAttachment(mediaInfo: mediaInfo, caption: perItemCaption) {
                             case .success:
                                 perItemCaption = nil // Set the caption only on the first uploaded file.
+                                state.gifTags.submit() // iphoneblog: the GIF's tags, once it went out
                             case .failure(let error):
                                 MXLog.error("Failed sending media with error: \(error)")
                                 showError(label: L10n.screenMediaUploadPreviewErrorFailedSending)

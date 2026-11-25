@@ -53,4 +53,15 @@ final class ChatLinkTests: XCTestCase {
             XCTAssertNil(ChatLink.parse(URL(string: string)!), string)
         }
     }
+
+    /// Philip, #bugs 2026-11-21: a tap on a person's link opened matrix.to in the browser.
+    func testUserLinkNamesThePerson() {
+        XCTAssertEqual(ChatLink.userID(URL(string: "https://matrix.to/#/@dominic:iphoneblog.de")!), "@dominic:iphoneblog.de")
+        XCTAssertEqual(ChatLink.userID(URL(string: "https://matrix.to/#/%40dominic%3Aiphoneblog.de")!), "@dominic:iphoneblog.de")
+        XCTAssertEqual(ChatLink.userID(URL(string: "https://matrix.to/#/@phlp:iphoneblog.de?via=iphoneblog.de")!), "@phlp:iphoneblog.de")
+        XCTAssertNil(ChatLink.userID(URL(string: "https://matrix.to/#/#allgemein:iphoneblog.de")!), "a room is no person")
+        XCTAssertNil(ChatLink.userID(URL(string: "https://matrix.to/#/@nobody")!), "no server, no person")
+        XCTAssertNil(ChatLink.userID(URL(string: "https://example.com/#/@dominic:iphoneblog.de")!), "another host")
+        XCTAssertNil(ChatLink.parse(URL(string: "https://matrix.to/#/@dominic:iphoneblog.de")!), "and still no room link")
+    }
 }

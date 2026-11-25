@@ -106,17 +106,7 @@ private struct EpisodePage: View {
             .accessibilityIdentifier("player.speed")
             Spacer()
             if player.hasCaptions {
-                Button { player.captionsOn.toggle() } label: {
-                    Text("UT")
-                        .font(.system(size: 13, weight: .bold))
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .foregroundStyle(player.captionsOn ? Theme.background : Theme.ink2)
-                        .background(player.captionsOn ? Theme.ink2 : .clear, in: RoundedRectangle(cornerRadius: 4))
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.ink2, lineWidth: 1.5))
-                        .frame(minWidth: 52, minHeight: 44)
-                }
-                .accessibilityLabel(player.captionsOn ? "Untertitel aus" : "Untertitel an")
-                .accessibilityIdentifier("player.captions")
+                CaptionsButton(player: player)
                 Spacer()
             }
             control("goforward.10", "10 Sekunden vor", "player.forward") { player.skip(10) }
@@ -200,5 +190,25 @@ enum ShowNotes {
             out = out.replacingOccurrences(of: entity, with: value)
         }
         return out
+    }
+}
+
+/// "CC": the captions on or off, in the episode page and under an article card's video; the
+/// web chat's button says the same (Thorsten's word, 2026-11-21).
+struct CaptionsButton: View {
+    @ObservedObject var player: EpisodePlayer
+
+    var body: some View {
+        Button { player.captionsOn.toggle() } label: {
+            Text("CC")
+                .font(.system(size: 13, weight: .bold))
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .foregroundStyle(player.captionsOn ? Theme.background : Theme.ink2)
+                .background(player.captionsOn ? Theme.ink2 : .clear, in: RoundedRectangle(cornerRadius: 4))
+                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.ink2, lineWidth: 1.5))
+                .frame(minWidth: 52, minHeight: 44)
+        }
+        .accessibilityLabel(player.captionsOn ? "Untertitel aus" : "Untertitel an")
+        .accessibilityIdentifier("player.captions")
     }
 }

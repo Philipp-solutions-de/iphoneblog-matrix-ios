@@ -13,8 +13,18 @@ struct SiteSearchView: View {
         NavigationStack {
             List {
                 ForEach(model.hits) { hit in
-                    Button { open(hit) } label: { SiteSearchRow(hit: hit) }
-                        .buttonStyle(.plain)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Button { open(hit) } label: { SiteSearchRow(hit: hit) }
+                            .buttonStyle(.plain)
+                        // A post merged with its video and discussion: each opens on its own.
+                        if let video = hit.videoHit {
+                            SiteSearchSubline(text: hit.videoLine, systemImage: "play.circle", id: "search.video") { open(video) }
+                        }
+                        if let discussion = hit.discussionHit {
+                            SiteSearchSubline(text: hit.discussionLine, systemImage: "bubble.left.and.bubble.right",
+                                              id: "search.discussion") { open(discussion) }
+                        }
+                    }
                         .listRowInsets(EdgeInsets(top: 12, leading: Theme.Space.page, bottom: 12, trailing: Theme.Space.page))
                         .listRowBackground(Theme.background)
                         .onAppear { if hit.id == model.hits.last?.id { model.loadMore() } }
@@ -119,6 +129,27 @@ struct SiteSearchChips: View {
 
 /// One hit: the type badge, the title, the snippet with its marks, and who, where, when.
 /// Everything it draws was prepared off the main thread (SiteSearchPage.prepare).
+/// A small teal line under a merged post that opens its video or its discussion.
+struct SiteSearchSubline: View {
+    let text: String
+    let systemImage: String
+    let id: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(text, systemImage: systemImage)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Theme.teal)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(id)
+    }
+}
+
 struct SiteSearchRow: View {
     let hit: SiteSearchHit
 
@@ -144,6 +175,13 @@ struct SiteSearchRow: View {
                     .font(.system(size: 15.5))
                     .foregroundStyle(Theme.ink2)
                     .lineLimit(3)
+            }
+            if !hit.more.isEmpty {
+                Text(hit.more)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Theme.teal)
+                    .lineLimit(1)
+                    .accessibilityIdentifier("search.more")
             }
             if !hit.meta.isEmpty {
                 Text(hit.meta)

@@ -26,6 +26,9 @@ public protocol ChatKitHost: AnyObject {
     func showMessage(_ text: String)
     /// "Melden" in a message's menu (App Review 1.2): the app asks why and reports it.
     func reportMessage(roomID: String, eventID: String)
+    /// "GIFs aus dem Chat" in the + menu: the app shows its library and calls `send` with the
+    /// GIF picked, which ChatKit sends into the room or thread the composer belongs to.
+    func pickGIF(roomID: String, send: @escaping @MainActor (ChatGIF) -> Void)
 }
 
 /// The app's look for ChatKit: our own views read `ChatKitStyle.current`, Element X's views read

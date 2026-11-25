@@ -330,6 +330,11 @@ final class ChatRoomCoordinator: ChatScreenCoordinator {
             sheets.mediaPicker(source: .photoLibrary, caption: composerViewModel.context.plainComposerText)
         case .displayDocumentPicker:
             sheets.mediaPicker(source: .documents(), caption: composerViewModel.context.plainComposerText)
+        case .displayGIFLibrary:
+            host?.pickGIF(roomID: roomProxy.id) { [weak self] gif in
+                guard let self else { return }
+                ChatGIFLibrary.send(gif, on: timelineController, host: host)
+            }
         case .displayMediaUploadPreviewScreen(let mediaURLs):
             sheets.uploadPreview(mediaURLs: mediaURLs, caption: composerViewModel.context.plainComposerText)
         case .displayMediaPreview(let mediaPreviewViewModel):
@@ -512,6 +517,11 @@ final class ChatThreadCoordinator: ChatScreenCoordinator {
             sheets.mediaPicker(source: mode.source, caption: caption)
         case .presentMediaUploadPreviewScreen(let mediaURLs, let caption):
             sheets.uploadPreview(mediaURLs: mediaURLs, caption: caption)
+        case .presentGIFLibrary:
+            host?.pickGIF(roomID: roomID) { [weak self] gif in
+                guard let self else { return }
+                ChatGIFLibrary.send(gif, on: sheets.timelineController, host: host)
+            }
         case .presentRoomMemberDetails(let userID):
             host?.openUser(userID: userID)
         case .presentReportContent(let itemID, _):

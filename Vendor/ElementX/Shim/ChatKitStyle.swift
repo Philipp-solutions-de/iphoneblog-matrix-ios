@@ -139,7 +139,7 @@ public struct ChatKitStyle {
                      threadSummary: .system(size: 15, weight: .semibold), threadPreview: .system(size: 15),
                      roomTitle: .system(size: 17, weight: .bold), roomSubtitle: .system(size: 13),
                      dayDivider: .system(size: 13, weight: .semibold)),
-        metrics: Metrics(page: 16, avatarGap: 12, avatar: 40, summaryAvatar: 20, groupSpacing: 14, messageSpacing: 4,
+        metrics: Metrics(page: 16, avatarGap: 12, avatar: 40, summaryAvatar: 20, groupSpacing: 16, messageSpacing: 16,
                          mediaWidth: 280, corner: 12)
     )
 }

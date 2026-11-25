@@ -53,6 +53,17 @@ protocol ChatHost: AnyObject {
     func showMessage(_ text: String)
     /// Asks why, then reports the message to the moderators (App/Sources/Moderation).
     func reportMessage(roomID: String, eventID: String)
+    /// Whether a room's composer offers "GIFs aus dem Chat" (#one rooms only, not the Blog room).
+    func offersGIFs(roomID: String) -> Bool
+    /// Shows "GIFs aus dem Chat"; `send` gets the picked GIF's mxc, width, height and size, and
+    /// the views send it into the room or thread the composer belongs to (App/Sources/GIFs).
+    func pickGIF(roomID: String, send: @escaping @MainActor (_ mxc: String, _ width: Int?, _ height: Int?, _ size: Int?) -> Void)
+    /// Whether a GIF of one's own (by its file's SHA-256) needs tags for the library.
+    func gifNeedsTags(sha256: String) async -> Bool
+    /// Adds tags to a GIF after it was sent.
+    func tagGIF(sha256: String, tags: [String]) async
+    /// "jubeln, facepalm" as tags, or why not, by the server's rules.
+    func parseGIFTags(_ text: String) -> (tags: [String], problem: String?)
     /// A timeline showed the reader up to `eventID` (in a thread when `threadRootEventID` is set)
     /// and sent its read receipt, private when `isPrivate`.
     func didSee(roomID: String, threadRootEventID: String?, eventID: String, isPrivate: Bool)

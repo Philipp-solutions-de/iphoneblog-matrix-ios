@@ -38,7 +38,12 @@ final class Router: ObservableObject {
         case video(postID: Int, seconds: Int, page: URL?)
     }
 
-    @Published var tab: Tab = Router.startTab
+    @Published var tab: Tab = Router.startTab {
+        didSet { if !visitedTabs.contains(tab) { visitedTabs.insert(tab) } }
+    }
+    /// The tabs shown so far: a tab's screens are built when it is first shown, not at launch
+    /// (MainView, 2026-11-21, docs/performance.md).
+    @Published private(set) var visitedTabs: Set<Tab> = [Router.startTab]
     /// #one: the hub at the root; Chat (the room bar and the open room), Videos or an episode
     /// pushed on it; in Chat a thread, the Threads list or a search on top. `.room` routes are
     /// not pushed any more; the room bar switches rooms.
@@ -73,6 +78,8 @@ final class Router: ObservableObject {
     @Published var profile: Person?
     /// A report from the conversation views (App/Sources/Moderation).
     @Published var moderation: ModerationRequest?
+    /// "GIFs aus dem Chat" from a composer's + menu (App/Sources/GIFs).
+    @Published var gifPick: GIFPickRequest?
     @Published var notice: String?
     /// The sign-in sheet, offered where reading ends and writing would start.
     @Published var showSignIn = false

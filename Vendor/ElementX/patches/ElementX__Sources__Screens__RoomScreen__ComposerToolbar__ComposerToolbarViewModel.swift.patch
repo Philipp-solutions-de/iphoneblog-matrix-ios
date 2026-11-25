@@ -9,11 +9,20 @@
      
      init(initialText: String? = nil,
           roomProxy: JoinedRoomProxyProtocol,
-@@ -200,6 +202,20 @@
-             saveDraft()
+@@ -84,6 +86,9 @@
+                                                               bindings: .init()),
+                    mediaProvider: mediaProvider)
+         
++        // iphoneblog: the app decides where its GIF library is offered (ChatGIFLibrary).
++        state.gifLibraryEnabled = ChatGIFLibrary.isOffered(roomProxy.id)
++        
+         state.keyCommands = [
+             .enter { [weak self] in
+                 self?.process(viewAction: .sendMessage)
+@@ -201,6 +206,20 @@
          case .sendMessage:
              guard !state.sendButtonDisabled else { return }
-+            
+             
 +            // iphoneblog: ask before an email address or phone number goes to the whole room.
 +            if !contactWarningConfirmed, !state.isVoiceMessageModeActivated {
 +                let found = ChatContactWarning.contactData(in: currentContent.plain)
@@ -27,6 +36,7 @@
 +                    return
 +                }
 +            }
-             
++            
              switch state.composerMode {
              case .previewVoiceMessage:
+                 actionsSubject.send(.voiceMessage(.send(inReplyToEventID: state.voiceMessageReply?.eventID)))

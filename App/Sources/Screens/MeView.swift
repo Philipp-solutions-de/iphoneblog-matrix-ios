@@ -94,7 +94,23 @@ struct MeView: View {
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.ink3)
                     .padding(.top, 18)
-                    .padding(.bottom, 30)
+                // The last launch's timing, for testers to send (2026-11-21, docs/performance.md):
+                // a tap copies build, device and every start-up step with its time.
+                if let summary = StartTrace.lastSummary {
+                    Button {
+                        UIPasteboard.general.string = StartTrace.lastReport
+                        router.notice = "Ladezeit kopiert."
+                    } label: {
+                        Text("Ladezeit beim letzten Start: \(summary)")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.ink3)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Kopiert die Zeiten")
+                    .accessibilityIdentifier("me.startTiming")
+                    .padding(.top, 4)
+                }
+                Color.clear.frame(height: 30)
             }
         }
         .background(Theme.group)

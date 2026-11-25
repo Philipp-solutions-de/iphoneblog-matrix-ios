@@ -401,6 +401,10 @@ final class ChatSession: ObservableObject, ChatHost {
     }
 
     func openURL(_ url: URL) {
+        if let user = ChatLink.userID(url) {
+            openUser(userID: user)
+            return
+        }
         if let link = ChatLink.parse(url) {
             Task { await open(link) }
             return
@@ -462,6 +466,34 @@ final class ChatSession: ObservableObject, ChatHost {
         Task { await mentions.didSee(roomID: roomID, threadRoot: threadRootEventID, eventID: eventID) }
         if threadRootEventID == nil {
             Task { await catchUpUnthreadedReceipt(roomID: roomID, eventID: eventID, isPrivate: isPrivate) }
+        }
+    }
+
+    // MARK: GIFs aus dem Chat
+
+    /// #one rooms and their threads, for #one members; never the Blog room (gif-library.md).
+    func offersGIFs(roomID: String) -> Bool {
+        isOneMember && roomID != blogRoomID && oneRooms.contains { $0.id == roomID }
+    }
+
+    func pickGIF(roomID: String, send: @escaping @MainActor (_ mxc: String, _ width: Int?, _ height: Int?, _ size: Int?) -> Void) {
+        router.gifPick = GIFPickRequest(roomID: roomID) { gif in send(gif.mxc, gif.width, gif.height, gif.size) }
+    }
+
+    func gifNeedsTags(sha256: String) async -> Bool {
+        guard isOneMember else { return false }
+        return (try? await GIFLibraryAPI(session: self).lookup(sha256: sha256).needsTag) ?? false
+    }
+
+    func tagGIF(sha256: String, tags: [String]) async {
+        _ = try? await GIFLibraryAPI(session: self).addTags(tags, to: sha256)
+    }
+
+    func parseGIFTags(_ text: String) -> (tags: [String], problem: String?) {
+        switch GIFTags.parse(text) {
+        case .success(let tags): (tags, nil)
+        case .failure(.badTag(let why)): ([], why)
+        case .failure: ([], "Die Schlagworte stimmen nicht.")
         }
     }
 
@@ -551,6 +583,8 @@ final class ChatSession: ObservableObject, ChatHost {
     }
 
     private var lastStatus = 0
+    /// The HTTP status of the last `api` call, so a caller can tell 403 from 429 (GIFLibraryAPI).
+    var lastAPIStatus: Int { lastStatus }
 
     /// What pauses our calls (the backoff): the server or the network failing, not a request
     /// the app itself cancelled (search cancels one per keystroke: "Comics" typed letter by

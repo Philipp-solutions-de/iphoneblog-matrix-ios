@@ -39,6 +39,8 @@ enum ThreadTimelineScreenCoordinatorAction {
     case presentRoomMemberDetails(userID: String)
     case presentMessageForwarding(forwardingPayload: MessageForwardingPayload)
     case presentResolveSendFailure(failure: TimelineItemSendFailure.VerifiedUser, sendHandle: SendHandleProxy)
+    /// iphoneblog: the GIF library picker, sending into this thread.
+    case presentGIFLibrary
 }
 
 final class ThreadTimelineScreenCoordinator: CoordinatorProtocol {
@@ -122,6 +124,8 @@ final class ThreadTimelineScreenCoordinator: CoordinatorProtocol {
                     viewModel.displayMediaPreview(mediaPreviewViewModel)
                 case .displayLocationPicker:
                     actionsSubject.send(.presentLocationPicker)
+                case .displayGIFLibrary:
+                    actionsSubject.send(.presentGIFLibrary)
                 case .displayLocation(let location):
                     actionsSubject.send(.presentLocationViewer(location))
                 case .displayLiveLocation(let sender, let initialLiveLocationShare):

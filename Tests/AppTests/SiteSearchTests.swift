@@ -55,6 +55,62 @@ final class SiteSearchTests: XCTestCase {
         XCTAssertEqual(SiteSearchFilter.posts.types, [.post, .one])
     }
 
+    /// ADR-0010, "Distinct results": a hit's group size under it, by kind; nothing at 0.
+    func testMoreLineUnderAGroupedHit() throws {
+        XCTAssertEqual(SiteSearchPage.moreLine(0, kind: .chat), "")
+        XCTAssertEqual(SiteSearchPage.moreLine(1, kind: .chat), "und 1 weitere Antwort")
+        XCTAssertEqual(SiteSearchPage.moreLine(3, kind: .discussion), "und 3 weitere Antworten")
+        XCTAssertEqual(SiteSearchPage.moreLine(1, kind: .video), "und 1 weitere Stelle")
+        XCTAssertEqual(SiteSearchPage.moreLine(7, kind: .video), "und 7 weitere Stellen")
+        XCTAssertEqual(SiteSearchPage.moreLine(2, kind: .post), "", "posts have no group")
+        XCTAssertEqual(SiteSearchPage.moreLine(2, kind: .link), "")
+        let page = try SiteSearchPage.prepare(Data("""
+            {"total":2,"counts":{"chat":1,"video":1},"hits":[
+              {"id":"chat:$A","type":"chat","title":"","snippet":"a","more":4},
+              {"id":"video:1:0001","type":"video","title":"V","snippet":"b","t":3}
+            ]}
+            """.utf8))
+        XCTAssertEqual(page.hits.map(\.more), ["und 4 weitere Antworten", ""], "missing more counts as 0")
+    }
+
+    /// A post merged with its own video and discussion (ADR-0010) shows a line for each, and
+    /// each opens where a video or discussion hit opens.
+    func testMergedPostCarriesVideoAndDiscussionLines() throws {
+        let page = try SiteSearchPage.prepare(Data("""
+            {"total":2,"counts":{"post":2},"hits":[
+              {"id":"post:7","type":"post","title":"P","snippet":"a","url":"https://www.iphoneblog.de/p/","post_id":7,
+               "video":{"t":754,"deep_link":"https://www.iphoneblog.de/p/?t=754","more":2},
+               "discussion":{"count":3,"deep_link":"https://chat.iphoneblog.de/#/room/!blog:iphoneblog.de/$reply","thread_root":"$article"}},
+              {"id":"post:8","type":"post","title":"Q","snippet":"b","video":null,"discussion":null}
+            ]}
+            """.utf8))
+        let merged = page.hits[0], plain = page.hits[1]
+        XCTAssertEqual(merged.videoLine, "Im Video ab 12:34")
+        XCTAssertEqual(merged.discussionLine, "3 Antworten in der Diskussion")
+        XCTAssertEqual(plain.videoLine, "")
+        XCTAssertEqual(plain.discussionLine, "")
+        XCTAssertNil(plain.videoHit)
+        XCTAssertNil(plain.discussionHit)
+
+        let video = try XCTUnwrap(merged.videoHit)
+        XCTAssertEqual(video.kind, .video)
+        XCTAssertEqual(video.seconds, 754)
+        XCTAssertEqual(video.postID, 7)
+        XCTAssertEqual(video.deepLink?.absoluteString, "https://www.iphoneblog.de/p/?t=754")
+        let discussion = try XCTUnwrap(merged.discussionHit)
+        XCTAssertEqual(discussion.kind, .discussion)
+        XCTAssertEqual(discussion.roomID, "!blog:iphoneblog.de")
+        XCTAssertEqual(discussion.eventID, "$reply")
+        XCTAssertEqual(discussion.threadRoot, "$article", "the discussion opens by the article's root")
+        XCTAssertEqual(Router.target(for: discussion, chat: false), .discussion(rootEventID: "$article"))
+
+        var one = merged
+        one.discussionCount = 1
+        XCTAssertEqual(one.discussionLine, "1 Antwort in der Diskussion")
+        XCTAssertEqual(SiteSearchHit.clock(3725), "1:02:05")
+        XCTAssertEqual(SiteSearchHit.clock(5), "0:05")
+    }
+
     /// Main-thread budget (WordPress docs/chat.md, "Performance"): a page's preparation runs off
     /// the main thread anyway; even so it stays far under one 120 Hz frame.
     func testPreparingAFullPageTakesUnderAFrame() throws {

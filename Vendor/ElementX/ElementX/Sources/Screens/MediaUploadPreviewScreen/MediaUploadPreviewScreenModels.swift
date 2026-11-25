@@ -22,6 +22,8 @@ struct MediaUploadPreviewScreenViewState: BindableState {
     var mediaEditVersion = 0
     /// iphoneblog: @ suggestions for the caption, as the message composer offers them.
     var suggestions: [SuggestionItem] = []
+    /// iphoneblog: tags for a GIF new to the library (ChatGIFTags).
+    let gifTags = ChatGIFTagModel()
     
     var bindings: MediaUploadPreviewScreenBindings
 }
