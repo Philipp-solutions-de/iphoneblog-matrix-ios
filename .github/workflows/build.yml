@@ -235,6 +235,15 @@ jobs:
         if: always() && runner.environment == 'self-hosted'
         run: scripts/mac-runner/shutdown-simulator.sh
 
+      # The screenshots XCTest takes when a test fails, from the result bundle: the Mac's
+      # bundles sit in the walled-off `ci` home, so the artifact is the only way to see them.
+      - name: Failure screenshots
+        if: failure()
+        run: |
+          [[ -d build/ui.xcresult ]] || exit 0
+          xcrun xcresulttool export attachments --path build/ui.xcresult --output-path build/shots --only-failures \
+            || echo "no failure screenshots exported"
+
       - name: Keep the logs
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -243,6 +252,7 @@ jobs:
           path: |
             build/*.log
             build/synapse/homeserver.log
+            build/shots
           if-no-files-found: ignore
 
   # Two TestFlight jobs, one of which runs on main. Normally the upload starts once the build
