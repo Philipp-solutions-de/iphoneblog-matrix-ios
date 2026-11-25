@@ -128,6 +128,8 @@ struct MessageText: UIViewRepresentable {
         
         let combined = NSMutableAttributedString(attributedString: baseText)
         combined.applyParagraphWritingDirections()
+        // iphoneblog: 4 pt after a paragraph, less than the 16 pt between messages (ChatParagraphs).
+        ChatParagraphs.space(combined)
         if trailingReservedSize.width > 0 {
             let attachment = TransparentTextAttachment()
             attachment.isAccessibilityElement = false
