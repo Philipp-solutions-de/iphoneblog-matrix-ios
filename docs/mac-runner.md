@@ -29,8 +29,8 @@ Studio is the machine he works on; four simulators there at once put its load ab
 | repository variable `MAC_RUNNER` = `off` | GitHub, always |
 | the status token missing or expired | GitHub |
 
-On the Mac Studio a run always has the lowest priority, whatever `MAC_RUNNER_PRIORITY` says
-(`scripts/low-priority.sh` and the step "Lowest priority" look at the runner's name).
+Each Mac's priority is set by `setup.sh --priority` (Priority, below); the repository variable
+`MAC_RUNNER_PRIORITY` no longer changes it on either Mac.
 
 The order lives in `pick-runner.sh` (`MAC_MACHINES`, default `mbp mac-studio`: the first is the default, the rest are fallbacks). A run stays on
 the Mac it was given: its build hands the products to its test shards on that Mac's disk.
@@ -61,9 +61,17 @@ first to the shard with the least time. Every shard computes the same split, and
 fails unless the four together hold every test exactly once. Refresh the times file from a green
 run's `ui.log` when the split drifts.
 
-On a Mac the four shards run side by side on four runner instances (`mbp`, `mbp-2` … `-4` on
-the MacBook Pro, `mac-studio`, `mac-studio-2` … `-4` on the Mac Studio; LaunchDaemons
-`de.iphoneblog.ci-runner`, `-2` … `-4` on each). Each instance's
+**How many jobs at once** (Thorsten, 2026-11-25): two on the MacBook Pro (`mbp`, `mbp-2`), one
+on the Mac Studio (`mac-studio`); LaunchDaemons `de.iphoneblog.ci-runner` and `-2`. Four
+simulators at once put the Studio's load at 430 to 880 that evening. So a run's four shards go
+two at a time on the MacBook Pro and one after the other on the Studio.
+
+**One build at a time on a Mac.** Two runs on one Mac share the user `ci` and with it one Xcode
+build service; when two `build-for-testing` ran at once on the MacBook Pro on 2026-11-25, one
+waited 42 minutes for a service that no longer answered it. `scripts/mac-runner/one-build.sh`
+makes the second wait for the first. Shards do not build and need no lock.
+
+Each instance's
 `.env` gives it its own ports (`180n8` for the homeserver, `180n9` for the blog fixture) and its
 own simulator (`iPhone 17 Pro (CI n)`), so shards never meet each other or Thorsten's own test
 runs on 8008 and 8793. The products pass from "Build" to the shards on the Mac's disk
@@ -81,18 +89,23 @@ green to merge.
 
 ## Priority
 
-Every job on the Mac runs at the lowest CPU priority, so Thorsten's own work never stutters
-(his rule, 2026-11-21). The runner services run with `ProcessType` Background, `Nice` 20 and
-low-priority I/O, which every process they start inherits. Besides, the job's first step starts `scripts/mac-runner/lower-priority.sh`,
-which every 5 seconds gives each process of the user `ci` nice 20 and the background QoS class
-(`taskpolicy -b`): on Apple silicon such a process runs only on the efficiency cores and yields
-the disk. A loop over the user rather than a wrapper around the job, because the simulators,
+Every job on a Mac runs at low CPU priority, so Thorsten's own work never stutters (his rule,
+2026-11-21). How low is `setup.sh --priority`:
+
+| Mac | `--priority` | What |
+|---|---|---|
+| Mac Studio | `background` | `ProcessType` Background, `Nice` 20, low-priority I/O, and the background QoS class (`taskpolicy -b`): efficiency cores only, yields the disk |
+| MacBook Pro | `nice` | `ProcessType` Standard, `Nice` 20, low-priority I/O: every core, but anything of Thorsten's comes first. Its M1 Pro has two efficiency cores, too few for a build (Thorsten, 2026-11-25) |
+
+Every process the runner service starts inherits that. Besides, the job's first step starts
+`scripts/mac-runner/lower-priority.sh`, which every 5 seconds gives each process of the user
+`ci` nice 20 and, on `background`, the background QoS class (`MAC_PRIORITY` in the runner's
+`.env` says which). A loop over the user rather than a wrapper around the job, because the simulators,
 `XCBBuildService`, `SWBBuildService` and the compilers they start come from launchd and XPC,
 outside the job's process tree. The runner ends the loop with the job, and each test shard shuts down its own simulator at
 the end (`scripts/mac-runner/shutdown-simulator.sh`), so none idles between jobs. The step "The job's
-processes and their priority" lists them with nice and priority at the end of each job. The
-repository variable `MAC_RUNNER_PRIORITY=normal` turns the loop off; the services' own setting
-needs `setup.sh` to change.
+processes and their priority" lists them with nice and priority at the end of each job. Changing a Mac's
+priority means `setup.sh` with the other `--priority`.
 
 ## Isolation
 
@@ -132,17 +145,18 @@ names each and the command that closes it (`sudo diskutil enableOwnership <volum
 Once per Mac, as Thorsten, in a checkout of this repository:
 
 ```bash
-scripts/mac-runner/setup.sh                            # the Mac Studio
-scripts/mac-runner/setup.sh --machine mbp --count 4    # the MacBook Pro
+scripts/mac-runner/setup.sh --count 1                                   # the Mac Studio
+scripts/mac-runner/setup.sh --machine mbp --count 2 --priority nice     # the MacBook Pro
 ```
 
-`--machine` is the runner label and the instances' names, `--count` the number of instances. It fetches a registration token with his `gh` login, asks for the Mac password once, and then
+`--machine` is the runner label and the instances' names, `--count` the number of instances
+(more are stopped and unregistered), `--priority` as in Priority, above. It fetches a registration token with his `gh` login, asks for the Mac password once, and then
 creates the user, the wall and the LaunchDaemons. Run it while no job runs: a changed service
 definition restarts its runner.
 
 | LaunchDaemon | Runs | What |
 |---|---|---|
-| `de.iphoneblog.ci-runner`, `-2` … `-4` | always (a laptop: on power), as `ci` | the runner instances, `/Users/ci/actions-runner`, `-2` … `-4`, label `mac-studio` or `mbp`, logs `/Users/ci/Library/Logs/<label>.log` |
+| `de.iphoneblog.ci-runner` (and `-2` on the MacBook Pro) | always (a laptop: on power), as `ci` | the runner instances, `/Users/ci/actions-runner` (and `-2`), label `mac-studio` or `mbp`, logs `/Users/ci/Library/Logs/<label>.log` |
 | `de.iphoneblog.ci-runner.pf` | at boot, every 5 minutes, as root | loads the network wall if it is missing |
 | `de.iphoneblog.ci-runner.xcode` | at boot, daily 05:10, after an Xcode update, as root | Xcode licence, first launch, iOS runtime; holds the runner back until they are ready (below) |
 | `de.iphoneblog.ci-runner.power` | a Mac with a battery only: at boot, every 30 seconds, as root | starts the runners on power, stops them on battery or hold (On a laptop, below) |
@@ -162,7 +176,7 @@ gh secret set MAC_RUNNER_STATUS_TOKEN -R Philipp-solutions-de/iphoneblog-matrix-
 The MacBook Pro has no `gh` login. Its runners were registered from the Mac Studio: a
 registration token from `gh api -X POST repos/…/actions/runners/registration-token` in a file
 copied to the MacBook Pro, then `sudo scripts/mac-runner/setup.sh --as-root <file> --machine mbp
---count 4` there, and the file deleted.
+--count 2 --priority nice` there (a removal token, when instances go, in `<file>.remove`), and the file deleted.
 
 ## On a laptop
 
@@ -214,8 +228,8 @@ job when the Mac has another major version, or no simulator runtime for its SDK.
 - **State:** `gh api repos/Philipp-solutions-de/iphoneblog-matrix-ios/actions/runners --jq '.runners[] | {name,status,busy}'`
 - **Send everything to GitHub for a while:** `gh variable set MAC_RUNNER -b off -R Philipp-solutions-de/iphoneblog-matrix-ios`;
   `gh variable delete MAC_RUNNER …` brings the Mac back.
-- **Restart a runner:** `sudo launchctl kickstart -k system/de.iphoneblog.ci-runner` (`-2` … `-4`
-  for the others)
+- **Restart a runner:** `sudo launchctl kickstart -k system/de.iphoneblog.ci-runner` (`-2` for the
+  second instance on the MacBook Pro)
 - **Keep jobs off the MacBook Pro for a while:** `touch /Users/Shared/ci-runner-hold` there,
   `rm` it to take jobs again (On a laptop, above).
 - **Ports:** each instance's own (Test shards, above); `TEST_HOMESERVER_PORT` and

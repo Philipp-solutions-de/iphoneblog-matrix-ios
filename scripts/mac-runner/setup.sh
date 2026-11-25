@@ -5,7 +5,10 @@
 #   scripts/mac-runner/setup.sh --machine mbp --count 4      # the MacBook Pro
 #
 # --machine is the runner label and the instances' names (<machine>, <machine>-2 …), which
-# pick-runner.sh asks for; --count is how many instances, one per test shard that may run at once.
+# pick-runner.sh asks for; --count is how many instances, one per job that may run at once
+# (instances above it are stopped and unregistered); --priority is `background` (nice 20 and
+# the background QoS class: efficiency cores only, the Mac Studio) or `nice` (nice 20 on every
+# core: the MacBook Pro, whose M1 Pro has only two efficiency cores).
 #
 # Run it as the Mac's admin user, not with sudo: it fetches the registration token with your
 # `gh` login, then asks for your password once (sudo) for the rest. Every step checks first, so
@@ -28,18 +31,21 @@ user="ci"
 # (docs/mac-runner.md, "Test shards").
 machine="mac-studio"
 runner_count=4
+priority=background
 as_root=no
 token_file=""
 while (( $# )); do
     case "$1" in
     --machine) machine="$2"; shift 2 ;;
     --count) runner_count="$2"; shift 2 ;;
+    --priority) priority="$2"; shift 2 ;;
     --as-root) as_root=yes; token_file="$2"; shift 2 ;;
-    *) echo "usage: $0 [--machine <label>] [--count <n>]" >&2; exit 1 ;;
+    *) echo "usage: $0 [--machine <label>] [--count <n>] [--priority background|nice]" >&2; exit 1 ;;
     esac
 done
-[[ "$machine" =~ ^[a-z][a-z0-9-]*$ && "$runner_count" =~ ^[1-9]$ ]] ||
-    { echo "--machine wants a lowercase label, --count 1 to 9." >&2; exit 1; }
+[[ "$machine" =~ ^[a-z][a-z0-9-]*$ && "$runner_count" =~ ^[1-9]$ && "$priority" =~ ^(background|nice)$ ]] ||
+    { echo "--machine wants a lowercase label, --count 1 to 9, --priority background or nice." >&2; exit 1; }
+if [[ "$priority" == background ]]; then process_type=Background; else process_type=Standard; fi
 labels="$machine"
 slot_name()  { if [[ "$1" == 1 ]]; then echo "$machine"; else echo "$machine-$1"; fi; }
 slot_dir()   { if [[ "$1" == 1 ]]; then echo "/Users/$user/actions-runner"; else echo "/Users/$user/actions-runner-$1"; fi; }
@@ -62,15 +68,21 @@ if [[ "$as_root" != yes ]]; then
     token_file="$(mktemp)"
     chmod 600 "$token_file"
     trap 'rm -f "$token_file"' EXIT
-    missing=no
+    missing=no surplus=no
     for slot in $(seq 1 "$runner_count"); do [[ -f "$(slot_dir "$slot")/.runner" ]] || missing=yes; done
+    for slot in $(seq $((runner_count + 1)) 9); do [[ ! -f "/Library/LaunchDaemons/$(slot_label "$slot").plist" ]] || surplus=yes; done
+    # Prints nothing: each token goes straight into a file only root and you can read.
     if [[ "$missing" == yes ]]; then
-        # Prints nothing: the token goes straight into a file only root and you can read.
         gh api -X POST "repos/$repo/actions/runners/registration-token" --jq .token > "$token_file"
         [[ -s "$token_file" ]] || { echo "No registration token (gh login with admin on $repo?)." >&2; exit 1; }
     fi
+    if [[ "$surplus" == yes ]]; then
+        gh api -X POST "repos/$repo/actions/runners/remove-token" --jq .token > "$token_file.remove"
+        chmod 600 "$token_file.remove"
+        trap 'rm -f "$token_file" "$token_file.remove"' EXIT
+    fi
     echo "Now sudo asks for your Mac password."
-    sudo "$0" --as-root "$token_file" --machine "$machine" --count "$runner_count"
+    sudo "$0" --as-root "$token_file" --machine "$machine" --count "$runner_count" --priority "$priority"
     exit 0
 fi
 
@@ -219,7 +231,8 @@ for slot in $(seq 1 "$runner_count"); do
     # none meets Thorsten's own test runs on 8008 and 8793.
     as_ci sh -c "printf '%s\n' '/Users/$user/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin' > '$dir/.path'"
     as_ci sh -c "printf '%s\n' 'LANG=en_US.UTF-8' 'DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer' \
-        'TEST_HOMESERVER_PORT=180${slot}8' 'FIXTURE_PORT=180${slot}9' 'DEVICE_NAME=iPhone 17 Pro (CI $slot)' > '$dir/.env'"
+        'TEST_HOMESERVER_PORT=180${slot}8' 'FIXTURE_PORT=180${slot}9' 'DEVICE_NAME=iPhone 17 Pro (CI $slot)' \
+        'MAC_PRIORITY=$priority' > '$dir/.env'"
     install_daemon "$label" "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
 <plist version=\"1.0\"><dict>
@@ -242,7 +255,7 @@ for slot in $(seq 1 "$runner_count"); do
   <!-- The lowest priority, inherited by every process the runner starts (xcodebuild, simctl,
        the test homeserver): Thorsten's work on this Mac comes first (docs/mac-runner.md,
        "Priority"). lower-priority.sh covers what launchd starts outside this tree. -->
-  <key>ProcessType</key><string>Background</string>
+  <key>ProcessType</key><string>$process_type</string>
   <key>Nice</key><integer>20</integer>
   <key>LowPriorityIO</key><true/>
   <key>LowPriorityBackgroundIO</key><true/>
@@ -251,6 +264,22 @@ for slot in $(seq 1 "$runner_count"); do
 </dict></plist>"
 done
 rm -f "$tarball"
+
+# Instances above --count: stop, unregister, delete (their work folders go too).
+for slot in $(seq $((runner_count + 1)) 9); do
+    label="$(slot_label "$slot")"
+    plist="/Library/LaunchDaemons/$label.plist"
+    [[ -f "$plist" ]] || continue
+    launchctl bootout "system/$label" 2>/dev/null || true
+    for _ in $(seq 1 30); do launchctl print "system/$label" >/dev/null 2>&1 || break; sleep 1; done
+    dir="$(slot_dir "$slot")"
+    if [[ -f "$dir/.runner" && -s "$token_file.remove" ]]; then
+        (cd "$dir" && sudo -u "$user" -H ./config.sh remove --token "$(cat "$token_file.remove")") || true
+    fi
+    rm -f "$plist"
+    rm -rf "$dir"
+    echo "$(slot_name "$slot") removed"
+done
 
 # 7. A laptop: jobs only on power, and on power it does not sleep (docs/mac-runner.md,
 # "On a laptop"). caffeinate -s holds off system sleep only while on power; the display may

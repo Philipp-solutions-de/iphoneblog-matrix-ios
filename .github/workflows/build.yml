@@ -91,10 +91,11 @@ jobs:
         with:
           persist-credentials: false
 
-      # Lowest CPU priority for everything this job starts on the Mac, simulators included
-      # (docs/mac-runner.md, "Priority"); MAC_RUNNER_PRIORITY=normal turns it off.
-      - name: Lowest priority (self-hosted Mac)
-        if: runner.environment == 'self-hosted' && (startsWith(runner.name, 'mac-studio') || vars.MAC_RUNNER_PRIORITY != 'normal')
+      # Low CPU priority for everything this job starts on the Mac, simulators included: nice 20
+      # and the background QoS class on the Mac Studio, nice 20 on every core on the MacBook Pro
+      # (its runner .env says MAC_PRIORITY=nice). docs/mac-runner.md, "Priority".
+      - name: Low priority (self-hosted Mac)
+        if: runner.environment == 'self-hosted'
         run: nohup scripts/mac-runner/lower-priority.sh >/dev/null 2>&1 &
 
       - name: Xcode
@@ -119,7 +120,8 @@ jobs:
           restore-keys: spm-${{ runner.environment }}-
 
       - name: Build the app and every test bundle
-        run: scripts/build.sh build-for-testing
+        # One build at a time on a Mac: two share its Xcode build service and one hangs.
+        run: scripts/mac-runner/one-build.sh scripts/build.sh build-for-testing
 
       - name: The job's processes and their priority (self-hosted Mac)
         if: always() && runner.environment == 'self-hosted'
@@ -173,10 +175,11 @@ jobs:
         with:
           persist-credentials: false
 
-      # Lowest CPU priority for everything this job starts on the Mac, simulators included
-      # (docs/mac-runner.md, "Priority"); MAC_RUNNER_PRIORITY=normal turns it off.
-      - name: Lowest priority (self-hosted Mac)
-        if: runner.environment == 'self-hosted' && (startsWith(runner.name, 'mac-studio') || vars.MAC_RUNNER_PRIORITY != 'normal')
+      # Low CPU priority for everything this job starts on the Mac, simulators included: nice 20
+      # and the background QoS class on the Mac Studio, nice 20 on every core on the MacBook Pro
+      # (its runner .env says MAC_PRIORITY=nice). docs/mac-runner.md, "Priority".
+      - name: Low priority (self-hosted Mac)
+        if: runner.environment == 'self-hosted'
         run: nohup scripts/mac-runner/lower-priority.sh >/dev/null 2>&1 &
 
       - name: Xcode

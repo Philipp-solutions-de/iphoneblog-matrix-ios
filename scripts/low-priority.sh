@@ -17,6 +17,9 @@
 # IPHONEBLOG_PRIORITY=normal turns it off anywhere; perf.sh measures at normal priority.
 
 lowprio_on() {
+    # A Mac set up with --priority nice (the MacBook Pro) runs on every core at nice 20, which
+    # the runner service gives every process it starts: no background QoS there.
+    [[ "${MAC_PRIORITY:-}" != nice ]] || return 1
     # The Mac Studio is only a fallback runner and Thorsten's own machine: always low there.
     if [[ "${RUNNER_NAME:-}" != mac-studio && "${RUNNER_NAME:-}" != mac-studio-* ]]; then
         [[ "${IPHONEBLOG_PRIORITY:-low}" != normal ]] || return 1
