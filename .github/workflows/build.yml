@@ -29,6 +29,9 @@ env:
   # The Xcode both runners must have: GitHub's image takes its newest Xcode 27.x, the Mac
   # Studio its /Applications/Xcode.app, which must be a 27.x (docs/mac-runner.md, "Xcode").
   XCODE_MAJOR: "27"
+  # MAC_RUNNER_PRIORITY=normal also turns off scripts/low-priority.sh's taskpolicy -b, which
+  # otherwise keeps xcodebuild on the efficiency cores and ran the shards into their timeout.
+  IPHONEBLOG_PRIORITY: ${{ vars.MAC_RUNNER_PRIORITY == 'normal' && 'normal' || 'low' }}
 
 jobs:
   pick:
