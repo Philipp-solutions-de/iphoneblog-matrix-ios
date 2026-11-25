@@ -116,10 +116,11 @@ jobs:
           path: build/DerivedData/SourcePackages
           # One cache per workspace folder: Swift packages record absolute paths. GitHub's is
           # /Users/runner/work; on a Mac each runner instance has its own (actions-runner,
-          # actions-runner-2 …), and mbp-2 failed on packages restored from actions-runner
-          # ("There is no XCFramework found", 2026-11-25).
-          key: spm-${{ runner.environment }}-${{ runner.environment == 'self-hosted' && runner.name || 'github' }}-${{ hashFiles('project.yml') }}
-          restore-keys: spm-${{ runner.environment }}-${{ runner.environment == 'self-hosted' && runner.name || 'github' }}-
+          # actions-runner-2 …), and a build failed on packages restored from another folder
+          # ("There is no XCFramework found", 2026-11-25). The key names the folder itself: the
+          # runner's name did not always match it (runner "mbp" in actions-runner-2).
+          key: spm-${{ runner.os }}-${{ github.workspace }}-${{ hashFiles('project.yml') }}
+          restore-keys: spm-${{ runner.os }}-${{ github.workspace }}-
 
       - name: Build the app and every test bundle
         # One build at a time on a Mac: two share its Xcode build service and one hangs.
