@@ -124,11 +124,13 @@ final class OneHubUITests: XCTestCase {
     /// Pictures in messages are left out: their colours are the sender's, not the app's, and
     /// the room holds what earlier tests sent (a GIF with a cyan frame; 2026-11-25, shard 4).
     private func check(_ app: XCUIApplication, _ name: String) {
-        let pictures = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH 'timeline-image.'"))
-            .allElementsBoundByIndex.map(\.frame)
         let shot = app.screenshot()
         save(app, name)
+        // Asked after the shot, and 4 pt wider: the timeline may still move a little, and a
+        // picture scrolled under the room bar left its last two pixel rows (2026-11-26).
+        let pictures = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'timeline-image.'"))
+            .allElementsBoundByIndex.map { $0.frame.insetBy(dx: -4, dy: -4) }
         guard let image = shot.image.cgImage else { return }
         let width = image.width, height = image.height
         let scale = CGFloat(width) / app.frame.width
