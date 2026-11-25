@@ -9,16 +9,18 @@
 #   HEAD_REPO      github.event.pull_request.head.repo.full_name (empty unless pull_request)
 #   REPO           github.repository
 #   MAC_RUNNER     the repository variable: "off" sends every job to GitHub
-#   MAC_MACHINES   the Macs in the order they are asked (default "mbp mac-studio": the MacBook
-#                  Pro first, the Mac Studio second); each is a runner label and name prefix
+#   MAC_MACHINES   the Macs, first the default and then the fallbacks (default "mbp mac-studio":
+#                  the MacBook Pro, the Mac Studio only when it is away); each is a runner label
+#                  and name prefix
 #   STATUS_TOKEN   a token that may read the repository's runners (Administration: read)
-#   WAIT_MINUTES   how long to wait for a busy Mac before going to GitHub (default 20)
+#   FALLBACK_MINUTES  how long the default Mac may be offline before a fallback takes the run
+#                  (default 30)
 #   RUNNERS_JSON   test hook: a file holding the API's answer instead of asking GitHub
 set -euo pipefail
 
 hosted='"xcode-27"'
 read -r -a machines <<<"${MAC_MACHINES:-mbp mac-studio}"
-wait_minutes="${WAIT_MINUTES:-20}"
+fallback_minutes="${FALLBACK_MINUTES:-30}"
 poll_seconds="${POLL_SECONDS:-30}"
 
 title() { # label → what the reason calls it
@@ -76,21 +78,31 @@ state_of() { # machine, json → "online busy", "online idle", "offline" or "mis
         elif any($on[]; .busy) then "online busy" else "online idle" end' <<<"$2"
 }
 
-deadline=$(( $(date +%s) + wait_minutes * 60 ))
+# The first Mac is the default (Thorsten, 2026-11-25: the MacBook Pro; the Mac Studio is only a
+# fallback, so a run there never slows the machine he works on). While the default is online,
+# busy or not, the run goes to it and waits for a free instance there. Only when it has been
+# offline for FALLBACK_MINUTES does a fallback take the run, and only one that is online and
+# idle; otherwise GitHub. A default Mac that is not registered at all is skipped at once.
+default="${machines[0]}"
+fallbacks=("${machines[@]:1}")
+deadline=$(( $(date +%s) + fallback_minutes * 60 ))
 while :; do
     json="$(runners_json)" || answer hosted "hosted: GitHub's runner API did not answer (token expired?)"
-    busy=() away=()
-    for m in "${machines[@]}"; do
-        state="$(state_of "$m" "$json")"
-        case "$state" in
-        "online idle") answer "$m" "$m: $(title "$m") is online and idle" ;;
-        "online busy") busy+=("$(title "$m")") ;;
-        *) away+=("$(title "$m") is $state") ;;
-        esac
-    done
-    (( ${#busy[@]} > 0 )) || answer hosted "hosted: no Mac is online ($(joined ', ' "${away[@]}"))"
-    (( $(date +%s) + poll_seconds <= deadline )) ||
-        answer hosted "hosted: $(joined ' and ' "${busy[@]}") stayed busy for $wait_minutes minutes"
-    echo "busy: $(joined ' and ' "${busy[@]}"); asking again in $poll_seconds s" >&2
+    state="$(state_of "$default" "$json")"
+    case "$state" in
+    "online idle") answer "$default" "$default: $(title "$default") is online and idle" ;;
+    "online busy") answer "$default" "$default: $(title "$default") is online; the run waits for a free instance there" ;;
+    missing) break ;;
+    esac
+    (( $(date +%s) + poll_seconds <= deadline )) || break
+    echo "$(title "$default") is offline; asking again in $poll_seconds s (fallback after $fallback_minutes minutes)" >&2
     sleep "$poll_seconds"
 done
+away="$(title "$default") is $state"
+for m in "${fallbacks[@]}"; do
+    fstate="$(state_of "$m" "$json")"
+    [[ "$fstate" != "online idle" ]] ||
+        answer "$m" "$m: $away, $(title "$m") is online and idle (fallback)"
+    away="$away, $(title "$m") is $fstate"
+done
+answer hosted "hosted: $away"

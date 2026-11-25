@@ -17,7 +17,10 @@
 # IPHONEBLOG_PRIORITY=normal turns it off anywhere; perf.sh measures at normal priority.
 
 lowprio_on() {
-    [[ "${IPHONEBLOG_PRIORITY:-low}" != normal ]] || return 1
+    # The Mac Studio is only a fallback runner and Thorsten's own machine: always low there.
+    if [[ "${RUNNER_NAME:-}" != mac-studio && "${RUNNER_NAME:-}" != mac-studio-* ]]; then
+        [[ "${IPHONEBLOG_PRIORITY:-low}" != normal ]] || return 1
+    fi
     [[ "${RUNNER_ENVIRONMENT:-}" != github-hosted ]] || return 1
     command -v taskpolicy >/dev/null
 }

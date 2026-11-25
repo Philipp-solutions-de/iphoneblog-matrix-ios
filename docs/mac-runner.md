@@ -13,21 +13,26 @@ his mail. A job must reach none of it, so isolation is the point of everything b
 ## Which runner
 
 The job "Pick a runner" in `.github/workflows/build.yml` runs `scripts/mac-runner/pick-runner.sh`
-on `ubuntu-latest` and hands `runs-on` to "Build" and the four "Tests" shards: a run stays on one
-kind of runner. Its tests, `scripts/mac-runner/test-pick-runner.sh`, run in the same job first.
-"Idle" means no online instance of that Mac is busy.
+on `iron` and hands `runs-on` to "Build" and the four "Tests" shards: a run stays on one kind of
+runner. Its tests, `scripts/mac-runner/test-pick-runner.sh`, run in the same job first.
+
+**The MacBook Pro is the default, the Mac Studio only a fallback** (Thorsten, 2026-11-25). The
+Studio is the machine he works on; four simulators there at once put its load above 800.
 
 | Event | Runner |
 |---|---|
-| push to `main`, hand run | the MacBook Pro if online and idle, else the Mac Studio if online and idle |
-| pull request from a branch of this repository | the same |
+| push to `main`, hand run, pull request from a branch of this repository | the MacBook Pro while it is online, busy or not: the run waits there for a free instance |
+| the same, MacBook Pro offline | wait up to 30 minutes (repository variable `MAC_FALLBACK_MINUTES`) for it to come back; then the Mac Studio if online and idle, else GitHub |
+| the same, MacBook Pro not registered | the Mac Studio at once if online and idle, else GitHub |
 | pull request from a fork | GitHub, always |
 | the weekly scheduled run | GitHub, always: it checks the hosted image the TestFlight job needs |
 | repository variable `MAC_RUNNER` = `off` | GitHub, always |
-| both Macs offline, not registered, or the status token missing or expired | GitHub |
-| a Mac online but busy, none idle | wait up to 20 minutes (repository variable `MAC_RUNNER_WAIT`) for either, then GitHub |
+| the status token missing or expired | GitHub |
 
-The order lives in `pick-runner.sh` (`MAC_MACHINES`, default `mbp mac-studio`). A run stays on
+On the Mac Studio a run always has the lowest priority, whatever `MAC_RUNNER_PRIORITY` says
+(`scripts/low-priority.sh` and the step "Lowest priority" look at the runner's name).
+
+The order lives in `pick-runner.sh` (`MAC_MACHINES`, default `mbp mac-studio`: the first is the default, the rest are fallbacks). A run stays on
 the Mac it was given: its build hands the products to its test shards on that Mac's disk.
 
 **The fallback asks GitHub before it queues.** A job sent to a self-hosted label waits up to 24

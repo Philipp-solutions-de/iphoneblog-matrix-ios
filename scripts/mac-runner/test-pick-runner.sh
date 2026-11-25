@@ -33,7 +33,7 @@ fails=0
 check() { # expected machine label or hosted, description, env...
     local want="$1" what="$2"; shift 2
     local out want_where=mac want_runs_on
-    out="$(env -i PATH="$PATH" REPO=Philipp-solutions-de/iphoneblog-matrix-ios WAIT_MINUTES=0 POLL_SECONDS=1 "$@" \
+    out="$(env -i PATH="$PATH" REPO=Philipp-solutions-de/iphoneblog-matrix-ios FALLBACK_MINUTES=0 POLL_SECONDS=1 "$@" \
         "$here/pick-runner.sh" 2>/dev/null)"
     if [[ "$want" == hosted ]]; then want_where=hosted; want_runs_on='"xcode-27"'
     else want_runs_on="[\"self-hosted\",\"$want\"]"; fi
@@ -55,19 +55,20 @@ check hosted     "weekly schedule"                        EVENT_NAME=schedule RU
 check hosted     "MAC_RUNNER=off"                         EVENT_NAME=push MAC_RUNNER=off RUNNERS_JSON="$tmp/both-idle.json"
 check hosted     "Studio offline, no MBP"                 EVENT_NAME=push RUNNERS_JSON="$tmp/offline.json"
 check hosted     "no Mac registered"                      EVENT_NAME=push RUNNERS_JSON="$tmp/none.json"
-check hosted     "Studio busy past the wait"              EVENT_NAME=push RUNNERS_JSON="$tmp/busy.json"
+check hosted     "no MBP, Studio busy"                    EVENT_NAME=push RUNNERS_JSON="$tmp/busy.json"
 check hosted     "one of the Studio's instances busy"     EVENT_NAME=push RUNNERS_JSON="$tmp/one-busy.json"
 check mac-studio "one instance offline, the rest idle"    EVENT_NAME=push RUNNERS_JSON="$tmp/one-off.json"
 check hosted     "only other runners registered"          EVENT_NAME=push RUNNERS_JSON="$tmp/other.json"
 check hosted     "names that only start like a Mac's"     EVENT_NAME=push RUNNERS_JSON="$tmp/prefix.json"
 check mbp        "both idle: the MacBook Pro first"       EVENT_NAME=push RUNNERS_JSON="$tmp/both-idle.json"
-check mac-studio "MacBook Pro busy, Studio idle"          EVENT_NAME=push RUNNERS_JSON="$tmp/mbp-busy.json"
-check mac-studio "MacBook Pro on battery (offline)"       EVENT_NAME=push RUNNERS_JSON="$tmp/mbp-off.json"
+check mbp        "MacBook Pro busy: it still takes the run" EVENT_NAME=push RUNNERS_JSON="$tmp/mbp-busy.json"
+check mac-studio "MacBook Pro offline past the fallback"  EVENT_NAME=push RUNNERS_JSON="$tmp/mbp-off.json"
 check mbp        "only the MacBook Pro registered"        EVENT_NAME=push RUNNERS_JSON="$tmp/mbp-only.json"
 check hosted     "both Macs offline"                      EVENT_NAME=push RUNNERS_JSON="$tmp/both-off.json"
-check hosted     "both Macs busy past the wait"           EVENT_NAME=push RUNNERS_JSON="$tmp/both-busy.json"
-check hosted     "MBP away, Studio busy past the wait"    EVENT_NAME=push RUNNERS_JSON="$tmp/studio-busy.json"
+check mbp        "both Macs busy: the MacBook Pro"        EVENT_NAME=push RUNNERS_JSON="$tmp/both-busy.json"
+check hosted     "MBP offline, Studio busy"               EVENT_NAME=push RUNNERS_JSON="$tmp/studio-busy.json"
 check mac-studio "MAC_MACHINES=mac-studio skips the MBP"  EVENT_NAME=push MAC_MACHINES=mac-studio RUNNERS_JSON="$tmp/both-idle.json"
+check mac-studio "MAC_MACHINES=mac-studio, busy: it waits"  EVENT_NAME=push MAC_MACHINES=mac-studio RUNNERS_JSON="$tmp/busy.json"
 check hosted     "no status token"                        EVENT_NAME=push
 check hosted     "API error"                              EVENT_NAME=push STATUS_TOKEN=bad RUNNERS_JSON=
 (( fails == 0 )) || { echo "$fails failed"; exit 1; }

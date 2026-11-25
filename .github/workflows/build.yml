@@ -31,15 +31,17 @@ env:
   XCODE_MAJOR: "27"
   # MAC_RUNNER_PRIORITY=normal also turns off scripts/low-priority.sh's taskpolicy -b, which
   # otherwise keeps xcodebuild on the efficiency cores and ran the shards into their timeout.
+  # Not on the Mac Studio: scripts/low-priority.sh keeps it low there whatever this says.
   IPHONEBLOG_PRIORITY: ${{ vars.MAC_RUNNER_PRIORITY == 'normal' && 'normal' || 'low' }}
 
 jobs:
   pick:
     name: Pick a runner
-    # The MacBook Pro, else the Mac Studio, when online and idle and the code is ours; GitHub's
-    # hosted Xcode 27 image otherwise (docs/mac-runner.md, "Which runner").
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The MacBook Pro when online and the code is ours; the Mac Studio only after the MBP has
+    # been offline for MAC_FALLBACK_MINUTES; GitHub's hosted Xcode 27 image otherwise
+    # (docs/mac-runner.md, "Which runner"). On iron, so waiting for the MBP costs no minutes.
+    runs-on: ${{ vars.RUNNER || 'iron' }}
+    timeout-minutes: 45
     permissions:
       contents: read
       actions: read
@@ -63,7 +65,7 @@ jobs:
           REPO: ${{ github.repository }}
           MAC_RUNNER: ${{ vars.MAC_RUNNER }}
           STATUS_TOKEN: ${{ secrets.MAC_RUNNER_STATUS_TOKEN }}
-          WAIT_MINUTES: ${{ vars.MAC_RUNNER_WAIT || '20' }}
+          FALLBACK_MINUTES: ${{ vars.MAC_FALLBACK_MINUTES || '30' }}
         run: |
           scripts/mac-runner/pick-runner.sh >> "$GITHUB_OUTPUT" 2> reason.txt || { cat reason.txt; exit 1; }
           cat reason.txt
@@ -91,7 +93,7 @@ jobs:
       # Lowest CPU priority for everything this job starts on the Mac, simulators included
       # (docs/mac-runner.md, "Priority"); MAC_RUNNER_PRIORITY=normal turns it off.
       - name: Lowest priority (self-hosted Mac)
-        if: runner.environment == 'self-hosted' && vars.MAC_RUNNER_PRIORITY != 'normal'
+        if: runner.environment == 'self-hosted' && (startsWith(runner.name, 'mac-studio') || vars.MAC_RUNNER_PRIORITY != 'normal')
         run: nohup scripts/mac-runner/lower-priority.sh >/dev/null 2>&1 &
 
       - name: Xcode
@@ -173,7 +175,7 @@ jobs:
       # Lowest CPU priority for everything this job starts on the Mac, simulators included
       # (docs/mac-runner.md, "Priority"); MAC_RUNNER_PRIORITY=normal turns it off.
       - name: Lowest priority (self-hosted Mac)
-        if: runner.environment == 'self-hosted' && vars.MAC_RUNNER_PRIORITY != 'normal'
+        if: runner.environment == 'self-hosted' && (startsWith(runner.name, 'mac-studio') || vars.MAC_RUNNER_PRIORITY != 'normal')
         run: nohup scripts/mac-runner/lower-priority.sh >/dev/null 2>&1 &
 
       - name: Xcode
@@ -316,7 +318,7 @@ jobs:
     name: Report a red scheduled build
     needs: [pick, build, test, testflight, testflight-after-tests]
     if: failure() && github.event_name == 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'iron' }}
     permissions:
       issues: write
     steps:
