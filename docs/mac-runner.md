@@ -13,7 +13,7 @@ his mail. A job must reach none of it, so isolation is the point of everything b
 ## Which runner
 
 The job "Pick a runner" in `.github/workflows/build.yml` runs `scripts/mac-runner/pick-runner.sh`
-on `iron` and hands `runs-on` to "Build" and the four "Tests" shards: a run stays on one kind of
+on `ubuntu-latest` (the repository is public: free minutes, and `iron` takes private repositories only) and hands `runs-on` to "Build" and the four "Tests" shards: a run stays on one kind of
 runner. Its tests, `scripts/mac-runner/test-pick-runner.sh`, run in the same job first.
 
 **The MacBook Pro is the default, the Mac Studio only a fallback** (Thorsten, 2026-11-25). The

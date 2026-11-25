@@ -39,8 +39,9 @@ jobs:
     name: Pick a runner
     # The MacBook Pro when online and the code is ours; the Mac Studio only after the MBP has
     # been offline for MAC_FALLBACK_MINUTES; GitHub's hosted Xcode 27 image otherwise
-    # (docs/mac-runner.md, "Which runner"). On iron, so waiting for the MBP costs no minutes.
-    runs-on: ${{ vars.RUNNER || 'iron' }}
+    # (docs/mac-runner.md, "Which runner"). On GitHub's Ubuntu runner: the repository is public,
+    # so its minutes are free, and iron serves private repositories only.
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
@@ -318,7 +319,7 @@ jobs:
     name: Report a red scheduled build
     needs: [pick, build, test, testflight, testflight-after-tests]
     if: failure() && github.event_name == 'schedule'
-    runs-on: ${{ vars.RUNNER || 'iron' }}
+    runs-on: ubuntu-latest
     permissions:
       issues: write
     steps:
