@@ -244,14 +244,11 @@ jobs:
         if: always() && runner.environment == 'self-hosted'
         run: scripts/mac-runner/shutdown-simulator.sh
 
-      # The screenshots XCTest takes when a test fails, from the result bundle: the Mac's
-      # bundles sit in the walled-off `ci` home, so the artifact is the only way to see them.
+      # Every screenshot of each failed test, from the result bundle: the Mac's bundles sit in
+      # the walled-off `ci` home, so the artifact is the only way to see them.
       - name: Failure screenshots
         if: failure()
-        run: |
-          [[ -d build/ui.xcresult ]] || exit 0
-          xcrun xcresulttool export attachments --path build/ui.xcresult --output-path build/shots --only-failures \
-            || echo "no failure screenshots exported"
+        run: scripts/failure-shots.sh build/ui.xcresult build/shots || echo "no failure screenshots exported"
 
       - name: Keep the logs
         if: always()
