@@ -1,6 +1,6 @@
 #!/bin/sh
 # Keep every process of the runner's user at the lowest CPU priority, so CI never makes
-# Thorsten's own work on the Mac Studio stutter (docs/mac-runner.md, "Priority").
+# Thorsten's own work on the Mac stutter (docs/mac-runner.md, "Priority").
 #
 #   scripts/mac-runner/lower-priority.sh          loop: every 5 s, all of this user's processes
 #   scripts/mac-runner/lower-priority.sh report   print them with nice and priority

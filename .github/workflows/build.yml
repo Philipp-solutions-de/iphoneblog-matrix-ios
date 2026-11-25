@@ -36,8 +36,8 @@ env:
 jobs:
   pick:
     name: Pick a runner
-    # The Mac Studio when it is online and idle and the code is ours; GitHub's hosted Xcode 27
-    # image otherwise (docs/mac-runner.md, "Which runner").
+    # The MacBook Pro, else the Mac Studio, when online and idle and the code is ours; GitHub's
+    # hosted Xcode 27 image otherwise (docs/mac-runner.md, "Which runner").
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -46,6 +46,7 @@ jobs:
     outputs:
       runs-on: ${{ steps.pick.outputs.runs-on }}
       where: ${{ steps.pick.outputs.where }}
+      machine: ${{ steps.pick.outputs.machine }}
       last-main-tests: ${{ steps.last.outputs.tests }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -89,7 +90,7 @@ jobs:
 
       # Lowest CPU priority for everything this job starts on the Mac, simulators included
       # (docs/mac-runner.md, "Priority"); MAC_RUNNER_PRIORITY=normal turns it off.
-      - name: Lowest priority (Mac Studio)
+      - name: Lowest priority (self-hosted Mac)
         if: runner.environment == 'self-hosted' && vars.MAC_RUNNER_PRIORITY != 'normal'
         run: nohup scripts/mac-runner/lower-priority.sh >/dev/null 2>&1 &
 
@@ -117,14 +118,14 @@ jobs:
       - name: Build the app and every test bundle
         run: scripts/build.sh build-for-testing
 
-      - name: The job's processes and their priority (Mac Studio)
+      - name: The job's processes and their priority (self-hosted Mac)
         if: always() && runner.environment == 'self-hosted'
         run: scripts/mac-runner/lower-priority.sh report
 
       # The shards test these products without building. On the Mac they stay on its disk; on
       # GitHub every shard is another machine, so they travel as an artifact, in a tar because
       # an artifact drops the executable bits.
-      - name: Hand the products to the shards (Mac Studio)
+      - name: Hand the products to the shards (self-hosted Mac)
         if: runner.environment == 'self-hosted'
         run: |
           mkdir -p "$HOME/ci-products"
@@ -171,7 +172,7 @@ jobs:
 
       # Lowest CPU priority for everything this job starts on the Mac, simulators included
       # (docs/mac-runner.md, "Priority"); MAC_RUNNER_PRIORITY=normal turns it off.
-      - name: Lowest priority (Mac Studio)
+      - name: Lowest priority (self-hosted Mac)
         if: runner.environment == 'self-hosted' && vars.MAC_RUNNER_PRIORITY != 'normal'
         run: nohup scripts/mac-runner/lower-priority.sh >/dev/null 2>&1 &
 
@@ -182,7 +183,7 @@ jobs:
         with:
           enable-cache: false
 
-      - name: Take the products (Mac Studio)
+      - name: Take the products (self-hosted Mac)
         if: runner.environment == 'self-hosted'
         run: |
           mkdir -p build/DerivedData/Build
@@ -227,11 +228,11 @@ jobs:
         if: always()
         run: scripts/test-homeserver.sh stop
 
-      - name: The job's processes and their priority (Mac Studio)
+      - name: The job's processes and their priority (self-hosted Mac)
         if: always() && runner.environment == 'self-hosted'
         run: scripts/mac-runner/lower-priority.sh report
 
-      - name: Shut down this shard's simulator (Mac Studio)
+      - name: Shut down this shard's simulator (self-hosted Mac)
         if: always() && runner.environment == 'self-hosted'
         run: scripts/mac-runner/shutdown-simulator.sh
 

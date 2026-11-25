@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Prepare Xcode for a CI job, on GitHub's runner or the Mac Studio (docs/mac-runner.md, "Xcode").
-# GitHub: select the newest Xcode $XCODE_MAJOR.x. Mac Studio: its user has no sudo, its .env sets
+# Prepare Xcode for a CI job, on GitHub's runner or a self-hosted Mac (docs/mac-runner.md, "Xcode").
+# GitHub: select the newest Xcode $XCODE_MAJOR.x. A self-hosted Mac: its user has no sudo, its .env sets
 # DEVELOPER_DIR; check the version and the iOS runtime, give the job its runner instance's ports
 # when the .env names none, and end servers a cancelled job left behind on them.
 set -euo pipefail
@@ -17,10 +17,10 @@ fi
 xcodebuild -version
 version="$(xcodebuild -version | sed -n 's/^Xcode //p')"
 [[ "${version%%.*}" == "$XCODE_MAJOR" ]] ||
-    { echo "::error::The Mac Studio has Xcode $version, the workflow wants $XCODE_MAJOR.x"; exit 1; }
+    { echo "::error::$(hostname -s) has Xcode $version, the workflow wants $XCODE_MAJOR.x"; exit 1; }
 sdk="$(xcodebuild -showsdks | sed -nE 's/.*-sdk iphonesimulator([0-9.]+).*/\1/p' | tail -1)"
 xcrun simctl list runtimes | grep "^iOS $sdk " ||
-    { echo "::error::No iOS $sdk simulator runtime on the Mac Studio (docs/mac-runner.md, Xcode)"; exit 1; }
+    { echo "::error::No iOS $sdk simulator runtime on $(hostname -s) (docs/mac-runner.md, Xcode)"; exit 1; }
 
 # Thorsten's local test runs on this Mac hold 8008 and 8793; each runner instance has its own
 # pair in its .env (setup.sh). A runner set up before that gets the first instance's.

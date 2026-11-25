@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prove, from inside a job on the Mac Studio, that the runner is walled off
+# Prove, from inside a job on a self-hosted Mac, that the runner is walled off
 # (docs/mac-runner.md, "Isolation"). Run by .github/workflows/mac-runner-check.yml, or by hand:
 #   sudo -u ci -H scripts/mac-runner/check-isolation.sh
 # Each private target below is open to Thorsten's own user, so "refused" here means the wall.

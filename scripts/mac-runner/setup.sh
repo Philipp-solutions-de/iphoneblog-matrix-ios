@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-# Set up the self-hosted GitHub Actions runner on the Mac Studio (docs/mac-runner.md).
+# Set up the self-hosted GitHub Actions runner on one of the Macs (docs/mac-runner.md).
 #
-#   scripts/mac-runner/setup.sh
+#   scripts/mac-runner/setup.sh                              # the Mac Studio: mac-studio, 4 instances
+#   scripts/mac-runner/setup.sh --machine mbp --count 4      # the MacBook Pro
+#
+# --machine is the runner label and the instances' names (<machine>, <machine>-2 …), which
+# pick-runner.sh asks for; --count is how many instances, one per test shard that may run at once.
 #
 # Run it as the Mac's admin user, not with sudo: it fetches the registration token with your
 # `gh` login, then asks for your password once (sudo) for the rest. Every step checks first, so
@@ -13,17 +17,31 @@
 #   3. closes every other home folder to other users (chmod go-rwx)
 #   4. keeps `ci` off private networks with a pf anchor (iron's WireGuard, the LAN, the NAS)
 #   5. a daily root job that keeps Xcode's licence, first launch and iOS runtime in step
-#   6. downloads the Actions runner (checksum checked), registers four instances for this one
-#      repository with the label `mac-studio`, and starts each as a LaunchDaemon under `ci`
+#   6. downloads the Actions runner (checksum checked), registers the instances for this one
+#      repository with the machine's label, and starts each as a LaunchDaemon under `ci`
+#   7. on a Mac with a battery: the power switch (jobs only on power) and no sleep on power
 set -euo pipefail
 
 repo="Philipp-solutions-de/iphoneblog-matrix-ios"
 user="ci"
-# Four instances, so the four test shards of a run go side by side (docs/mac-runner.md, "Test
-# shards"). The first keeps the names it had before there were four.
+# Four instances by default, so the four test shards of a run go side by side
+# (docs/mac-runner.md, "Test shards").
+machine="mac-studio"
 runner_count=4
-labels="mac-studio"
-slot_name()  { if [[ "$1" == 1 ]]; then echo mac-studio; else echo "mac-studio-$1"; fi; }
+as_root=no
+token_file=""
+while (( $# )); do
+    case "$1" in
+    --machine) machine="$2"; shift 2 ;;
+    --count) runner_count="$2"; shift 2 ;;
+    --as-root) as_root=yes; token_file="$2"; shift 2 ;;
+    *) echo "usage: $0 [--machine <label>] [--count <n>]" >&2; exit 1 ;;
+    esac
+done
+[[ "$machine" =~ ^[a-z][a-z0-9-]*$ && "$runner_count" =~ ^[1-9]$ ]] ||
+    { echo "--machine wants a lowercase label, --count 1 to 9." >&2; exit 1; }
+labels="$machine"
+slot_name()  { if [[ "$1" == 1 ]]; then echo "$machine"; else echo "$machine-$1"; fi; }
 slot_dir()   { if [[ "$1" == 1 ]]; then echo "/Users/$user/actions-runner"; else echo "/Users/$user/actions-runner-$1"; fi; }
 slot_label() { if [[ "$1" == 1 ]]; then echo de.iphoneblog.ci-runner; else echo "de.iphoneblog.ci-runner-$1"; fi; }
 runner_version="2.338.2"
@@ -31,9 +49,9 @@ runner_sha256="25a065af409ffa317ab4d5a3b614dd15fc9c40f2172bc1b35a1b1258e919a388"
 support="/Library/Application Support/ci-runner"
 here="$(cd "$(dirname "$0")" && pwd)"
 
-if [[ "${1:-}" != "--as-root" ]]; then
+if [[ "$as_root" != yes ]]; then
     [[ "$(id -u)" != 0 ]] || { echo "Run this as yourself, not with sudo." >&2; exit 1; }
-    [[ "$(uname -m)" == arm64 ]] || { echo "This is for the Apple-silicon Mac Studio." >&2; exit 1; }
+    [[ "$(uname -m)" == arm64 ]] || { echo "This is for an Apple-silicon Mac." >&2; exit 1; }
     [[ -d /Applications/Xcode.app ]] || { echo "No /Applications/Xcode.app." >&2; exit 1; }
     free_gib=$(( $(df -k /System/Volumes/Data | awk 'NR==2 {print $4}') / 1024 / 1024 ))
     if (( free_gib < 40 )); then
@@ -52,11 +70,10 @@ if [[ "${1:-}" != "--as-root" ]]; then
         [[ -s "$token_file" ]] || { echo "No registration token (gh login with admin on $repo?)." >&2; exit 1; }
     fi
     echo "Now sudo asks for your Mac password."
-    sudo "$0" --as-root "$token_file"
+    sudo "$0" --as-root "$token_file" --machine "$machine" --count "$runner_count"
     exit 0
 fi
 
-token_file="${2:-}"
 step() { printf '\n== %s\n' "$*"; }
 
 # 1. The user. dscl rather than sysadminctl, because sysadminctl wants a password and this
@@ -234,7 +251,34 @@ for slot in $(seq 1 "$runner_count"); do
 </dict></plist>"
 done
 rm -f "$tarball"
-# xcode-upkeep.sh starts the runners once Xcode is ready; until then GitHub sees them offline.
+
+# 7. A laptop: jobs only on power, and on power it does not sleep (docs/mac-runner.md,
+# "On a laptop"). caffeinate -s holds off system sleep only while on power; the display may
+# still sleep, and a closed lid without an external display still sleeps.
+if pmset -g batt | grep -q InternalBattery; then
+    step "power switch"
+    install -m 755 -o root -g wheel "$here/power-switch.sh" "$support/power-switch.sh"
+    install_daemon de.iphoneblog.ci-runner.power "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\"><dict>
+  <key>Label</key><string>de.iphoneblog.ci-runner.power</string>
+  <key>ProgramArguments</key><array><string>$support/power-switch.sh</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>StartInterval</key><integer>30</integer>
+  <key>StandardOutPath</key><string>/var/log/ci-runner-power.log</string>
+  <key>StandardErrorPath</key><string>/var/log/ci-runner-power.log</string>
+</dict></plist>"
+    install_daemon de.iphoneblog.ci-runner.awake "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\"><dict>
+  <key>Label</key><string>de.iphoneblog.ci-runner.awake</string>
+  <key>ProgramArguments</key><array><string>/usr/bin/caffeinate</string><string>-s</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+</dict></plist>"
+fi
+# xcode-upkeep.sh starts the runners once Xcode is ready (on a laptop through the power
+# switch); until then GitHub sees them offline.
 sdk="$(DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -showsdks 2>/dev/null |
     sed -nE 's/.*-sdk iphonesimulator([0-9.]+).*/\1/p' | tail -1)"
 if ! xcrun simctl list runtimes 2>/dev/null | grep -q "^iOS $sdk "; then

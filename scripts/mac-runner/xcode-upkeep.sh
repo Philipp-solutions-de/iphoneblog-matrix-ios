@@ -14,7 +14,10 @@ runners() {
         [ -f "$plist" ] && basename "$plist" .plist
     done
 }
+ready="/Library/Application Support/ci-runner/xcode-ready"
+power_switch="/Library/Application Support/ci-runner/power-switch.sh"
 stop_runner() {
+    rm -f "$ready"
     for r in $(runners); do
         if launchctl print "system/$r" >/dev/null 2>&1; then launchctl bootout "system/$r"; log "$r stopped until Xcode is ready"; fi
     done
@@ -44,4 +47,6 @@ if ! xcrun simctl list runtimes 2>/dev/null | grep -q "^iOS $sdk "; then
     xcrun simctl list runtimes | grep -q "^iOS $sdk " || { log "iOS $sdk runtime still missing"; exit 1; }
 fi
 log "Xcode $(xcodebuild -version | head -1 | cut -d' ' -f2), iOS $sdk runtime present"
-start_runner
+touch "$ready"
+# On a laptop the power switch decides: it starts the runners only on power (power-switch.sh).
+if [ -x "$power_switch" ]; then "$power_switch"; else start_runner; fi

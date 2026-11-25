@@ -1,12 +1,13 @@
-# The Mac Studio runner
+# The Mac runners
 
-"Build and test" runs on Thorsten's Mac Studio when it can, and on GitHub's hosted `xcode-27`
-image otherwise. On GitHub the job took 66 to over 127 minutes in November 2026 and twice hit
-the job limit; the Mac Studio is always on and nothing queues there. Thorsten decided this on
-2026-11-20, as a named exception to the rule that nothing runs on his Mac (infra repository,
-`docs/architecture.md`, "Nothing runs on Thorsten's Mac").
+"Build and test" runs on one of Thorsten's two Macs when it can, and on GitHub's hosted
+`xcode-27` image otherwise: first his MacBook Pro (label `mbp`, M1 Pro, 16 GB), then his Mac
+Studio (label `mac-studio`, M2 Max, 32 GB). On GitHub the job took 66 to over 127 minutes in
+November 2026 and twice hit the job limit; on a Mac nothing queues. Thorsten decided the Mac
+Studio on 2026-11-20 and the MacBook Pro as the default on 2026-11-25, as named exceptions to
+the rule that nothing runs on his Mac (infra repository, `docs/runners.md`, "The Mac runners").
 
-The Mac holds his keychain with the age key for the infra secrets, the ssh keys to `iron` and
+Both Macs hold his keychain with the age key for the infra secrets, the ssh keys to `iron` and
 his mail. A job must reach none of it, so isolation is the point of everything below.
 
 ## Which runner
@@ -14,17 +15,20 @@ his mail. A job must reach none of it, so isolation is the point of everything b
 The job "Pick a runner" in `.github/workflows/build.yml` runs `scripts/mac-runner/pick-runner.sh`
 on `ubuntu-latest` and hands `runs-on` to "Build" and the four "Tests" shards: a run stays on one
 kind of runner. Its tests, `scripts/mac-runner/test-pick-runner.sh`, run in the same job first.
-"Idle" means no online instance of the four is busy.
+"Idle" means no online instance of that Mac is busy.
 
 | Event | Runner |
 |---|---|
-| push to `main`, hand run | the Mac, if online and idle |
-| pull request from a branch of this repository | the Mac, if online and idle |
+| push to `main`, hand run | the MacBook Pro if online and idle, else the Mac Studio if online and idle |
+| pull request from a branch of this repository | the same |
 | pull request from a fork | GitHub, always |
 | the weekly scheduled run | GitHub, always: it checks the hosted image the TestFlight job needs |
 | repository variable `MAC_RUNNER` = `off` | GitHub, always |
-| Mac offline, not registered, or the status token missing or expired | GitHub |
-| Mac busy | wait up to 20 minutes for it (repository variable `MAC_RUNNER_WAIT`), then GitHub |
+| both Macs offline, not registered, or the status token missing or expired | GitHub |
+| a Mac online but busy, none idle | wait up to 20 minutes (repository variable `MAC_RUNNER_WAIT`) for either, then GitHub |
+
+The order lives in `pick-runner.sh` (`MAC_MACHINES`, default `mbp mac-studio`). A run stays on
+the Mac it was given: its build hands the products to its test shards on that Mac's disk.
 
 **The fallback asks GitHub before it queues.** A job sent to a self-hosted label waits up to 24
 hours for that runner and cannot be moved once queued, so the pick job reads the runner's state
@@ -52,8 +56,9 @@ first to the shard with the least time. Every shard computes the same split, and
 fails unless the four together hold every test exactly once. Refresh the times file from a green
 run's `ui.log` when the split drifts.
 
-On the Mac the four shards run side by side on four runner instances (`mac-studio`,
-`mac-studio-2` … `-4`, LaunchDaemons `de.iphoneblog.ci-runner`, `-2` … `-4`). Each instance's
+On a Mac the four shards run side by side on four runner instances (`mbp`, `mbp-2` … `-4` on
+the MacBook Pro, `mac-studio`, `mac-studio-2` … `-4` on the Mac Studio; LaunchDaemons
+`de.iphoneblog.ci-runner`, `-2` … `-4` on each). Each instance's
 `.env` gives it its own ports (`180n8` for the homeserver, `180n9` for the blog fixture) and its
 own simulator (`iPhone 17 Pro (CI n)`), so shards never meet each other or Thorsten's own test
 runs on 8008 and 8793. The products pass from "Build" to the shards on the Mac's disk
@@ -107,8 +112,8 @@ for all external contributors" on 2026-11-20. Check it:
 gh api repos/Philipp-solutions-de/iphoneblog-matrix-ios/actions/permissions/fork-pr-contributor-approval
 ```
 
-`.github/workflows/mac-runner-check.yml` proves the wall from inside a job, weekly and on every
-pull request that changes `scripts/mac-runner/`: it runs as `ci`, has no admin, sudo or keychain,
+`.github/workflows/mac-runner-check.yml` proves the wall from inside a job on each Mac that is
+online, weekly and on every pull request that changes `scripts/mac-runner/`: it runs as `ci`, has no admin, sudo or keychain,
 cannot list another home, cannot reach `iron`, the router or the NAS (all open to Thorsten's
 user), and does reach the internet and loopback. By hand: `sudo -u ci -H scripts/mac-runner/check-isolation.sh`.
 
@@ -119,21 +124,24 @@ names each and the command that closes it (`sudo diskutil enableOwnership <volum
 
 ## Setup
 
-Once, as Thorsten, in a checkout of this repository:
+Once per Mac, as Thorsten, in a checkout of this repository:
 
 ```bash
-scripts/mac-runner/setup.sh
+scripts/mac-runner/setup.sh                            # the Mac Studio
+scripts/mac-runner/setup.sh --machine mbp --count 4    # the MacBook Pro
 ```
 
-It fetches a registration token with his `gh` login, asks for the Mac password once, and then
+`--machine` is the runner label and the instances' names, `--count` the number of instances. It fetches a registration token with his `gh` login, asks for the Mac password once, and then
 creates the user, the wall and the LaunchDaemons. Run it while no job runs: a changed service
 definition restarts its runner.
 
 | LaunchDaemon | Runs | What |
 |---|---|---|
-| `de.iphoneblog.ci-runner`, `-2` … `-4` | always, as `ci` | the four runner instances, `/Users/ci/actions-runner`, `-2` … `-4`, label `mac-studio`, logs `/Users/ci/Library/Logs/<label>.log` |
+| `de.iphoneblog.ci-runner`, `-2` … `-4` | always (a laptop: on power), as `ci` | the runner instances, `/Users/ci/actions-runner`, `-2` … `-4`, label `mac-studio` or `mbp`, logs `/Users/ci/Library/Logs/<label>.log` |
 | `de.iphoneblog.ci-runner.pf` | at boot, every 5 minutes, as root | loads the network wall if it is missing |
 | `de.iphoneblog.ci-runner.xcode` | at boot, daily 05:10, after an Xcode update, as root | Xcode licence, first launch, iOS runtime; holds the runner back until they are ready (below) |
+| `de.iphoneblog.ci-runner.power` | a Mac with a battery only: at boot, every 30 seconds, as root | starts the runners on power, stops them on battery or hold (On a laptop, below) |
+| `de.iphoneblog.ci-runner.awake` | a Mac with a battery only: always, as root | `caffeinate -s`: no system sleep while on power |
 
 Then the status token, in the browser: GitHub → Settings → Developer settings → Fine-grained
 tokens → Generate new token. Resource owner `Philipp-solutions-de`, only the repository
@@ -146,15 +154,45 @@ gh secret set MAC_RUNNER_STATUS_TOKEN -R Philipp-solutions-de/iphoneblog-matrix-
 
 `setup.sh` changes nothing on a second run, so it is also the repair: run it again.
 
+The MacBook Pro has no `gh` login. Its runners were registered from the Mac Studio: a
+registration token from `gh api -X POST repos/…/actions/runners/registration-token` in a file
+copied to the MacBook Pro, then `sudo scripts/mac-runner/setup.sh --as-root <file> --machine mbp
+--count 4` there, and the file deleted.
+
+## On a laptop
+
+The MacBook Pro takes jobs only on power (Thorsten, 2026-11-25). `power-switch.sh` checks every
+30 seconds:
+
+- **On power**, and Xcode ready: it starts every runner. `caffeinate -s` keeps the Mac awake
+  while it is plugged in; the display may sleep. A closed lid without an external display still
+  sleeps, and the runners then show offline.
+- **On battery**: it stops every runner once no job has run for two checks in a row. It never
+  stops one in the middle of a run: a run's test shards queue on the Mac's label after its build
+  and would wait there for a day. So the laptop finishes a run it started, then stops.
+- **Hold**: while `/Users/Shared/ci-runner-hold` exists, it acts as on battery. Any user may
+  create the file, for example before a game test on the same Mac (trebuchet-testlab), and
+  delete it afterwards. `pgrep -f Runner.Worker` printing nothing means no job runs.
+
+pick-runner.sh then sees the MacBook Pro offline and sends the next run to the Mac Studio. The
+power switch also stops and starts a runner a user installed with the runner's own `svc.sh`
+(LaunchAgents `actions.runner.*`). Log: `/var/log/ci-runner-power.log`.
+
 ## Xcode
 
 The workflow wants Xcode `XCODE_MAJOR` (27). GitHub's image picks its newest 27.x, betas
 included; the Mac uses `/Applications/Xcode.app`. "Check Xcode and the iOS runtime" fails the
 job when the Mac has another major version, or no simulator runtime for its SDK.
 
-- **Xcode itself** updates through the App Store with automatic updates on, signed in with
-  Thorsten's Apple ID. That sign-in is the one thing only he can do. A new major Xcode (28) means
-  changing `XCODE_MAJOR` in the same pull request that moves the hosted image.
+- **Xcode itself**, on the Mac Studio, updates through the App Store with automatic updates on,
+  signed in with Thorsten's Apple ID. That sign-in is the one thing only he can do. A new major
+  Xcode (28) means changing `XCODE_MAJOR` in the same pull request that moves the hosted image.
+- **The MacBook Pro gets a copy** of the Mac Studio's Xcode and iOS runtime:
+  `scripts/mac-runner/copy-xcode.sh mbp`, run on the Mac Studio. There the App Store asks for
+  his password on every install, and `xcodebuild -downloadPlatform iOS` fails as root. The
+  script needs passwordless sudo on the MacBook Pro while it runs. Run it after the Mac Studio's
+  Xcode updates; a MacBook Pro with an older 27.x keeps working, one with another major fails
+  its jobs at "Xcode".
 - **Everything after an update** is `de.iphoneblog.ci-runner.xcode`. It starts when Xcode's
   `version.plist` changes, at boot and daily at 05:10. It accepts the licence, runs the
   first-launch install, and downloads the iOS simulator runtime that matches the new SDK
@@ -172,6 +210,8 @@ job when the Mac has another major version, or no simulator runtime for its SDK.
   `gh variable delete MAC_RUNNER …` brings the Mac back.
 - **Restart a runner:** `sudo launchctl kickstart -k system/de.iphoneblog.ci-runner` (`-2` … `-4`
   for the others)
+- **Keep jobs off the MacBook Pro for a while:** `touch /Users/Shared/ci-runner-hold` there,
+  `rm` it to take jobs again (On a laptop, above).
 - **Ports:** each instance's own (Test shards, above); `TEST_HOMESERVER_PORT` and
   `FIXTURE_PORT` default to 8008 and 8793 everywhere else.
 - **Swift package cache:** one per kind of runner (`spm-self-hosted-…`, `spm-github-hosted-…`),
@@ -207,10 +247,11 @@ It creates the iPhone 17 Pro when the machine has none (`DEVICE_TYPE` picks anot
 ## Removal
 
 ```bash
-scripts/mac-runner/remove.sh
+scripts/mac-runner/remove.sh                    # the Mac Studio
+scripts/mac-runner/remove.sh --machine mbp      # the MacBook Pro
 ```
 
-unregisters the four runners, stops and deletes the LaunchDaemons and the network wall, and ends
+unregisters that Mac's runners, stops and deletes the LaunchDaemons and the network wall, and ends
 whatever still runs as `ci`. CI carries on at once on GitHub's runner. `--delete-user` deletes
 the user `ci` and its home as well. The home folders stay closed; the script prints the modes
 they had. Developer mode (`DevToolsSecurity`) stays on.

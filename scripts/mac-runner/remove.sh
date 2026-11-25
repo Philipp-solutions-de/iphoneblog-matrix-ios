@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Remove the self-hosted runner from the Mac Studio in one step (docs/mac-runner.md, "Removal").
+# Remove the self-hosted runner from this Mac in one step (docs/mac-runner.md, "Removal").
 #
 #   scripts/mac-runner/remove.sh                 unregister, stop and remove the services
 #   scripts/mac-runner/remove.sh --delete-user   the same, then delete the user `ci` and its home
+#   --machine mbp                                the label setup.sh used (default mac-studio)
 #
 # Run it as the Mac's admin user, not with sudo. It unregisters the runner with your `gh` login
 # and asks for your password once. CI goes on: build.yml sends every job to GitHub's runner as
@@ -13,17 +14,19 @@ set -euo pipefail
 
 repo="Philipp-solutions-de/iphoneblog-matrix-ios"
 user="ci"
-runner_prefix="mac-studio"   # mac-studio, mac-studio-2 … (setup.sh)
+machine="mac-studio"   # the instances <machine>, <machine>-2 … (setup.sh)
 support="/Library/Application Support/ci-runner"
 
 if [[ "${1:-}" != "--as-root" ]]; then
     [[ "$(id -u)" != 0 ]] || { echo "Run this as yourself, not with sudo." >&2; exit 1; }
     delete_user="no"
-    case "${1:-}" in
-    --delete-user) delete_user="yes" ;;
-    "") ;;
-    *) echo "usage: $0 [--delete-user]" >&2; exit 2 ;;
-    esac
+    while (( $# )); do
+        case "$1" in
+        --delete-user) delete_user="yes"; shift ;;
+        --machine) machine="$2"; shift 2 ;;
+        *) echo "usage: $0 [--machine <label>] [--delete-user]" >&2; exit 2 ;;
+        esac
+    done
     token_file="$(mktemp)"
     chmod 600 "$token_file"
     trap 'rm -f "$token_file"' EXIT
@@ -31,7 +34,7 @@ if [[ "${1:-}" != "--as-root" ]]; then
     echo "Now sudo asks for your Mac password."
     sudo "$0" --as-root "$token_file" "$delete_user"
     # A runner may already be gone from the Mac but still listed on GitHub (offline).
-    for id_ in $(gh api "repos/$repo/actions/runners" --jq ".runners[] | select(.name | startswith(\"$runner_prefix\")) | .id" || true); do
+    for id_ in $(gh api "repos/$repo/actions/runners" --jq ".runners[] | select(.name == \"$machine\" or (.name | test(\"^$machine-[0-9]+$\"))) | .id" || true); do
         gh api -X DELETE "repos/$repo/actions/runners/$id_" && echo "deleted runner $id_ on GitHub"
     done
     echo "Runner removed. GitHub lists: $(gh api "repos/$repo/actions/runners" --jq '[.runners[].name] | join(", ")')"
@@ -64,7 +67,7 @@ if [[ -f "$support/home-modes" ]]; then
     sed 's/^/  /' "$support/home-modes"
 fi
 rm -rf "$support"
-rm -f /var/log/ci-runner-pf.log /var/log/ci-runner-xcode.log
+rm -f /var/log/ci-runner-pf.log /var/log/ci-runner-xcode.log /var/log/ci-runner-power.log
 
 if [[ "$delete_user" == "yes" ]] && dscl . -read "/Users/$user" UniqueID >/dev/null 2>&1; then
     dseditgroup -o edit -d "$user" -t user _developer 2>/dev/null || true

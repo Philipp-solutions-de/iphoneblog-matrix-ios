@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shut down this runner instance's simulator at the end of a job on the Mac Studio, so no
+# Shut down this runner instance's simulator at the end of a job on a self-hosted Mac, so no
 # simulator idles between jobs (docs/mac-runner.md, "Priority"). Only its own: four shards run
 # side by side under the same user, each with the device its .env names (DEVICE_NAME).
 set -euo pipefail
