@@ -172,9 +172,10 @@ The MacBook Pro takes jobs only on power (Thorsten, 2026-11-25). `power-switch.s
 - **On power**, and Xcode ready: it starts every runner. `caffeinate -s` keeps the Mac awake
   while it is plugged in; the display may sleep. A closed lid without an external display still
   sleeps, and the runners then show offline.
-- **On battery**: it stops every runner once no job has run for two checks in a row. It never
-  stops one in the middle of a run: a run's test shards queue on the Mac's label after its build
-  and would wait there for a day. So the laptop finishes a run it started, then stops.
+- **On battery**: it stops each instance without a job at once, so none takes a new one, and
+  lets the instances with a job finish it. Jobs already queued on the Mac's label (a run's test
+  shards after its build) go to those, one after the other, instead of waiting there for a day.
+  Once no job has run for two checks in a row, the last instances stop too.
 - **Hold**: while `/Users/Shared/ci-runner-hold` exists, it acts as on battery. Any user may
   create the file, for example before a game test on the same Mac (trebuchet-testlab), and
   delete it afterwards. `pgrep -f Runner.Worker` printing nothing means no job runs.

@@ -4,10 +4,10 @@
 # a battery; installed by setup.sh.
 #
 # On power: starts every runner, once Xcode is ready (xcode-upkeep.sh leaves the file
-# xcode-ready). On battery: stops them, but never in the middle of a run. A run sent here
-# queues its test shards on this Mac's label after its build; a runner stopped between the
-# two would strand them for 24 hours. So it waits until no job has run for two checks in a
-# row (a minute), and the laptop finishes the run it started on battery.
+# xcode-ready). On battery: stops each instance that has no job at once, so it takes no new
+# one, and lets the instances with a job finish it. Jobs already queued on this Mac's label
+# (a run's test shards after its build) then go to those, one after the other, and are never
+# stranded. Once no job has run for two checks in a row (a minute), the last ones stop too.
 #
 # Every GitHub runner on this Mac counts: the walled-off instances of user ci (LaunchDaemons
 # de.iphoneblog.ci-runner, -2 …) and a runner a user installed with the runner's own svc.sh
@@ -39,6 +39,10 @@ services() { daemons; agents; }
 hold=/Users/Shared/ci-runner-hold
 on_power() { [ ! -e "$hold" ] && pmset -g ps | head -1 | grep -q "'AC Power'"; }
 job_running() { pgrep -f 'Runner\.Worker' >/dev/null 2>&1; }
+has_job() { # plist → true while that runner's own Runner.Worker runs
+    wd="$(plutil -extract WorkingDirectory raw -o - "$1" 2>/dev/null)" || return 1
+    pgrep -f "$wd/bin/Runner\.Worker" >/dev/null 2>&1
+}
 
 if on_power; then
     rm -f "$dir/idle-on-battery"
@@ -53,19 +57,26 @@ if on_power; then
 fi
 
 # On battery.
+why="on battery"; [ -e "$hold" ] && why="on hold"
 running="$(services | while read -r target plist; do
-    launchctl print "$target" >/dev/null 2>&1 && echo "$target"; done)"
+    launchctl print "$target" >/dev/null 2>&1 && echo "$target $plist"; done)"
 [ -n "$running" ] || exit 0
 if job_running; then
     rm -f "$dir/idle-on-battery"
-    log "on battery, a job runs: the runners stay until the run is done"
+    echo "$running" | while read -r target plist; do
+        if has_job "$plist"; then
+            log "$why: $target finishes its job"
+        else
+            launchctl bootout "$target" && log "$why: $target stopped (no job)"
+        fi
+    done
     exit 0
 fi
 if [ ! -f "$dir/idle-on-battery" ]; then
     touch "$dir/idle-on-battery"
     exit 0
 fi
-for target in $running; do
-    launchctl bootout "$target" && log "on battery: $target stopped"
+echo "$running" | while read -r target plist; do
+    launchctl bootout "$target" && log "$why: $target stopped"
 done
 rm -f "$dir/idle-on-battery"
