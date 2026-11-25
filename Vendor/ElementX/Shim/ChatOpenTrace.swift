@@ -26,17 +26,18 @@ public enum ChatOpenTrace {
         log.notice("open \(what, privacy: .public): begin")
     }
 
-    /// Called once, the first time a timeline shows at least `firstItems` items: the app's
-    /// measure of "launch to the first messages" (StartTrace, testOneChatAfterLaunch).
+    /// Called once, the first time a timeline shows a message: the app's measure of "launch to
+    /// the first message" (StartTrace, testOneChatAfterLaunch). The timeline shows what it has at
+    /// once and fills the rest in the background; five items was a stricter bar the app never
+    /// waited for (2026-11-21).
     nonisolated(unsafe) public static var onFirstMessages: (() -> Void)?
     nonisolated(unsafe) private static var firstReported = false
-    private static let firstItems = 5
 
-    /// A timeline was built with this many items.
-    public static func items(_ count: Int) {
-        mark("items \(count)")
+    /// A timeline was built with this many items, `messages` of them messages.
+    public static func items(_ count: Int, messages: Int) {
+        mark("items \(count), messages \(messages)")
         let first = lock.withLock { () -> Bool in
-            guard count >= firstItems, !firstReported else { return false }
+            guard messages > 0, !firstReported else { return false }
             firstReported = true
             return true
         }

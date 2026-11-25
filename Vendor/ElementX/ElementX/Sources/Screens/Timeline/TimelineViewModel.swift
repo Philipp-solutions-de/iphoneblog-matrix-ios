@@ -918,7 +918,7 @@ class TimelineViewModel: TimelineViewModelType, TimelineViewModelProtocol {
     // MARK: - Timeline Item Building
     
     private func buildTimelineViews(timelineItems: [RoomTimelineItemProtocol], isSwitchingTimelines: Bool = false) {
-        defer { ChatOpenTrace.items(timelineItems.count) } // iphoneblog: room-open timing
+        defer { ChatOpenTrace.items(timelineItems.count, messages: timelineItems.filter { $0 is EventBasedMessageTimelineItemProtocol }.count) } // iphoneblog: room-open timing
         var timelineItemsDictionary = OrderedDictionary<TimelineItemIdentifier.UniqueID, RoomTimelineItemViewState>()
         
         timelineItems.filter { $0 is RedactedRoomTimelineItem }.forEach { timelineItem in
