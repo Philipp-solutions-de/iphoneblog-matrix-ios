@@ -31,6 +31,13 @@ start_runner() {
 # The App Store writes the new Xcode in place; wait until the bundle stops changing.
 sleep 60
 
+# The system's developer directory is Xcode, not the Command Line Tools: a step that loses the
+# runner's DEVELOPER_DIR otherwise finds no simctl ("xcrun: error: unable to find utility
+# simctl", the MacBook Pro, 2026-11-25).
+if [ "$(xcode-select -p 2>/dev/null)" != "$DEVELOPER_DIR" ]; then
+    xcode-select -s "$DEVELOPER_DIR"; log "xcode-select now points to Xcode"
+fi
+
 if ! xcodebuild -license check >/dev/null 2>&1; then
     stop_runner; xcodebuild -license accept; log "licence accepted"
 fi
