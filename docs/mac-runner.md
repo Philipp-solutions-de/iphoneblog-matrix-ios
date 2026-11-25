@@ -234,8 +234,9 @@ job when the Mac has another major version, or no simulator runtime for its SDK.
   `rm` it to take jobs again (On a laptop, above).
 - **Ports:** each instance's own (Test shards, above); `TEST_HOMESERVER_PORT` and
   `FIXTURE_PORT` default to 8008 and 8793 everywhere else.
-- **Swift package cache:** one per kind of runner (`spm-self-hosted-…`, `spm-github-hosted-…`),
-  because the packages record absolute paths and the workspaces differ.
+- **Swift package cache:** one per workspace folder (`spm-github-hosted-github-…` on GitHub,
+  `spm-self-hosted-<runner name>-…` on the Macs), because the packages record absolute paths
+  and every runner instance has its own folder.
 - **Disk:** a job needs about 40 GB free (iOS runtime, derived data, Swift packages,
   simulators). The checkout wipes `build/` at the start of every job.
 
