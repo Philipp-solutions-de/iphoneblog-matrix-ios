@@ -121,11 +121,18 @@ final class OneHubUITests: XCTestCase {
     }
 
     /// Saves the screen and counts teal above the tab bar: hue 165–195°, clearly coloured.
+    /// Pictures in messages are left out: their colours are the sender's, not the app's, and
+    /// the room holds what earlier tests sent (a GIF with a cyan frame; 2026-11-25, shard 4).
     private func check(_ app: XCUIApplication, _ name: String) {
+        let pictures = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'timeline-image.'"))
+            .allElementsBoundByIndex.map(\.frame)
         let shot = app.screenshot()
         save(app, name)
         guard let image = shot.image.cgImage else { return }
         let width = image.width, height = image.height
+        let scale = CGFloat(width) / app.frame.width
+        let masked = pictures.map { CGRect(x: $0.minX * scale, y: $0.minY * scale, width: $0.width * scale, height: $0.height * scale) }
         var pixels = [UInt8](repeating: 0, count: width * height * 4)
         guard let context = CGContext(data: &pixels, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
                                       space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return }
@@ -135,6 +142,7 @@ final class OneHubUITests: XCTestCase {
         var teal = 0
         for y in stride(from: 0, to: bottom, by: 2) {
             for x in stride(from: 0, to: width, by: 2) {
+                if masked.contains(where: { $0.contains(CGPoint(x: x, y: y)) }) { continue }
                 let i = (y * width + x) * 4
                 let r = Double(pixels[i]) / 255, g = Double(pixels[i + 1]) / 255, b = Double(pixels[i + 2]) / 255
                 let maxC = max(r, g, b), minC = min(r, g, b), delta = maxC - minC
