@@ -111,6 +111,10 @@ else
     echo "exists"
 fi
 uid="$(id -u "$user")"
+# A laptop starts its runners only through the power switch (on power, no hold, Xcode ready),
+# also right after this script changed them (docs/mac-runner.md, "On a laptop").
+start_runner=start
+if pmset -g batt | grep -q InternalBattery; then start_runner=nostart; fi
 gid="$(id -g "$user")"
 if dseditgroup -o checkmember -m "$user" admin >/dev/null 2>&1; then
     echo "$user is an admin; refusing. Remove it from the admin group first." >&2
@@ -151,7 +155,7 @@ install -m 755 -o root -g wheel "$here/pf-apply.sh" "$support/pf-apply.sh"
 sed "s/@UID@/$uid/g" "$here/ci-runner.pf" > "$support/ci-runner.pf"
 chown root:wheel "$support/ci-runner.pf"
 chmod 644 "$support/ci-runner.pf"
-install_daemon() { # label, plist body
+install_daemon() { # label, plist body[, nostart]: nostart leaves starting it to the power switch
     local plist="/Library/LaunchDaemons/$1.plist"
     local tmp; tmp="$(mktemp)"
     printf '%s\n' "$2" > "$tmp"
@@ -162,10 +166,14 @@ install_daemon() { # label, plist body
         # "5: Input/output error" (2026-11-21, the runner after its priority change).
         for _ in $(seq 1 30); do launchctl print "system/$1" >/dev/null 2>&1 || break; sleep 1; done
         install -m 644 -o root -g wheel "$tmp" "$plist"
-        launchctl bootstrap system "$plist" || { sleep 5; launchctl bootstrap system "$plist"; }
-        echo "$1 (re)loaded"
+        if [[ "${3:-}" == nostart ]]; then
+            echo "$1 written; the power switch starts it"
+        else
+            launchctl bootstrap system "$plist" || { sleep 5; launchctl bootstrap system "$plist"; }
+            echo "$1 (re)loaded"
+        fi
     else
-        launchctl print "system/$1" >/dev/null 2>&1 || launchctl bootstrap system "$plist"
+        [[ "${3:-}" == nostart ]] || launchctl print "system/$1" >/dev/null 2>&1 || launchctl bootstrap system "$plist"
         echo "$1 unchanged"
     fi
     rm -f "$tmp"
@@ -261,7 +269,7 @@ for slot in $(seq 1 "$runner_count"); do
   <key>LowPriorityBackgroundIO</key><true/>
   <key>StandardOutPath</key><string>/Users/$user/Library/Logs/$label.log</string>
   <key>StandardErrorPath</key><string>/Users/$user/Library/Logs/$label.log</string>
-</dict></plist>"
+</dict></plist>" "$start_runner"
 done
 rm -f "$tarball"
 
