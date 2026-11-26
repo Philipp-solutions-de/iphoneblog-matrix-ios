@@ -30,12 +30,13 @@ while IFS= read -r id; do
         || { echo "could not export $id"; continue; }
     mkdir -p "$dir"
     python3 -I - "$raw" "$dir" <<'PY'
-import json, os, shutil, sys
+import json, os, re, shutil, sys
 raw, dest = sys.argv[1], sys.argv[2]
 for test in json.load(open(os.path.join(raw, "manifest.json"))):
     for a in test.get("attachments", []):
         name = a.get("suggestedHumanReadableName") or a["exportedFileName"]
-        name = f'try{a.get("repetitionNumber", 1)}-{name}'.replace("/", "_")
+        # upload-artifact refuses " : < > | * ? \\ / and line breaks in a path.
+        name = re.sub(r'[^A-Za-z0-9 ._()`-]', "_", f'try{a.get("repetitionNumber", 1)}-{name}')
         shutil.copy(os.path.join(raw, a["exportedFileName"]), os.path.join(dest, name))
 PY
     rm -rf "$raw"

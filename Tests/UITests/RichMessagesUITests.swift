@@ -62,16 +62,7 @@ final class RichMessagesUITests: XCTestCase {
         // Each suite added there pushes it further up (25 swipes; 10 stopped short on CI once
         // the hub's and the long-press tests had written), and a swipe can carry past the row
         // while the list still moves, so the search also comes back down.
-        if !fileRow(app).waitForExistence(timeout: 30) {
-            for _ in 0..<25 where !onScreen(fileRow(app), app) {
-                app.swipeDown(velocity: .slow)
-                _ = fileRow(app).waitForExistence(timeout: 2)
-            }
-            for _ in 0..<25 where !onScreen(fileRow(app), app) {
-                app.swipeUp(velocity: .slow)
-                _ = fileRow(app).waitForExistence(timeout: 2)
-            }
-        }
+        findFileRow(app)
         XCTAssertTrue(fileRow(app).waitForExistence(timeout: 30), "file not shown")
         sleep(4) // pictures and the link preview load
         attach(app, "channel-media")
@@ -86,7 +77,10 @@ final class RichMessagesUITests: XCTestCase {
         guard let root = env["IPHONEBLOG_TEST_ARTICLE_ROOT"], !root.isEmpty else { throw XCTSkip("no article thread") }
         let app = try launch(["IPHONEBLOG_START_DISCUSSION": root])
         XCTAssertTrue(app.buttons["room-send_button"].waitForExistence(timeout: 120), "discussion did not open")
-        XCTAssertTrue(fileRow(app).waitForExistence(timeout: 90), "file not shown")
+        // Other tests reply in this Diskussion too, so the seeded set may sit above the screen,
+        // and under load the thread may show only its newest reply until it is scrolled.
+        findFileRow(app)
+        XCTAssertTrue(fileRow(app).waitForExistence(timeout: 30), "file not shown")
         sleep(4)
         attach(app, "discussion-media")
         scrollTimeline(app, toFind: "Lies das")
@@ -412,6 +406,20 @@ final class RichMessagesUITests: XCTestCase {
         guard element.exists else { return false }
         let frame = element.frame
         return !frame.isEmpty && app.windows.firstMatch.frame.contains(CGPoint(x: frame.midX, y: frame.midY))
+    }
+
+    /// Waits for the PDF's row, and if it does not come, scrolls up towards older messages and
+    /// back down, since a swipe can carry past the row while the list still moves.
+    private func findFileRow(_ app: XCUIApplication) {
+        guard !fileRow(app).waitForExistence(timeout: 30) else { return }
+        for _ in 0..<25 where !onScreen(fileRow(app), app) {
+            app.swipeDown(velocity: .slow)
+            _ = fileRow(app).waitForExistence(timeout: 2)
+        }
+        for _ in 0..<25 where !onScreen(fileRow(app), app) {
+            app.swipeUp(velocity: .slow)
+            _ = fileRow(app).waitForExistence(timeout: 2)
+        }
     }
 
     private func fileRow(_ app: XCUIApplication) -> XCUIElement {
