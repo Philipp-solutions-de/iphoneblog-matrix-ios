@@ -128,8 +128,10 @@ final class OneHubUITests: XCTestCase {
         save(app, name)
         // Asked after the shot, and 4 pt wider: the timeline may still move a little, and a
         // picture scrolled under the room bar left its last two pixel rows (2026-11-26).
+        // Pictures carry LoadableImage's test marker; a video's poster hides it under its
+        // label "Video" (Element X's VideoRoomTimelineView), a sticker is "Sticker, …".
         let pictures = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH 'timeline-image.'"))
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'timeline-image.' OR label IN {'Bild', 'Video'} OR label BEGINSWITH 'Sticker, '"))
             .allElementsBoundByIndex.map { $0.frame.insetBy(dx: -4, dy: -4) }
         guard let image = shot.image.cgImage else { return }
         let width = image.width, height = image.height
