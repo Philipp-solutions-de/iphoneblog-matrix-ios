@@ -62,8 +62,10 @@ run() {
 # The app's own settings live in its data container (no simctl command reaches them).
 clear_app_settings() {
     local data
-    data="$(xcrun simctl get_app_container "$device" de.iphoneblog.matrix.preview data 2>/dev/null)" || return 0
-    rm -f "${data:?}/Library/Preferences/de.iphoneblog.matrix.preview.plist"
+    local id
+    id="$(sed -n 's/^BUNDLE_ID="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "$here/brand.env")"
+    data="$(xcrun simctl get_app_container "$device" "$id" data 2>/dev/null)" || return 0
+    rm -f "${data:?}/Library/Preferences/$id.plist"
 }
 
 # A picture in the simulator's photo library, imported until the library shows it. addmedia

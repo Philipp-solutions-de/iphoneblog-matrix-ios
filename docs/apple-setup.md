@@ -1,18 +1,18 @@
 # Apple setup for both chat apps: what Thorsten clicks
 
-Until Alex's company account exists, both iphoneblog chat apps ship to TestFlight under
-Thorsten's personal developer team. This page is every step a person has to do at Apple, for
+Both iphoneblog chat apps ship under Thorsten's developer team W9N692KH39: the Matrix app to
+TestFlight and the App Store (Thorsten, 2026-11-21), the Zulip app to TestFlight. This page is every step a person has to do at Apple, for
 **both apps at once**, in order. Everything else (identifiers, capabilities, certificates,
 profiles, builds, uploads) runs in GitHub Actions with one App Store Connect API key.
 
 | | Matrix app | Zulip app |
 |---|---|---|
 | Repository | `Philipp-solutions-de/iphoneblog-matrix-ios` | `Philipp-solutions-de/iphoneblog-zulip-ios` |
-| Bundle id | `de.iphoneblog.matrix.preview` | `de.iphoneblog.zulip.preview` |
-| Extension | `de.iphoneblog.matrix.preview.nse` | `de.iphoneblog.zulip.preview.NotificationService` |
-| App group | `group.de.iphoneblog.matrix.preview` | `group.de.iphoneblog.zulip.preview` |
-| App record name | `iphoneblog Chat Preview` | `iphoneblog Z Preview` |
-| SKU | `iphoneblog-matrix-preview` | `iphoneblog-zulip-preview` |
+| Bundle id | `de.iphoneblog.app` | `de.iphoneblog.zulip.preview` |
+| Extension | `de.iphoneblog.app.nse` | `de.iphoneblog.zulip.preview.NotificationService` |
+| App group | `group.de.iphoneblog.app` | `group.de.iphoneblog.zulip.preview` |
+| App record name | `iPhoneBlog` | `iphoneblog Z Preview` |
+| SKU | `iphoneblog-app` | `iphoneblog-zulip-preview` |
 | Identifier workflow | `apple-setup.yml` | `apple-setup.yml` |
 
 Checked against Apple's and fastlane's documentation on 2026-11-14; links at each step.
@@ -87,7 +87,7 @@ Then move the `.p8` into your password manager and delete it from Downloads.
 
 developer.apple.com/account > **Certificates, Identifiers & Profiles** > **Identifiers** > **+**
 > **App Groups** > Continue > description and identifier > Continue > **Register**. Twice:
-`group.de.iphoneblog.matrix.preview` and `group.de.iphoneblog.zulip.preview`.
+`group.de.iphoneblog.app` and `group.de.iphoneblog.zulip.preview`.
 [Source](https://developer.apple.com/help/account/identifiers/register-an-app-group). The App
 Store Connect API has no resource for app groups.
 
@@ -125,7 +125,7 @@ after step 6), SKU, User Access **Full Access** > **Create**.
 
 There is no API for this (`POST /v1/apps` does not exist), and fastlane's `produce` needs an
 Apple ID login, which we do not use. Names are 2 to 30 characters; bundle ID and SKU cannot
-change later. If a name is taken, use `iphoneblog Matrix Preview` or `iphoneblog Zulip Preview`
+change later. If a name is taken, use `iPhoneBlog.de` or `iphoneblog Zulip Preview`
 and tell the agent, which updates the repository's config.
 
 ## 8. One push key for both servers
@@ -195,9 +195,12 @@ Compliance" ([source](https://developer.apple.com/help/app-store-connect/test-a-
   message. Request it later if needed ([form](https://developer.apple.com/contact/request/notification-service)).
 - **Certificates and profiles**: Xcode creates them on the build machine with the Admin key.
 
-## When Alex's company account exists
+## The release id replaces the preview
 
-Repeat steps 1 to 10 in his account with the final ids (`de.iphoneblog.matrix`,
-`de.iphoneblog.zulip`), his Team ID, his API key in both `apple` environments and his push key
-under the same six sops names. An app that was never released cannot move between accounts,
-so testers install the new apps once and the preview apps leave TestFlight.
+TestFlight holds the Matrix app as `de.iphoneblog.matrix.preview` until `de.iphoneblog.app`,
+the id it is released under, is set up in the same team. A bundle id cannot be
+renamed, so this is a new app: run `apple-setup.yml` once on `main` (steps 6 and 7 register the
+new ids and app group), create the app record `iPhoneBlog` (step 7), and testers install the new
+app once; the preview app leaves TestFlight. The push key and the team stay. The server side
+names the id twice (infra): Sygnal's app id `de.iphoneblog.app.ios.prod` and the
+`webcredentials` entry `W9N692KH39.de.iphoneblog.app`.
