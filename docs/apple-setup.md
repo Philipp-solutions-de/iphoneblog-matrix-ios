@@ -10,6 +10,7 @@ profiles, builds, uploads) runs in GitHub Actions with one App Store Connect API
 | Repository | `Philipp-solutions-de/iphoneblog-matrix-ios` | `Philipp-solutions-de/iphoneblog-zulip-ios` |
 | Bundle id | `de.iphoneblog.matrix.preview` | `de.iphoneblog.zulip.preview` |
 | Extension | `de.iphoneblog.matrix.preview.nse` | `de.iphoneblog.zulip.preview.NotificationService` |
+| Share extension | `de.iphoneblog.matrix.preview.share` | none |
 | App group | `group.de.iphoneblog.matrix.preview` | `group.de.iphoneblog.zulip.preview` |
 | App record name | `iphoneblog Chat Preview` | `iphoneblog Z Preview` |
 | SKU | `iphoneblog-matrix-preview` | `iphoneblog-zulip-preview` |
@@ -112,7 +113,7 @@ the infra repository's `inventory/host_vars/moon.yml` and run `playbooks/door.ym
 Running them again changes nothing. Check both went green on the repositories' Actions pages.
 
 The API only switches the App Groups capability on; it does not pick the group. For each of
-the four ids in the table: **Identifiers** > the id > App Groups **Configure** > tick its app's
+the five ids in the table (app, extensions): **Identifiers** > the id > App Groups **Configure** > tick its app's
 group > Continue > **Save**. **Unverified:** whether automatic signing on the build machine
 does this by itself; by hand it takes a minute and removes the doubt.
 

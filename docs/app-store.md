@@ -18,13 +18,14 @@ are. Apple's texts quoted here were read on 2026-11-16.
 
 ## Privacy manifests
 
-Three files, one per bundle that runs code: `App/Resources/PrivacyInfo.xcprivacy`,
-`NotificationExtension/PrivacyInfo.xcprivacy` and `Vendor/ElementX/Shim/PrivacyInfo.xcprivacy`
-(ChatKit). xcodegen adds each to its target's resources by itself.
+Four files, one per bundle that runs code: `App/Resources/PrivacyInfo.xcprivacy`,
+`NotificationExtension/PrivacyInfo.xcprivacy`, `ShareExtension/PrivacyInfo.xcprivacy` and
+`Vendor/ElementX/Shim/PrivacyInfo.xcprivacy` (ChatKit). xcodegen adds each to its target's resources by itself.
 
 - **Required reasons**: UserDefaults `CA92.1` (the app's own settings: emoji, read threads, the
-  article rule) in the app and ChatKit; file timestamps `C617.1` (files in the app's container
-  and app group: the SDK's store, log rotation in `Tracing.swift`) in all three. Nothing reads
+  article rule) in the app and ChatKit, `1C8F.1` (the #one rooms the app keeps in the app
+  group for the share sheet) in the app and the share extension; file timestamps `C617.1` (files in the app's container
+  and app group: the SDK's store, log rotation in `Tracing.swift`) in all four. Nothing reads
   disk space, boot time or the keyboard list. Check again when a package is added or the SDK
   bumped: `grep -rE "UserDefaults|modificationDate|creationDate|systemUptime|volumeAvailableCapacity"`.
 - **Tracking**: none, no tracking domains. Element X's PostHog and Sentry are cut
