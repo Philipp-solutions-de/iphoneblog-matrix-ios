@@ -268,8 +268,13 @@ final class DiscussionUITests: XCTestCase {
         attach(app, "old-thread-first-open")
 
         let count = app.staticTexts.matching(NSPredicate(format: "label MATCHES '[0-9]+ Antworten|1 Antwort'")).firstMatch
+        // The root sits above the reply; on a slow runner the count comes a little later
+        // (main failed twice at a 10 s wait, 2026-11-27).
         for _ in 0..<8 where !count.isHittable { app.swipeDown(velocity: .fast) }
-        XCTAssertTrue(count.waitForExistence(timeout: 10), "no reply count under the root")
+        if !count.waitForExistence(timeout: 20) {
+            for _ in 0..<4 { app.swipeDown(velocity: .fast) }
+        }
+        XCTAssertTrue(count.waitForExistence(timeout: 20), "no reply count under the root")
         XCTAssertEqual(count.label, "1 Antwort")
         try other.send("Neue Antwort \(stamp)", in: room, thread: root)
         let grown = NSPredicate { _, _ in count.label == "2 Antworten" }

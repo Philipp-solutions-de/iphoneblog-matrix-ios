@@ -62,9 +62,10 @@ struct TestServer {
     }
 
     /// Uploads an endless animated GIF of eight coloured frames, 0.1 s each, and returns its mxc
-    /// URL. Two screenshots 0.4 s apart always show different frames.
+    /// URL. Two screenshots 0.4 s apart always show different frames. No cyan: the GIF stays in
+    /// #one-Chat, and OneHubUITests counts teal there (a cyan frame failed it on main, 2026-11-27).
     func uploadGIF(width: Int = 240, height: Int = 160) throws -> String {
-        let colors: [UIColor] = [.red, .orange, .yellow, .green, .cyan, .blue, .purple, .magenta]
+        let colors: [UIColor] = [.red, .orange, .yellow, .green, .darkGray, .blue, .purple, .magenta]
         let data = NSMutableData()
         let destination = try XCTUnwrap(CGImageDestinationCreateWithData(data, UTType.gif.identifier as CFString, colors.count, nil))
         CGImageDestinationSetProperties(destination, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)

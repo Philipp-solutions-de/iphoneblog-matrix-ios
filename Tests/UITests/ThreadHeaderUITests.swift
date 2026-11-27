@@ -43,7 +43,8 @@ final class ThreadHeaderUITests: XCTestCase {
             let first = try other.send("Kante eins \(stamp)", in: room)
             _ = try other.sendContent(["msgtype": "m.text", "body": "Kante Antwort \(stamp)",
                                        "m.relates_to": ["m.in_reply_to": ["event_id": first]]], in: room)
-            let mxc = try other.uploadPNG(colored: .systemTeal, width: 160, height: 90)
+            // Not teal: the picture stays in #one-Chat, where OneHubUITests counts teal.
+            let mxc = try other.uploadPNG(colored: .systemIndigo, width: 160, height: 90)
             _ = try other.sendContent(["msgtype": "m.image", "body": "Kante Bild \(stamp)", "filename": "bild.png", "url": mxc,
                                        "info": ["w": 160, "h": 90, "mimetype": "image/png"]], in: room)
             _ = try other.send("Kante zwei \(stamp)", in: room)
