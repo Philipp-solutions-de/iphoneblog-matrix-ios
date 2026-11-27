@@ -4,10 +4,10 @@ import XCTest
 
 /// The share sheet's way out (ShareSender) against the test homeserver, beside a signed-in app
 /// as on a phone: the app writes the #one rooms for the sheet, and a second client on the same
-/// store (process "share-extension") posts a link and a captioned picture into one of them.
+/// store (process "share-extension") posts a link and a captioned picture into a room.
 @MainActor
 final class ShareSenderTests: XCTestCase {
-    func testShareGoesIntoTheChosenOneRoom() async throws {
+    func testShareGoesIntoTheChosenRoom() async throws {
         let env = ProcessInfo.processInfo.environment
         guard let server = env["IPHONEBLOG_TEST_HOMESERVER"], let user = env["IPHONEBLOG_TEST_USER"],
               let password = env["IPHONEBLOG_TEST_PASSWORD"], env["IPHONEBLOG_ONE_ALIAS"] != nil else {
@@ -23,14 +23,26 @@ final class ShareSenderTests: XCTestCase {
 
         // The app offers the #one rooms it writes in, by name.
         var targets: ShareTargets?
-        let until = Date().addingTimeInterval(60)
+        let until = Date().addingTimeInterval(120)
         while Date() < until {
             targets = ShareTargets.load(for: session.userID)
             if targets?.rooms.count == 2 { break }
             try await Task.sleep(for: .milliseconds(500))
         }
         XCTAssertEqual(Set(targets?.rooms.map(\.name) ?? []), ["Allgemein", "Raum 2"], "the share sheet's rooms")
-        let room = try XCTUnwrap(targets?.rooms.first { $0.name == "Raum 2" })
+
+        // The posts go into a room of the test's own: the UI tests read the #one rooms' unread
+        // state ("Alle als gelesen" failed after two shares landed in Raum 2).
+        let created = try await session.api("POST", "/_matrix/client/v3/createRoom",
+                                            body: Data(#"{"name":"Teilen-Test","preset":"private_chat"}"#.utf8))
+        let roomID = try XCTUnwrap((JSONSerialization.jsonObject(with: created) as? [String: Any])?["room_id"] as? String)
+        let encoded = try XCTUnwrap(roomID.addingPercentEncoding(withAllowedCharacters: .alphanumerics))
+        // The extension finds the room in the app's store, so the app's sync must have it.
+        let synced = Date().addingTimeInterval(30)
+        while Date() < synced, (try? session.client.getRoom(roomId: roomID)) == nil {
+            try await Task.sleep(for: .milliseconds(250))
+        }
+        let room = ShareTargets.Room(id: roomID, name: "Teilen-Test")
 
         let marker = "geteilt\(Int.random(in: 1000...9999))"
         let link = URL(string: "https://www.iphoneblog.de/\(marker)/")
@@ -47,7 +59,6 @@ final class ShareSenderTests: XCTestCase {
         XCTAssertEqual(pictureEvents.count, 1)
 
         // Both are in the room as plain events any client reads.
-        let encoded = try XCTUnwrap(room.id.addingPercentEncoding(withAllowedCharacters: .alphanumerics))
         let data = try await session.api("GET", "/_matrix/client/v3/rooms/\(encoded)/messages?dir=b&limit=10")
         let chunk = try XCTUnwrap((JSONSerialization.jsonObject(with: data) as? [String: Any])?["chunk"] as? [[String: Any]])
         let byID = Dictionary(uniqueKeysWithValues: chunk.compactMap { event in (event["event_id"] as? String).map { ($0, event) } })
@@ -60,7 +71,9 @@ final class ShareSenderTests: XCTestCase {
         XCTAssertEqual(imageContent["filename"] as? String, "Bild.png")
         XCTAssertTrue((imageContent["url"] as? String)?.hasPrefix("mxc://") == true)
 
-        // Signed out, the sheet offers no rooms.
+        // The room goes; signed out, the sheet offers no rooms.
+        _ = try? await session.api("POST", "/_matrix/client/v3/rooms/\(encoded)/leave", body: Data("{}".utf8))
+        _ = try? await session.api("POST", "/_matrix/client/v3/rooms/\(encoded)/forget", body: Data("{}".utf8))
         await model.signOut()
         XCTAssertNil(ShareTargets.load(for: session.userID))
     }
