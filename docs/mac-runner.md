@@ -180,13 +180,21 @@ copied to the MacBook Pro, then `sudo scripts/mac-runner/setup.sh --as-root <fil
 
 ## On a laptop
 
-The MacBook Pro takes jobs only on power (Thorsten, 2026-11-25). `power-switch.sh` checks every
-30 seconds:
+The MacBook Pro takes jobs only while its **CPU gate** is open: at home, on power, and Thorsten
+idle for 10 minutes or the screen locked (Thorsten, 2026-11-27). A root daemon on the MBP keeps
+the gate (infra repository, `mac/cpu-gate/`, `docs/runners.md` "The CPU gate"), writes
+`/Users/Shared/cpu-gate/state` and calls `power-switch.sh` within about 2 seconds of a change.
+`power-switch.sh` also checks every 30 seconds by itself:
 
-- **On power**, and Xcode ready: it starts every runner. `caffeinate -s` keeps the Mac awake
+- **Gate closed**: it stops every runner at once, a job in the middle included, then ends every
+  process of `ci` (the job, its simulators, its build service). The run fails or is cancelled;
+  Thorsten accepts that. Jobs queued on the Mac's label wait until the gate opens again, or until
+  GitHub drops them after a day.
+- **On power**, gate open (or no gate, as on the Mac Studio), and Xcode ready: it starts every
+  runner. `caffeinate -s` keeps the Mac awake
   while it is plugged in; the display may sleep. A closed lid without an external display still
   sleeps, and the runners then show offline.
-- **On battery**: it stops each instance without a job at once, so none takes a new one, and
+- **On battery** without a gate: it stops each instance without a job at once, so none takes a new one, and
   lets the instances with a job finish it. Jobs already queued on the Mac's label (a run's test
   shards after its build) go to those, one after the other, instead of waiting there for a day.
   Once no job has run for two checks in a row, the last instances stop too.

@@ -38,6 +38,29 @@ services() { daemons; agents; }
 # finish their run, stop, and start again once the file is gone.
 hold=/Users/Shared/ci-runner-hold
 on_power() { [ ! -e "$hold" ] && pmset -g ps | head -1 | grep -q "'AC Power'"; }
+
+# The CPU gate (infra docs/runners.md, "The CPU gate"; Thorsten, 2026-11-27): on the MacBook Pro a
+# root daemon opens it only at home, on power and while he is idle. Closed means stop at once,
+# a job in the middle included: every runner out, then every process of the user ci (the job,
+# its simulators, its build service). A Mac without the gate (the Mac Studio) has no state file.
+gate=/Users/Shared/cpu-gate/state
+gate_closed() { [ -f "$gate" ] && [ "$(head -1 "$gate")" = closed ]; }
+if gate_closed; then
+    rm -f "$dir/idle-on-battery"
+    why="gate closed ($(sed -n 2p "$gate"))"
+    services | while read -r target plist; do
+        if launchctl print "$target" >/dev/null 2>&1; then
+            launchctl bootout "$target" && log "$why: $target stopped"
+        fi
+    done
+    if pgrep -u ci >/dev/null 2>&1; then
+        pkill -TERM -u ci
+        for _ in 1 2 3 4 5; do pgrep -u ci >/dev/null 2>&1 || break; sleep 1; done
+        pkill -KILL -u ci 2>/dev/null || true
+        log "$why: every process of ci ended"
+    fi
+    exit 0
+fi
 job_running() { pgrep -f 'Runner\.Worker' >/dev/null 2>&1; }
 has_job() { # plist → true while that runner's own Runner.Worker runs
     wd="$(plutil -extract WorkingDirectory raw -o - "$1" 2>/dev/null)" || return 1
@@ -58,8 +81,10 @@ fi
 
 # On battery.
 why="on battery"; [ -e "$hold" ] && why="on hold"
+# launchctl print answers 113 for a service that is not loaded; under set -e that must not end
+# the script, so the loop ends with true.
 running="$(services | while read -r target plist; do
-    launchctl print "$target" >/dev/null 2>&1 && echo "$target $plist"; done)"
+    if launchctl print "$target" >/dev/null 2>&1; then echo "$target $plist"; fi; done; true)"
 [ -n "$running" ] || exit 0
 if job_running; then
     rm -f "$dir/idle-on-battery"
