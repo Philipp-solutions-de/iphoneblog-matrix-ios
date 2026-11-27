@@ -187,6 +187,27 @@ final class DiscussionUITests: XCTestCase {
         attach(app, "member-reply-reopened")
     }
 
+    /// A chat link to a reply in an article's discussion, handed over at launch (iOS opens the
+    /// app from a chat.iphoneblog.de link), opens that discussion with the reply in it, in the
+    /// Blog tab (#bugs, build 320: "a launch link to a Blog reply opens nothing").
+    func testLaunchLinkToABlogReplyOpensIt() throws {
+        let other = try TestServer.signIn(2)
+        defer { other.signOut() }
+        let room = try XCTUnwrap(env["IPHONEBLOG_TEST_BLOG_ROOM"]), root = try XCTUnwrap(env["IPHONEBLOG_TEST_ARTICLE_ROOT"])
+        try other.join(room) // the Blog room is public; the second person is not in it yet
+        let marker = "verlinkt\(Int.random(in: 1000...9999))"
+        let reply = try other.send("Antwort \(marker)", in: room, thread: root)
+        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~$")
+        let link = "https://chat.iphoneblog.de/#/" + [room, reply].map { $0.addingPercentEncoding(withAllowedCharacters: allowed) ?? $0 }
+            .joined(separator: "/")
+
+        let app = try launch(member: true, extra: ["IPHONEBLOG_OPEN_URL": link])
+        XCTAssertTrue(app.staticTexts["DISKUSSION"].waitForExistence(timeout: 90), "the link did not open the discussion")
+        let shown = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", marker)).firstMatch
+        XCTAssertTrue(shown.waitForExistence(timeout: 30), "the linked reply does not show")
+        attach(app, "launch-link-blog-reply")
+    }
+
     // MARK: Helpers
 
     private func swipeBackFromLeftEdge(_ app: XCUIApplication) {
