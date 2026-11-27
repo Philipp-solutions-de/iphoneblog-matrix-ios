@@ -61,7 +61,7 @@ final class AppModel: ObservableObject {
             case .signedIn(let session):
                 session.openUser(userID: user)
                 return true
-            case .starting:
+            case .starting, .signingIn:
                 // Opened once the session is back, like a chat link.
                 pendingLinkURL = url
                 return true
@@ -71,11 +71,13 @@ final class AppModel: ObservableObject {
         }
         guard let link = ChatLink.parse(url) else { return false }
         switch state {
-        case .starting:
+        case .starting, .signingIn:
+            // Opened once signed in: a link that arrives at launch, or while a sign-in is under
+            // way, waits for the session instead of going to the web chat.
             pendingLinkURL = url
         case .signedIn(let session):
             Task { await session.open(link) }
-        case .signedOut, .signingIn:
+        case .signedOut:
             router.presentedURL = url
         }
         return true
@@ -83,7 +85,10 @@ final class AppModel: ObservableObject {
 
     private func openPendingLink() {
         guard let url = pendingLinkURL else { return }
-        if case .starting = state { return }
+        switch state {
+        case .starting, .signingIn: return
+        default: break
+        }
         pendingLinkURL = nil
         open(url)
     }
