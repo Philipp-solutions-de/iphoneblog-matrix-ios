@@ -351,6 +351,10 @@ final class ChatSession: ObservableObject, ChatHost {
     private func saveWarmStart() {
         WarmStart(blogRoomID: blogRoomID, oneRoomID: oneRoomID, oneChannelID: oneChannelID, isMember: isOneMember,
                   channels: rooms.channelIDs.sorted(), spaceOrder: spaceOrder, oneRooms: oneRooms).save(for: userID)
+        // The share extension's room picker: the #one rooms this member writes in.
+        ShareTargets(userID: userID,
+                     rooms: ShareTargets.rooms(from: oneRooms.map { ($0.id, $0.name, $0.locked) },
+                                               joined: isOneMember ? rooms.channelIDs : [])).save()
     }
 
     /// Resolves an alias of this account's own server. Another server's alias would send the
@@ -778,6 +782,10 @@ struct WarmStart: Codable, Equatable {
         UserDefaults.standard.set(data, forKey: Self.key(userID))
     }
 
-    static func forget(for userID: String) { UserDefaults.standard.removeObject(forKey: key(userID)) }
+    static func forget(for userID: String) {
+        UserDefaults.standard.removeObject(forKey: key(userID))
+        // Signed out: the share extension offers no rooms either.
+        ShareTargets.forget()
+    }
 }
 

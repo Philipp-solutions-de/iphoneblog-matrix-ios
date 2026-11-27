@@ -91,6 +91,8 @@ targets:
         embed: true
       - target: NotificationExtension
         embed: true
+      - target: ShareExtension
+        embed: true
       - target: ChatKit
       # ChatKit's voice-message playback links Opus and Ogg as dynamic frameworks; the app embeds them.
       - package: SwiftOGG
@@ -219,6 +221,52 @@ targets:
       base:
         PRODUCT_NAME: NotificationExtension
         PRODUCT_BUNDLE_IDENTIFIER: ${BUNDLE_ID}.nse
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+
+  # The app in the share sheet (Thorsten, 2026-11-26): web pages, links, text and pictures
+  # into a #one room the member picks; no videos. It opens the app's store in the app group
+  # with the shared session, as the notification extension does (docs/architecture.md, "Share").
+  ShareExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ShareExtension
+      - path: App/Generated
+      - path: App/Sources/Matrix/MatrixClientFactory.swift
+      - path: App/Sources/Matrix/SessionStore.swift
+      - path: App/Sources/Matrix/SharedStorage.swift
+      - path: App/Sources/Share
+    dependencies:
+      - package: MatrixRustSDK
+    info:
+      path: ShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: ${APP_DISPLAY_NAME}
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        AppIdentifierPrefix: $(AppIdentifierPrefix)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            # Safari's pages arrive as their URL; text from any app; up to ten pictures.
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsWebPageWithMaxCount: 1
+              NSExtensionActivationSupportsText: true
+              NSExtensionActivationSupportsImageWithMaxCount: 10
+    entitlements:
+      path: ShareExtension/ShareExtension.entitlements
+      properties:
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)${BUNDLE_ID}
+        com.apple.security.application-groups:
+          - ${APP_GROUP_ID}
+    settings:
+      base:
+        PRODUCT_NAME: ShareExtension
+        PRODUCT_BUNDLE_IDENTIFIER: ${BUNDLE_ID}.share
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_STYLE: Automatic
 

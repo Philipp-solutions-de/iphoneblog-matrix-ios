@@ -310,6 +310,23 @@ on Ich are server push rules for the same reason: "Neue Artikel" is an override 
 `de.iphoneblog.article` field, while the Blog room itself stays on mentions only, so replies
 under articles do not ring.
 
+**The app in the share sheet** (Thorsten, 2026-11-26: "Die app soll unter 'share' auftauchen.
+Mit raumauswahl"; content at 22:02: "Webseiten, Bilder, text, links", no videos). A share
+extension (`ShareExtension/`, bundle id `<BUNDLE_ID>.share`) takes a web page or link, text and
+up to ten pictures, offers the #one rooms the member writes in, preselects the last one shared
+to, and posts. The rooms come from the app: after every fresh look at the server it writes
+them beside its WarmStart into the app group's defaults (`ShareTargets`, room ids and names
+only; forgotten at sign-out). The extension opens the app's store in the app group with the
+shared session and `process: "share-extension"` (`ShareSender`), loads only the chosen room
+(`RoomLoadSettings.one`) and sends with `Room.sendRaw`, which waits for the server's answer:
+the SDK's send queue would still be sending when iOS ends the extension. The events are plain
+(`ShareMessage`): an `m.text` with the words and then the link, or one `m.image` per picture
+with the words as the first one's caption (MSC2530), so stock Matrix clients show them as any
+message. Pictures are written anew at most 2560 px on the long side, upright and without
+metadata (no camera location goes along); a GIF stays as it is, a PNG stays a PNG. Signed out,
+or with no #one room, the sheet says what to do in the app. The id needs its app group ticked
+once by hand (docs/apple-setup.md, step 6).
+
 **Reuse before writing: the SDK's UI layer plus Element X's chat views.** The Matrix engine's
 UI layer (`matrix-sdk-ui`, Apache-2.0, inside the Swift bindings) does the chat logic. For the
 views we take Element X iOS's timeline, thread and composer code instead of writing our own

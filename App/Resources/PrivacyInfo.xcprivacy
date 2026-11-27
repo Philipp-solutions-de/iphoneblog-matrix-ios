@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- The app's privacy manifest (docs/app-store.md, "Privacy"). Required reasons: UserDefaults for the app's own settings (CA92.1); file timestamps of files in the app's container, which the Matrix SDK's store and the log rotation read (C617.1). Collected: what a member sends to chat.iphoneblog.de and their account (email address, and the nickname as user ID), linked to them, for the app to work; nothing for tracking, analytics or ads. -->
+<!-- The app's privacy manifest (docs/app-store.md, "Privacy"). Required reasons: UserDefaults for the app's own settings (CA92.1) and for the #one rooms the share extension offers, in the app group (1C8F.1); file timestamps of files in the app's container, which the Matrix SDK's store and the log rotation read (C617.1). Collected: what a member sends to chat.iphoneblog.de and their account (email address, and the nickname as user ID), linked to them, for the app to work; nothing for tracking, analytics or ads. -->
 <plist version="1.0">
 <dict>
 	<key>NSPrivacyTracking</key>
@@ -90,6 +90,7 @@
 			<key>NSPrivacyAccessedAPITypeReasons</key>
 			<array>
 				<string>CA92.1</string>
+				<string>1C8F.1</string>
 			</array>
 		</dict>
 		<dict>
