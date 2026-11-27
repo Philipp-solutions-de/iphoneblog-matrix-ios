@@ -317,7 +317,7 @@ up to ten pictures, offers the #one rooms the member writes in, preselects the l
 to, and posts. The rooms come from the app: after every fresh look at the server it writes
 them beside its WarmStart into the app group's defaults (`ShareTargets`, room ids and names
 only; forgotten at sign-out). The extension opens the app's store in the app group with the
-shared session and `process: "share-extension"`, loads only the chosen room
+shared session and `process: "share-extension"` (`ShareSender`), loads only the chosen room
 (`RoomLoadSettings.one`) and sends with `Room.sendRaw`, which waits for the server's answer:
 the SDK's send queue would still be sending when iOS ends the extension. The events are plain
 (`ShareMessage`): an `m.text` with the words and then the link, or one `m.image` per picture
