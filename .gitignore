@@ -6,6 +6,8 @@ App/App.entitlements
 .DS_Store
 NotificationExtension/Info.plist
 NotificationExtension/NotificationExtension.entitlements
+ShareExtension/Info.plist
+ShareExtension/ShareExtension.entitlements
 
 # Xcode writes package metadata into the vendored Compound package.
 Vendor/ElementX/compound-ios/.swiftpm/

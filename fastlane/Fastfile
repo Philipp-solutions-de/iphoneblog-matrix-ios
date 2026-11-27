@@ -93,7 +93,7 @@ platform :ios do
     # Capabilities first: a profile carries only what the App ID has switched on. Adds only
     # what is missing (Associated Domains came after the first builds).
     register
-    { "App" => bundle_id, "NotificationExtension" => "#{bundle_id}.nse" }.each do |target, identifier|
+    { "App" => bundle_id, "NotificationExtension" => "#{bundle_id}.nse", "ShareExtension" => "#{bundle_id}.share" }.each do |target, identifier|
       name, path = app_store_profile(key, identifier)
       # A profile made before Associated Domains was on lacks it; make it once more.
       if target == "App" && !profile_has_associated_domains?(path)
@@ -161,7 +161,8 @@ platform :ios do
     store_name = brand("APP_STORE_NAME")
     ids = {
       bundle_id => store_name,
-      "#{bundle_id}.nse" => "#{store_name} Notifications"
+      "#{bundle_id}.nse" => "#{store_name} Notifications",
+      "#{bundle_id}.share" => "#{store_name} Share"
     }
     caps = Spaceship::ConnectAPI::BundleIdCapability::Type
     ids.each do |identifier, name|
