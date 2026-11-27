@@ -66,6 +66,10 @@ final class ElementXChatScreens: ChatScreenProviding {
         session?.focus(roomID: roomID, eventID: eventID)
     }
 
+    func focus(roomID: String, threadRootEventID: String, eventID: String) {
+        session?.focus(roomID: roomID, eventID: eventID, threadRootEventID: threadRootEventID)
+    }
+
     func threadsEntry(host: ChatHost, open: @escaping () -> Void) -> AnyView {
         guard let session else { return AnyView(EmptyView()) }
         return session.threadsEntryView(open: open)

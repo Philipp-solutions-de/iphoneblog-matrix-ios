@@ -94,6 +94,15 @@ public final class ChatReadPositions: @unchecked Sendable {
         return eventID
     }
 
+    /// A reply a link named, opened like a restored position (no "Lädt" toast; the newest
+    /// message if the event is gone) but highlighted.
+    func opening(_ eventID: String) -> String {
+        lock.lock()
+        restoring.insert(eventID)
+        lock.unlock()
+        return eventID
+    }
+
     /// Whether this focused event is a restored read position, which gets no highlight.
     func isQuiet(_ eventID: String) -> Bool {
         lock.lock()

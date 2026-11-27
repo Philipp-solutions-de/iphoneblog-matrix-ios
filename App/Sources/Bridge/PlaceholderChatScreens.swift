@@ -21,6 +21,8 @@ final class PlaceholderChatScreens: ChatScreenProviding {
 extension ChatScreenProviding {
     func focus(roomID: String, eventID: String) {}
 
+    func focus(roomID: String, threadRootEventID: String, eventID: String) {}
+
     func threadsEntry(host: ChatHost, open: @escaping () -> Void) -> AnyView {
         AnyView(Button("Threads", action: open).padding())
     }

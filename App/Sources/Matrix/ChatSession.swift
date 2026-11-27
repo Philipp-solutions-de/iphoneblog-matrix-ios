@@ -414,7 +414,7 @@ final class ChatSession: ObservableObject, ChatHost {
 
     /// A chat link: a thread reply opens its thread, any other message its room, scrolled to and
     /// highlighted; a room link the room. The link names no thread, so the event says (as the
-    /// web chat does). The thread screen does not scroll to a reply yet.
+    /// web chat does). A thread opens on the linked reply; a Blog thread in the Blog tab.
     func open(_ link: ChatLink) async {
         let roomID: String
         if link.room.hasPrefix("#") {
@@ -431,6 +431,10 @@ final class ChatSession: ObservableObject, ChatHost {
             return
         }
         if let root = await threadRoot(of: eventID, in: roomID) {
+            // The thread opens on the linked reply, not where the reader stopped.
+            if !router.isOnScreen(roomID: roomID, threadRootEventID: root) {
+                ChatScreens.provider.focus(roomID: roomID, threadRootEventID: root, eventID: eventID)
+            }
             router.openThread(roomID: roomID, rootEventID: root)
         } else {
             router.openMessage(roomID: roomID, eventID: eventID)
