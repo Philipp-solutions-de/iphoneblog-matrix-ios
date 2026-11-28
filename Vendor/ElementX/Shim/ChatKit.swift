@@ -183,9 +183,24 @@ public final class ChatKitSession {
         for thread in threads { ChatThreadActivity.shared.markSeen(roomID: thread.roomID, rootEventID: thread.rootEventID) }
     }
 
+    /// The room from the room list service. Right after a sign-in, sliding sync may not have
+    /// listed it yet (a chat link to a Blog reply opened at once and showed "RoomNotFound",
+    /// CI 2026-11-28): then the room is asked for by subscription, and the screen waits until
+    /// the service has it, 30 s at most.
+    private func listedRoom(_ roomID: String) async throws -> Room {
+        if let room = try? roomListService.room(roomId: roomID) { return room }
+        try? await roomListService.setRoomSubscriptions(roomIds: [roomID])
+        let deadline = Date().addingTimeInterval(30)
+        while Date() < deadline {
+            if let room = try? roomListService.room(roomId: roomID) { return room }
+            try await Task.sleep(for: .milliseconds(200))
+        }
+        return try roomListService.room(roomId: roomID)
+    }
+
     func joinedRoomProxy(_ roomID: String) async throws -> JoinedRoomProxyProtocol {
         if let proxy = roomProxies[roomID] { return proxy }
-        let room = try roomListService.room(roomId: roomID)
+        let room = try await listedRoom(roomID)
         let proxy = try await JoinedRoomProxy(roomListService: roomListService,
                                               room: room,
                                               userSettings: userSession.userSettings,
