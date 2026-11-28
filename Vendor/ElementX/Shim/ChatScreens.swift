@@ -510,9 +510,30 @@ final class ChatThreadCoordinator: ChatScreenCoordinator {
             .sink { [weak self] action in self?.handle(action) }
             .store(in: &cancellables)
         coordinator.start()
+        loadRoot()
     }
 
+    /// The thread's first message, with the reply count under it. A thread whose replies the
+    /// app already synced starts with those replies but without its root when the root lies
+    /// further back in the room (an older article's discussion, Philip's case); the screen
+    /// pages back only on scrolling, which a short thread never does, so the root and its count
+    /// never came. One page back brings the root (ThreadRootTests); a few at most.
+    private func loadRoot() {
+        rootLoad = Task { [weak self] in
+            for _ in 0..<5 {
+                try? await Task.sleep(for: .milliseconds(400))
+                guard let self, !Task.isCancelled else { return }
+                let controller = sheets.timelineController
+                if controller.timelineItems.contains(where: { $0.id.eventID == self.rootEventID }) { return }
+                guard case .success = await controller.paginateBackwards(requestSize: 20) else { return }
+            }
+        }
+    }
+
+    private var rootLoad: Task<Void, Never>?
+
     func stop() {
+        rootLoad?.cancel()
         // Replies read while the thread was open count as seen.
         ChatThreadActivity.shared.markSeen(roomID: roomID, rootEventID: rootEventID)
         coordinator.stop()
