@@ -80,6 +80,23 @@ jobs:
           set -a; . build/test-homeserver.env; set +a
           scripts/build.sh ui
 
+      # A failed UI test's screenshots, screen recording and element tree, from the result
+      # bundle: the text log says what was missing, not what the screen showed instead.
+      - name: Attachments of failed UI tests
+        if: failure()
+        run: |
+          [ -d build/ui.xcresult ] || exit 0
+          xcrun xcresulttool export attachments --path build/ui.xcresult --output-path build/failed-ui --only-failures || true
+
+      - name: Keep the failed UI tests' attachments
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: failed-ui
+          path: build/failed-ui
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Keep the logs
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
