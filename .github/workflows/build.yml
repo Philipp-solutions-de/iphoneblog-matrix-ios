@@ -153,14 +153,22 @@ jobs:
 
       # A failed UI test's screenshots, screen recording and element tree, from the result
       # bundle: the text log says what was missing, not what the screen showed instead.
+      # Also when a retry passed: a test that fails only on its first attempt is the one to see.
       - name: Attachments of failed UI tests
-        if: failure()
+        if: always()
         run: |
           [ -d build/ui.xcresult ] || exit 0
-          xcrun xcresulttool export attachments --path build/ui.xcresult --output-path build/failed-ui --only-failures || true
+          # Every test that failed an attempt, retried ones included (--only-failures skips a
+          # test whose retry passed), with all its attachments.
+          grep -oE "UITests\.[A-Za-z]+ test[A-Za-z0-9_]+\]' failed" build/ui.log | sort -u \
+            | sed -E 's/UITests\.([A-Za-z]+) (test[A-Za-z0-9_]+).*/\1\/\2()/' \
+            | while read -r test; do
+                xcrun xcresulttool export attachments --path build/ui.xcresult --test-id "$test" \
+                  --output-path "build/failed-ui/$(echo "$test" | tr -d '()' | tr '/' '-')" || true
+              done
 
       - name: Keep the failed UI tests' attachments
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: failed-ui
