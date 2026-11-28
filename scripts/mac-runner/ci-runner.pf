@@ -1,0 +1,9 @@
+# The CI runner's user (uid @UID@) may reach loopback and the internet, nothing private:
+# not iron over WireGuard (10.10.0.0/16), not the LAN, the NAS or Home Assistant, not
+# link-local addresses. Loaded into the anchor com.apple/ci-runner by pf-apply.sh
+# (docs/mac-runner.md, "Isolation"). Loopback (127.0.0.0/8, ::1) is not in these ranges, so
+# the test servers on 127.0.0.1 stay reachable.
+table <ci_private> const { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 169.254.0.0/16, 224.0.0.0/4 }
+table <ci_private6> const { fc00::/7, fe80::/10, ff00::/8 }
+block return out quick proto { tcp, udp } from any to <ci_private> user @UID@
+block return out quick inet6 proto { tcp, udp } from any to <ci_private6> user @UID@

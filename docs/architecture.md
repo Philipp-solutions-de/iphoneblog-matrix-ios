@@ -420,7 +420,14 @@ API change small, which costs less than a monthly jump over eight releases.
   the test simulator's process tree and the build services (`scripts/low-priority.sh`). The
   performance tests measure at normal priority and say so. GitHub's hosted runners keep normal
   priority; `IPHONEBLOG_PRIORITY=normal` turns it off anywhere.
-- CI runs on GitHub's hosted `xcode-27` image (public preview; free for public repositories).
+- CI builds once, then runs the unit, sign-in and UI tests in four shards side by side, balanced
+  by measured test time (`scripts/ui-shards.py`). It runs on Thorsten's Mac Studio, four runner
+  instances under their own user, when it is online and idle and the code is ours; on GitHub's
+  hosted `xcode-27` image otherwise: forks, the weekly run, and every fallback
+  (docs/mac-runner.md).
+- On `main`, TestFlight uploads right after the build, without waiting for the tests; a red test
+  holds back the next upload, not the current one (docs/mac-runner.md, "TestFlight"). TestFlight
+  always runs on GitHub, so no Apple secret reaches the Mac. Pull requests need every shard green.
 - One run per branch at a time. A new push to a pull request's branch cancels its older run;
   on `main` a new merge waits for the running build, and GitHub keeps only the newest waiting
   run, so `main` still builds its newest commit next. Cancelling on `main` too stopped every
@@ -447,11 +454,10 @@ API change small, which costs less than a monthly jump over eight releases.
      from paths to suites, plus the full set whenever `Vendor/`, `project.yml` or
      `TestServer.swift` change. 15 to 40 minutes per PR, free, half a day's work. A break the
      map misses shows up on `main` after the merge, where the build also gates TestFlight.
-  3. **A self-hosted Mac.** A Mac mini runs the suite about twice as fast and nothing queues.
-     About EUR 700 to 1,000 to buy, or roughly EUR 100 to 200 a month rented (price not
-     checked), plus Xcode updates by hand. A public repository's pull requests would run
-     strangers' code on it, so it needs runs from forks switched off or kept on GitHub's
-     runners.
+  3. **A self-hosted Mac.** Decided 2026-11-20: Thorsten's Mac Studio, as its own user, with
+     forks kept on GitHub's runners (docs/mac-runner.md). Measured: 89 minutes from push to
+     result against 168 on GitHub, but the UI tests take 80 minutes on both; the gain is the
+     queue and a four times faster build. Option 1 (parallel UI test shards) is the next step.
 
 - Fonts: the blog uses Foro and Foro Sans, licensed for the web. Using them in the app needs
   an app licence from the foundry; until then the app uses the system font (SF Pro).

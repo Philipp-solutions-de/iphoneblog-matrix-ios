@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start a throwaway Synapse on localhost:8008 for the integration test: the user "tester",
+# Start a throwaway Synapse on localhost:8008 (TEST_HOMESERVER_PORT) for the integration test: the user "tester",
 # two rooms, and a second user who writes a message and mentions the tester in Allgemein. Writes the variables for scripts/build.sh to build/test-homeserver.env.
 #
 #   scripts/test-homeserver.sh start
@@ -11,7 +11,10 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")/.." && pwd)"
 dir="$here/build/synapse"
 synapse_version="1.165.0"
-url="http://127.0.0.1:8008"
+# TEST_HOMESERVER_PORT for a second server beside one already running (the Mac Studio runner
+# shares the machine with local test runs; docs/mac-runner.md).
+port="${TEST_HOMESERVER_PORT:-8008}"
+url="http://127.0.0.1:$port"
 run() { uv tool run --python 3.12 --from "matrix-synapse==$synapse_version" "$@"; }
 
 case "${1:-start}" in
@@ -53,6 +56,7 @@ bcrypt_rounds: 4
 # As on our server: no encryption for any room type.
 encryption_enabled_by_default_for_room_type: "off"
 EOF
+sed -i.bak "s/port: 8008/port: $port/" homeserver.yaml
 sed -i.bak 's/bind_addresses: \[.*\]/bind_addresses: ["127.0.0.1"]/' homeserver.yaml
 
 run synapse_homeserver --config-path homeserver.yaml --daemonize

@@ -1,0 +1,65 @@
+name: Mac runner check
+
+# Proves from inside a job that each self-hosted Mac runner is walled off (docs/mac-runner.md,
+# "Isolation"): user ci, no admin, no sudo, other homes closed, iron, LAN and NAS unreachable.
+# Weekly, by hand, and on pull requests of this repository that change the runner's scripts.
+# Only on the Macs that are online now: a job sent to an offline Mac's label would wait there
+# for a day, and the MacBook Pro is offline whenever it runs on battery.
+
+on:
+  schedule:
+    - cron: "41 4 * * 1"   # Mondays 04:41 UTC
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/mac-runner/**
+      - .github/workflows/mac-runner-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  online:
+    name: Which Macs are online
+    # Never a fork's pull request on a Mac (docs/mac-runner.md, "Which runner").
+    # Nor anything while the repository variable MAC_RUNNER is off.
+    if: >-
+      vars.MAC_RUNNER != 'off' && (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      machines: ${{ steps.online.outputs.machines }}
+    steps:
+      - id: online
+        env:
+          STATUS_TOKEN: ${{ secrets.MAC_RUNNER_STATUS_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          machines='[]'
+          if [[ -n "$STATUS_TOKEN" ]]; then
+            machines="$(curl -fsS -m 20 -H "Authorization: Bearer $STATUS_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$REPO/actions/runners?per_page=100" |
+              jq -c '[.runners[] | select(.status == "online") | .labels[].name
+                      | select(. == "mbp" or . == "mac-studio")] | unique')"
+          fi
+          echo "machines=$machines" >> "$GITHUB_OUTPUT"
+          echo "Online Macs: $machines" >> "$GITHUB_STEP_SUMMARY"
+
+  check:
+    name: Isolation (${{ matrix.machine }})
+    needs: online
+    if: needs.online.outputs.machines != '[]' && needs.online.outputs.machines != ''
+    strategy:
+      fail-fast: false
+      matrix:
+        machine: ${{ fromJSON(needs.online.outputs.machines) }}
+    runs-on: [self-hosted, "${{ matrix.machine }}"]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/mac-runner
+      - run: scripts/mac-runner/check-isolation.sh

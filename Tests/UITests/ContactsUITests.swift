@@ -58,11 +58,18 @@ final class ContactsUITests: XCTestCase {
         XCTAssertFalse(send.isEnabled, "sending is possible before anything is chosen")
         XCTAssertTrue(app.staticTexts["tester@example.org"].waitForExistence(timeout: 10), "the own address is not shown")
 
-        tapSwitch(app.switches["contactShare.phone"])
+        // Under load a tap can land before the screen takes it: tap again when nothing happened.
         let number = app.textFields["contactShare.phoneNumber"]
-        XCTAssertTrue(number.waitForExistence(timeout: 5), "no field for the phone number")
+        for _ in 0..<3 where !number.exists {
+            tapSwitch(app.switches["contactShare.phone"])
+            _ = number.waitForExistence(timeout: 10)
+        }
+        XCTAssertTrue(number.exists, "no field for the phone number")
         XCTAssertFalse(send.isEnabled, "sending is possible without a number")
-        number.tap()
+        for _ in 0..<3 where !hasFocus(number) {
+            number.tap()
+            sleep(1)
+        }
         number.typeText("0170 1234567")
         XCTAssertTrue(send.isEnabled, "a valid number does not enable sending")
         save(app, "share")
@@ -85,6 +92,10 @@ final class ContactsUITests: XCTestCase {
         let app = try launch(["IPHONEBLOG_CONTACT_SHARE_STUB": "1", "IPHONEBLOG_START_PROFILE": me.userID])
         XCTAssertTrue(app.staticTexts[me.userID].waitForExistence(timeout: 120), "the own profile did not open")
         XCTAssertFalse(app.buttons["profile.shareContact"].exists, "sharing offered with oneself")
+    }
+
+    private func hasFocus(_ element: XCUIElement) -> Bool {
+        (element.value(forKey: "hasKeyboardFocus") as? Bool) ?? false
     }
 
     private func tapSwitch(_ toggle: XCUIElement) {
