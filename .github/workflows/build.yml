@@ -82,14 +82,15 @@ jobs:
 
       # A failed UI test's screenshots, screen recording and element tree, from the result
       # bundle: the text log says what was missing, not what the screen showed instead.
+      # Also when a retry passed: a test that fails only on its first attempt is the one to see.
       - name: Attachments of failed UI tests
-        if: failure()
+        if: always()
         run: |
           [ -d build/ui.xcresult ] || exit 0
           xcrun xcresulttool export attachments --path build/ui.xcresult --output-path build/failed-ui --only-failures || true
 
       - name: Keep the failed UI tests' attachments
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: failed-ui

@@ -302,7 +302,15 @@ final class DiscussionUITests: XCTestCase {
         let app = try launch(member: true, extra: ["IPHONEBLOG_OPEN_URL": link])
         XCTAssertTrue(app.staticTexts["DISKUSSION"].waitForExistence(timeout: 90), "the link did not open the discussion")
         let shown = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", marker)).firstMatch
-        XCTAssertTrue(shown.waitForExistence(timeout: 30), "the linked reply does not show")
+        if !shown.waitForExistence(timeout: 30) {
+            // What the screen holds instead (kept as the CI artifact failed-ui).
+            let tree = XCTAttachment(string: app.debugDescription)
+            tree.name = "launch-link-tree"
+            tree.lifetime = .keepAlways
+            add(tree)
+            attach(app, "launch-link-missing-reply")
+        }
+        XCTAssertTrue(shown.exists, "the linked reply does not show")
         attach(app, "launch-link-blog-reply")
     }
 
