@@ -87,6 +87,8 @@ protocol ChatScreenProviding: AnyObject {
     func threadsScreen(host: ChatHost) -> AnyView
     /// Scrolls a room's timeline to a message and highlights it (a search result).
     func focus(roomID: String, eventID: String)
+    /// Opens the next screen of that thread on this reply (a link to a reply).
+    func focus(roomID: String, threadRootEventID: String, eventID: String)
     /// The "Threads" row at the top of #one-Chat, with the count of your threads that have news.
     func threadsEntry(host: ChatHost, open: @escaping () -> Void) -> AnyView
     /// The threads you take part in, newest activity first ("Für dich").

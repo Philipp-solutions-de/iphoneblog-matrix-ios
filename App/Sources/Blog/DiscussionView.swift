@@ -18,7 +18,11 @@ struct DiscussionView: View {
     /// one made (the server makes threads only for signed-in calls).
     enum LoadState { case loading, ready, signInToStart, unavailable }
 
-    private var isMember: Bool { session?.isOneMember ?? false }
+    /// The router's copy of #one membership: this view observes the router, not the session, so
+    /// a discussion opened before membership is known (a cold launch, a link right after sign-in)
+    /// turns into the members' live thread once it is, instead of keeping the guests' list of
+    /// the bot's file (no new replies, no count).
+    private var isMember: Bool { session != nil && router.isMember }
 
     var body: some View {
         VStack(spacing: 0) {

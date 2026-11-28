@@ -143,9 +143,10 @@ public final class ChatKitSession {
         })
     }
 
-    /// Shows a message in its room's timeline, in context (a search result's tap).
-    public func focus(roomID: String, eventID: String) {
-        ChatFocusRequests.shared.pending = .init(roomID: roomID, eventID: eventID)
+    /// Shows a message in its room's timeline, in context (a search result's tap); with a thread
+    /// root, the reply in that thread's screen when it opens next (a link to a reply).
+    public func focus(roomID: String, eventID: String, threadRootEventID: String? = nil) {
+        ChatFocusRequests.shared.pending = .init(roomID: roomID, eventID: eventID, threadRootEventID: threadRootEventID)
     }
 
     /// The "Threads" row for the top of a channel: your threads with news, counted.

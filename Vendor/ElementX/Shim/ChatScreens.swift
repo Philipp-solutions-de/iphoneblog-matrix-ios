@@ -194,10 +194,15 @@ private struct ChatSheets {
 // MARK: - Room
 
 /// "Show this message in its room": set by a search result, taken by that room's screen when it
-/// is (or becomes) live. Element X's own focus then loads the message in context.
+/// is (or becomes) live. Element X's own focus then loads the message in context. A request
+/// with a thread root is for that thread's screen (a link to a reply), never the room's.
 @MainActor
 final class ChatFocusRequests: ObservableObject {
-    struct Request: Equatable { let roomID: String; let eventID: String }
+    struct Request: Equatable {
+        let roomID: String
+        let eventID: String
+        var threadRootEventID: String?
+    }
     static let shared = ChatFocusRequests()
     @Published var pending: Request?
 }
@@ -225,7 +230,8 @@ final class ChatRoomCoordinator: ChatScreenCoordinator {
         let itemFactory = session.timelineItemFactory()
         // Where the reader stopped here (ChatReadPositions), unless a search result is about to
         // show a message of its own.
-        let readPosition = ChatFocusRequests.shared.pending?.roomID == roomProxy.id ? nil
+        let pending = ChatFocusRequests.shared.pending
+        let readPosition = pending?.roomID == roomProxy.id && pending?.threadRootEventID == nil ? nil
             : ChatReadPositions.shared.restore(user: roomProxy.ownUserID, room: roomProxy.id, thread: nil)
         let timelineController = session.timelineControllerFactory.buildTimelineController(roomProxy: roomProxy,
                                                                                             initialFocussedEventID: readPosition,
@@ -268,7 +274,7 @@ final class ChatRoomCoordinator: ChatScreenCoordinator {
 
         // A search result asked to show a message here (ChatKitSession.focus).
         ChatFocusRequests.shared.$pending
-            .compactMap { [roomID = roomProxy.id] in $0?.roomID == roomID ? $0 : nil }
+            .compactMap { [roomID = roomProxy.id] in $0?.roomID == roomID && $0?.threadRootEventID == nil ? $0 : nil }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] request in
                 ChatFocusRequests.shared.pending = nil
@@ -467,9 +473,17 @@ final class ChatThreadCoordinator: ChatScreenCoordinator {
         guard case let .success(timelineController) = result else { throw ChatKitError.threadUnavailable }
         sheets = ChatSheets(session: session, presenter: presenter, timelineController: timelineController, roomProxy: roomProxy)
 
-        // Where the reader stopped in this thread (ChatReadPositions). Only the view model gets it:
-        // the controller would focus the room's timeline, not the thread's, on an event it lacks.
-        let readPosition = ChatReadPositions.shared.restore(user: roomProxy.ownUserID, room: roomProxy.id, thread: rootEventID)
+        // A reply a link named (ChatFocusRequests), else where the reader stopped in this thread
+        // (ChatReadPositions). Only the view model gets it: the controller would focus the
+        // room's timeline, not the thread's, on an event it lacks.
+        let readPosition: String?
+        if let request = ChatFocusRequests.shared.pending, request.roomID == roomProxy.id,
+           request.threadRootEventID == rootEventID {
+            ChatFocusRequests.shared.pending = nil
+            readPosition = ChatReadPositions.shared.opening(request.eventID)
+        } else {
+            readPosition = ChatReadPositions.shared.restore(user: roomProxy.ownUserID, room: roomProxy.id, thread: rootEventID)
+        }
         let parameters = ThreadTimelineScreenCoordinatorParameters(userSession: session.userSession,
                                                                    roomProxy: roomProxy,
                                                                    focussedEventID: readPosition,

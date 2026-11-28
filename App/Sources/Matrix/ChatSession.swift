@@ -246,11 +246,23 @@ final class ChatSession: ObservableObject, ChatHost {
     /// is joined or invited. Invites to the space and its children are accepted here, and
     /// #one-Chat lists exactly the space's children.
     func refreshMembership() async {
-        guard let one = oneRoomID, let space = try? client.getRoom(roomId: one) else {
+        guard let one = oneRoomID else {
             setMembership(false, channels: [])
             return
         }
-        switch space.membership() {
+        // Right after a sign-in the space has often not synced yet: the server says whether we
+        // are in it, so a member is not shown the guests' screens for the first minute (a chat
+        // link opened at sign-in showed a Blog reply's discussion without the reply).
+        let membership: Membership
+        if let space = try? client.getRoom(roomId: one) {
+            membership = space.membership()
+        } else if await isJoinedOnServer(one) {
+            membership = .joined
+        } else {
+            setMembership(false, channels: [])
+            return
+        }
+        switch membership {
         case .invited:
             _ = try? await client.joinRoomById(roomId: one)
         case .joined:
@@ -273,6 +285,14 @@ final class ChatSession: ObservableObject, ChatHost {
         }
         spaceOrder = order
         setMembership(true, channels: children)
+    }
+
+    /// Whether the server has this account joined to a room the store does not know yet.
+    private func isJoinedOnServer(_ roomID: String) async -> Bool {
+        guard let data = try? await api("GET", "/_matrix/client/v3/joined_rooms"),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let rooms = json["joined_rooms"] as? [String] else { return false }
+        return rooms.contains(roomID)
     }
 
     /// Fetches the #one room list (names, order, locked for non-members); without the server's
@@ -418,7 +438,7 @@ final class ChatSession: ObservableObject, ChatHost {
 
     /// A chat link: a thread reply opens its thread, any other message its room, scrolled to and
     /// highlighted; a room link the room. The link names no thread, so the event says (as the
-    /// web chat does). The thread screen does not scroll to a reply yet.
+    /// web chat does). A thread opens on the linked reply; a Blog thread in the Blog tab.
     func open(_ link: ChatLink) async {
         let roomID: String
         if link.room.hasPrefix("#") {
@@ -435,6 +455,10 @@ final class ChatSession: ObservableObject, ChatHost {
             return
         }
         if let root = await threadRoot(of: eventID, in: roomID) {
+            // The thread opens on the linked reply, not where the reader stopped.
+            if !router.isOnScreen(roomID: roomID, threadRootEventID: root) {
+                ChatScreens.provider.focus(roomID: roomID, threadRootEventID: root, eventID: eventID)
+            }
             router.openThread(roomID: roomID, rootEventID: root)
         } else {
             router.openMessage(roomID: roomID, eventID: eventID)
