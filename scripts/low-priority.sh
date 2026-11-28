@@ -17,14 +17,16 @@
 # IPHONEBLOG_PRIORITY=normal turns it off anywhere; perf.sh measures at normal priority.
 
 lowprio_on() {
-    # A Mac set up with --priority nice (the MacBook Pro) runs on every core at nice 20, which
-    # the runner service gives every process it starts: no background QoS there.
-    [[ "${MAC_PRIORITY:-}" != nice ]] || return 1
-    # The Mac Studio is only a fallback runner and Thorsten's own machine: always low there.
-    if [[ "${RUNNER_NAME:-}" != mac-studio && "${RUNNER_NAME:-}" != mac-studio-* ]]; then
+    [[ "${RUNNER_ENVIRONMENT:-}" != github-hosted ]] || return 1
+    if [[ "${RUNNER_ENVIRONMENT:-}" == self-hosted ]]; then
+        # The runner Macs run CI at nice 20 on every core, which the runner service gives every
+        # process it starts (Thorsten, 2026-11-28: on the efficiency cores alone a test shard on
+        # the Mac Studio ran past its 90 minutes). Only a Mac set up with --priority background
+        # (MAC_PRIORITY in its runner .env) adds the background QoS class.
+        [[ "${MAC_PRIORITY:-nice}" == background ]] || return 1
+    else
         [[ "${IPHONEBLOG_PRIORITY:-low}" != normal ]] || return 1
     fi
-    [[ "${RUNNER_ENVIRONMENT:-}" != github-hosted ]] || return 1
     command -v taskpolicy >/dev/null
 }
 
@@ -36,7 +38,8 @@ lowprio() {
 lowprio_tree() {
     local pid
     for pid in $(pgrep -P "$1" 2>/dev/null); do
-        echo "$pid"
+        # Silent when the loop that reads this ends first (hundreds of "Broken pipe" lines).
+        echo "$pid" 2>/dev/null
         lowprio_tree "$pid"
     done
 }

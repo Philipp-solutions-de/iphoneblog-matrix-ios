@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Set up the self-hosted GitHub Actions runner on one of the Macs (docs/mac-runner.md).
 #
-#   scripts/mac-runner/setup.sh                              # the Mac Studio: mac-studio, 4 instances
-#   scripts/mac-runner/setup.sh --machine mbp --count 4      # the MacBook Pro
+#   scripts/mac-runner/setup.sh --count 1                   # the Mac Studio: mac-studio
+#   scripts/mac-runner/setup.sh --machine mbp --count 2     # the MacBook Pro
 #
 # --machine is the runner label and the instances' names (<machine>, <machine>-2 …), which
 # pick-runner.sh asks for; --count is how many instances, one per job that may run at once
-# (instances above it are stopped and unregistered); --priority is `background` (nice 20 and
-# the background QoS class: efficiency cores only, the Mac Studio) or `nice` (nice 20 on every
-# core: the MacBook Pro, whose M1 Pro has only two efficiency cores).
+# (instances above it are stopped and unregistered); --priority is `nice` (the default: nice 20
+# on every core, both Macs) or `background` (nice 20 and the background QoS class: efficiency
+# cores only, too slow for a test shard within its 90 minutes, measured 2026-11-27).
 #
 # Run it as the Mac's admin user, not with sudo: it fetches the registration token with your
 # `gh` login, then asks for your password once (sudo) for the rest. Every step checks first, so
@@ -31,7 +31,7 @@ user="ci"
 # (docs/mac-runner.md, "Test shards").
 machine="mac-studio"
 runner_count=4
-priority=background
+priority=nice
 as_root=no
 token_file=""
 while (( $# )); do
@@ -260,7 +260,7 @@ for slot in $(seq 1 "$runner_count"); do
   </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <!-- The lowest priority, inherited by every process the runner starts (xcodebuild, simctl,
+  <!-- Low priority, inherited by every process the runner starts (xcodebuild, simctl,
        the test homeserver): Thorsten's work on this Mac comes first (docs/mac-runner.md,
        "Priority"). lower-priority.sh covers what launchd starts outside this tree. -->
   <key>ProcessType</key><string>$process_type</string>

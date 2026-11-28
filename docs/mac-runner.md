@@ -90,16 +90,17 @@ green to merge.
 ## Priority
 
 Every job on a Mac runs at low CPU priority, so Thorsten's own work never stutters (his rule,
-2026-11-21). How low is `setup.sh --priority`:
+2026-11-21). Both Macs run CI at `setup.sh --priority nice`, the default: `ProcessType` Standard,
+`Nice` 20, low-priority I/O. Every core, but anything of Thorsten's comes first.
 
-| Mac | `--priority` | What |
-|---|---|---|
-| Mac Studio | `background` | `ProcessType` Background, `Nice` 20, low-priority I/O, and the background QoS class (`taskpolicy -b`): efficiency cores only, yields the disk |
-| MacBook Pro | `nice` | `ProcessType` Standard, `Nice` 20, low-priority I/O: every core, but anything of Thorsten's comes first. Its M1 Pro has two efficiency cores, too few for a build (Thorsten, 2026-11-25) |
+The other setting, `--priority background`, adds the background QoS class (`taskpolicy -b`):
+efficiency cores only. It is too slow for CI: the MacBook Pro's M1 Pro has two efficiency cores,
+too few for a build (Thorsten, 2026-11-25), and on the Mac Studio a test shard ran past its 90
+minutes, so a fallback run never finished (Thorsten, 2026-11-28: the Studio at nice 20 too).
 
 Every process the runner service starts inherits that. Besides, the job's first step starts
 `scripts/mac-runner/lower-priority.sh`, which every 5 seconds gives each process of the user
-`ci` nice 20 and, on `background`, the background QoS class (`MAC_PRIORITY` in the runner's
+`ci` nice 20 and, only on `background`, the background QoS class (`MAC_PRIORITY` in the runner's
 `.env` says which). A loop over the user rather than a wrapper around the job, because the simulators,
 `XCBBuildService`, `SWBBuildService` and the compilers they start come from launchd and XPC,
 outside the job's process tree. The runner ends the loop with the job, and each test shard shuts down its own simulator at
@@ -146,7 +147,7 @@ Once per Mac, as Thorsten, in a checkout of this repository:
 
 ```bash
 scripts/mac-runner/setup.sh --count 1                                   # the Mac Studio
-scripts/mac-runner/setup.sh --machine mbp --count 2 --priority nice     # the MacBook Pro
+scripts/mac-runner/setup.sh --machine mbp --count 2                     # the MacBook Pro
 ```
 
 `--machine` is the runner label and the instances' names, `--count` the number of instances
@@ -176,7 +177,7 @@ gh secret set MAC_RUNNER_STATUS_TOKEN -R Philipp-solutions-de/iphoneblog-matrix-
 The MacBook Pro has no `gh` login. Its runners were registered from the Mac Studio: a
 registration token from `gh api -X POST repos/…/actions/runners/registration-token` in a file
 copied to the MacBook Pro, then `sudo scripts/mac-runner/setup.sh --as-root <file> --machine mbp
---count 2 --priority nice` there (a removal token, when instances go, in `<file>.remove`), and the file deleted.
+--count 2` there (a removal token, when instances go, in `<file>.remove`), and the file deleted.
 
 ## On a laptop
 
