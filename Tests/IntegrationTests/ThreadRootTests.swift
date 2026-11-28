@@ -36,19 +36,19 @@ final class ThreadRootTests: XCTestCase {
         // articles push the root back.
         let joined = Date().addingTimeInterval(30)
         while Date() < joined, (try? session.client.getRoom(roomId: roomID)) == nil {
-            try await Task.sleep(for: .milliseconds(250))
+            try? await Task.sleep(for: .milliseconds(250))
         }
         let root = try await send(["msgtype": "m.text", "body": "Ein alter Artikel"])
         let reply = try await send(["msgtype": "m.text", "body": "Alte Antwort",
                                     "m.relates_to": ["rel_type": "m.thread", "event_id": root, "is_falling_back": true,
                                                      "m.in_reply_to": ["event_id": root]]])
-        try await Task.sleep(for: .seconds(4)) // the sync takes root and reply into the cache
+        try? await Task.sleep(for: .seconds(4)) // the sync takes root and reply into the cache
         for n in 1...40 { _ = try await send(["msgtype": "m.text", "body": "Neuerer Artikel \(n)"]) }
-        try await Task.sleep(for: .seconds(4))
+        try? await Task.sleep(for: .seconds(4))
 
         let synced = Date().addingTimeInterval(30)
         while Date() < synced, (try? session.client.getRoom(roomId: roomID)) == nil {
-            try await Task.sleep(for: .milliseconds(250))
+            try? await Task.sleep(for: .milliseconds(250))
         }
         let room = try XCTUnwrap(try session.client.getRoom(roomId: roomID), "the room did not sync")
         let timeline = try await room.timelineWithConfiguration(configuration: .init(focus: .thread(rootEventId: root),
@@ -62,11 +62,11 @@ final class ThreadRootTests: XCTestCase {
         defer { handle.cancel() }
         // What the thread screen gets at first: the synced reply, not the root; one page back
         // brings the root (ChatThreadCoordinator.loadRoot pages back for it).
-        try await Task.sleep(for: .seconds(1))
+        try? await Task.sleep(for: .seconds(1))
         var reachedStart = false
         for _ in 0..<5 where !items.eventIDs.contains(root) {
             reachedStart = (try? await timeline.paginateBackwards(numEvents: 20)) ?? false
-            try await Task.sleep(for: .milliseconds(300))
+            try? await Task.sleep(for: .milliseconds(300))
         }
         let ids = items.eventIDs
         XCTAssertTrue(ids.contains(reply), "the reply is not in the thread timeline: \(ids)")
